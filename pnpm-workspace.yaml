@@ -1,0 +1,40 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+minimumReleaseAge: 10080
+minimumReleaseAgeStrict: true
+minimumReleaseAgeIgnoreMissingTime: true
+resolutionMode: highest
+registrySupportsTimeField: true
+minimumReleaseAgeExclude:
+  - "@types/node"
+  - "@biomejs/biome"
+  - "typescript"
+  - "prisma"
+  - "@prisma/client"
+  - "@prisma/config"
+  - "@nestjs/common"
+  - "@nestjs/core"
+  - "@nestjs/platform-express"
+  - "reflect-metadata"
+  - "rxjs"
+  - "tsx"
+  - "@vitejs/plugin-react"
+  - "@types/react"
+  - "@types/react-dom"
+  - "vite"
+  - "react"
+  - "react-dom"
+onlyBuiltDependencies:
+  - "@nestjs/core"
+  - "@prisma/client"
+  - "@prisma/engines"
+  - "esbuild"
+  - "prisma"
+allowBuilds:
+  '@nestjs/core': true
+  '@prisma/client': true
+  '@prisma/engines': true
+  esbuild: true
+  prisma: true

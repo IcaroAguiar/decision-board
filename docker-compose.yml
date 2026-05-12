@@ -1,0 +1,22 @@
+name: decision-board
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: decision-board-postgres
+    environment:
+      POSTGRES_DB: decision_board
+      POSTGRES_USER: decision_board
+      POSTGRES_PASSWORD: decision_board
+    ports:
+      - "55432:5432"
+    volumes:
+      - decision-board-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U decision_board -d decision_board"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  decision-board-postgres-data:

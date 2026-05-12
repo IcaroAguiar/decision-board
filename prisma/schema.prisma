@@ -1,0 +1,143 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AssetType {
+  FII
+  STOCK
+  ETF
+  CASH
+  OTHER
+}
+
+enum RiskCategory {
+  BRICK
+  PAPER
+  HYBRID
+  CASH
+  OTHER
+}
+
+enum PositionSource {
+  MANUAL
+  PROVIDER
+}
+
+model User {
+  id        String   @id @default(uuid()) @db.Uuid
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  portfolios         Portfolio[]
+  positions          Position[]
+  cashAccounts       CashAccount[]
+  userAssetOverrides UserAssetOverride[]
+
+  @@map("users")
+}
+
+model Portfolio {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  name         String
+  baseCurrency String   @default("BRL") @map("base_currency")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  positions    Position[]
+  cashAccounts CashAccount[]
+
+  @@unique([id, userId])
+  @@index([userId])
+  @@map("portfolios")
+}
+
+model Asset {
+  id           String       @id @default(uuid()) @db.Uuid
+  ticker       String
+  name         String
+  assetType    AssetType    @map("asset_type")
+  segment      String?
+  riskCategory RiskCategory @map("risk_category")
+  currency     String       @default("BRL")
+  exchange     String?
+  isActive     Boolean      @default(true) @map("is_active")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  positions          Position[]
+  userAssetOverrides UserAssetOverride[]
+
+  @@unique([ticker, exchange])
+  @@map("assets")
+}
+
+model UserAssetOverride {
+  id                 String        @id @default(uuid()) @db.Uuid
+  userId             String        @map("user_id") @db.Uuid
+  assetId            String        @map("asset_id") @db.Uuid
+  customName         String?       @map("custom_name")
+  customSegment      String?       @map("custom_segment")
+  customRiskCategory RiskCategory? @map("custom_risk_category")
+  notes              String?
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, assetId])
+  @@index([assetId])
+  @@map("user_asset_overrides")
+}
+
+model Position {
+  id                 String         @id @default(uuid()) @db.Uuid
+  userId             String         @map("user_id") @db.Uuid
+  portfolioId        String         @map("portfolio_id") @db.Uuid
+  assetId            String         @map("asset_id") @db.Uuid
+  quantity           Decimal        @db.Decimal(20, 8)
+  averagePrice       Decimal?       @map("average_price") @db.Decimal(20, 8)
+  manualCurrentPrice Decimal?       @map("manual_current_price") @db.Decimal(20, 8)
+  source             PositionSource @default(MANUAL)
+  notes              String?
+  createdAt          DateTime       @default(now()) @map("created_at")
+  updatedAt          DateTime       @updatedAt @map("updated_at")
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  portfolio Portfolio @relation(fields: [portfolioId, userId], references: [id, userId], onDelete: Cascade)
+  asset     Asset     @relation(fields: [assetId], references: [id], onDelete: Restrict)
+
+  @@index([userId, portfolioId])
+  @@index([assetId])
+  @@map("positions")
+}
+
+model CashAccount {
+  id               String   @id @default(uuid()) @db.Uuid
+  userId           String   @map("user_id") @db.Uuid
+  portfolioId      String   @map("portfolio_id") @db.Uuid
+  name             String
+  type             String
+  balance          Decimal  @db.Decimal(20, 8)
+  liquidity        String?
+  benchmark        String?
+  benchmarkPercent Decimal? @map("benchmark_percent") @db.Decimal(10, 4)
+  notes            String?
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  portfolio Portfolio @relation(fields: [portfolioId, userId], references: [id, userId], onDelete: Cascade)
+
+  @@index([userId, portfolioId])
+  @@map("cash_accounts")
+}

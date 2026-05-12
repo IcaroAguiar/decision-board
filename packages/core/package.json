@@ -1,0 +1,23 @@
+{
+	"name": "@decision-board/core",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
+		}
+	},
+	"scripts": {
+		"build": "tsc -p tsconfig.json",
+		"test": "corepack pnpm build && node --test \"dist/**/*.test.js\"",
+		"typecheck": "tsc -p tsconfig.json --noEmit"
+	},
+	"dependencies": {
+		"@decision-board/types": "workspace:*"
+	},
+	"devDependencies": {
+		"typescript": "5.9.3"
+	}
+}
