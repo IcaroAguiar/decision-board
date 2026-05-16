@@ -207,7 +207,8 @@ Uma tarefa só está concluída se:
 
 ```txt
 - Better Auth configurado
-- rotas de auth expostas
+- login local por e-mail e senha
+- rotas de auth expostas sob /auth/*
 - sessão via cookie
 - usuário autenticado disponível na API
 ```
@@ -218,14 +219,41 @@ Uma tarefa só está concluída se:
 - [ ] Configurar BETTER_AUTH_SECRET
 - [ ] Configurar BETTER_AUTH_URL
 - [ ] Integrar Better Auth ao NestJS
+- [ ] Configurar Better Auth com `basePath: "/auth"`
+- [ ] Montar handler Better Auth sob /auth/* antes do body parser JSON comum
+- [ ] Usar os modelos padrão do Better Auth como base do schema
+- [ ] Criar migration Prisma versionada para as tabelas de auth
 - [ ] Alinhar schema Better Auth com `users` via schema gerado ou model mapping + UUID
-- [ ] Criar rota/session helper para obter usuário atual
+- [ ] Criar helper de sessão que exponha `AuthenticatedUser { userId, email }`
 - [ ] Garantir cookies httpOnly
-- [ ] Adicionar rate limit básico nas rotas de auth
+- [ ] Configurar rate limiting no Better Auth para rotas de auth
 - [ ] Criar teste de login/logout/session
+- [ ] Rodar teste HTTP de auth contra Postgres real via Docker Compose
 ```
 
 **Fora do escopo:** OAuth social, 2FA, passkeys.
+
+**Decisão de escopo:** PR-004 implementa apenas e-mail/senha local. OAuth, providers sociais e callbacks externos ficam fora do primeiro corte de auth.
+
+**Decisão de UI:** PR-004 não implementa tela real de login. UI de auth deve vir em corte posterior consumindo o contrato HTTP já validado.
+
+**Decisão de validação:** testes unitários podem mockar o helper de sessão, mas o fluxo HTTP de sign-up/sign-in/session/logout deve exercitar Better Auth, Prisma e Postgres reais.
+
+**Decisão de boundary:** módulos de domínio não recebem o payload completo de sessão do Better Auth. O helper de sessão expõe somente `AuthenticatedUser { userId, email }`.
+
+**Decisão de schema:** PR-004 usa o schema padrão do Better Auth como base e versiona a migration Prisma no repo, com o menor ajuste necessário para manter `users` como tabela canônica de **User**.
+
+**Decisão de rate limit:** PR-004 usa rate limiting no escopo do Better Auth para rotas de auth. Política global de rate limit e hardening amplo continuam reservados para PR-023.
+
+**Plano de execução paralela:** PR-004 pode ser executado com subagentes em workspaces separados, desde que os write scopes sejam disjuntos e o Codex principal integre o resultado. Divisão inicial:
+
+```txt
+1. schema/auth-config: Better Auth config, Prisma schema e migration versionada.
+2. api-mount/session-helper: mount /auth/*, CORS com credenciais e helper AuthenticatedUser.
+3. tests: testes unitários do helper e teste HTTP real de sign-up/sign-in/session/logout.
+```
+
+**Gates obrigatórios:** antes de abrir PR ou declarar pronto, rodar `agentic-testability-gate`, executar validação com Postgres real quando schema/auth forem tocados, e rodar `agentic-code-review` com exatamente um reviewer independente para o diff integrado.
 
 **Aceite:** usuário consegue criar conta, logar, obter sessão e sair.
 

@@ -1,0 +1,90 @@
+name: Agentic Quality Gate
+
+on:
+  pull_request: {}
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      refresh_baseline:
+        description: Refresh baseline after a passing main/default-branch run
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  quality-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.0.6 --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Tests
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      - name: Gate script syntax check
+        run: |
+          node --check docs/ai/quality-gate/check-ratchet.mjs
+          node --check docs/ai/quality-gate/refresh-baseline.mjs
+          node --check docs/ai/quality-gate/vendor/collect-review-context.mjs
+
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: false
+
+      - name: Agentic review packet
+        env:
+          AGENTIC_REVIEW_BASE: origin/${{ github.base_ref || 'main' }}
+        run: node docs/ai/quality-gate/vendor/collect-review-context.mjs --base "$AGENTIC_REVIEW_BASE" --json > docs/ai/quality-gate/agentic-review-packet.json
+
+      - name: Ratchet quality gate
+        env:
+          AGENTIC_REVIEW_BASE: origin/${{ github.base_ref || 'main' }}
+        run: node docs/ai/quality-gate/check-ratchet.mjs
+
+      - name: Refresh baseline artifact
+        if: github.event_name == 'workflow_dispatch' && inputs.refresh_baseline == true && github.ref == 'refs/heads/main'
+        run: node docs/ai/quality-gate/refresh-baseline.mjs
+
+      - name: Upload quality artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: agentic-quality-gate
+          path: |
+            docs/ai/quality-gate/baseline.json
+            docs/ai/quality-gate/*report*.json
+            docs/ai/quality-gate/*report*.md
+            docs/ai/quality-gate/quality-trend-entry.json
+            docs/ai/quality-gate/quality-trend.jsonl
+            docs/ai/quality-gate/auto-improvement-queue.json
+            docs/ai/quality-gate/agentic-review-packet.json

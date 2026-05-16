@@ -1,0 +1,162 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-05-16T05:46:22.591Z",
+  "rootName": "decision-board",
+  "strategy": "ratchet-clean-as-you-code",
+  "commands": {
+    "packageManager": "pnpm",
+    "install": "pnpm install --frozen-lockfile",
+    "lint": "pnpm lint",
+    "typecheck": "pnpm typecheck",
+    "test": "pnpm test",
+    "coverage": "",
+    "build": "pnpm build"
+  },
+  "tooling": {
+    "eslint": false,
+    "biome": true,
+    "jscpd": false,
+    "sonar": false,
+    "codecov": false,
+    "githubActions": false
+  },
+  "metrics": {
+    "coverage": null,
+    "duplication": null,
+    "code": {
+      "sourceFiles": 20,
+      "totalLines": 597,
+      "commentLines": 1,
+      "commentDensity": 0.0017,
+      "largeFiles": 0,
+      "largeFilesWithoutContextComments": [],
+      "largestFiles": [
+        {
+          "path": "prisma/migrations/20260512000000_initial_schema/migration.sql",
+          "lines": 109,
+          "commentLines": 0,
+          "commentDensity": 0
+        },
+        {
+          "path": "packages/strategies/src/index.ts",
+          "lines": 90,
+          "commentLines": 0,
+          "commentDensity": 0
+        },
+        {
+          "path": "apps/web/src/styles.css",
+          "lines": 82,
+          "commentLines": 1,
+          "commentDensity": 0.0122
+        },
+        {
+          "path": "packages/core/src/index.test.ts",
+          "lines": 41,
+          "commentLines": 0,
+          "commentDensity": 0
+        },
+        {
+          "path": "apps/web/src/App.tsx",
+          "lines": 36,
+          "commentLines": 0,
+          "commentDensity": 0
+        },
+        {
+          "path": "packages/core/src/index.ts",
+          "lines": 34,
+          "commentLines": 0,
+          "commentDensity": 0
+        },
+        {
+          "path": "packages/reports/src/index.ts",
+          "lines": 28,
+          "commentLines": 0,
+          "commentDensity": 0
+        },
+        {
+          "path": "packages/market-data/src/index.ts",
+          "lines": 24,
+          "commentLines": 0,
+          "commentDensity": 0
+        },
+        {
+          "path": "packages/types/src/index.ts",
+          "lines": 23,
+          "commentLines": 0,
+          "commentDensity": 0
+        },
+        {
+          "path": "apps/api/src/health.controller.ts",
+          "lines": 18,
+          "commentLines": 0,
+          "commentDensity": 0
+        },
+        {
+          "path": "apps/web/src/main.tsx",
+          "lines": 17,
+          "commentLines": 0,
+          "commentDensity": 0
+        },
+        {
+          "path": "apps/api/src/main.ts",
+          "lines": 15,
+          "commentLines": 0,
+          "commentDensity": 0
+        },
+        {
+          "path": "apps/api/src/health.controller.test.ts",
+          "lines": 13,
+          "commentLines": 0,
+          "commentDensity": 0
+        },
+        {
+          "path": "packages/strategies/src/index.test.ts",
+          "lines": 12,
+          "commentLines": 0,
+          "commentDensity": 0
+        },
+        {
+          "path": "apps/web/vite.config.ts",
+          "lines": 11,
+          "commentLines": 0,
+          "commentDensity": 0
+        },
+        {
+          "path": "packages/reports/src/index.test.ts",
+          "lines": 11,
+          "commentLines": 0,
+          "commentDensity": 0
+        },
+        {
+          "path": "packages/market-data/src/index.test.ts",
+          "lines": 10,
+          "commentLines": 0,
+          "commentDensity": 0
+        },
+        {
+          "path": "packages/types/src/index.test.ts",
+          "lines": 10,
+          "commentLines": 0,
+          "commentDensity": 0
+        },
+        {
+          "path": "apps/api/src/app.module.ts",
+          "lines": 8,
+          "commentLines": 0,
+          "commentDensity": 0
+        },
+        {
+          "path": "apps/web/src/App.test.tsx",
+          "lines": 5,
+          "commentLines": 0,
+          "commentDensity": 0
+        }
+      ]
+    },
+    "review": {
+      "blockingFindings": 0,
+      "highFindings": 0,
+      "mediumFindings": 0
+    }
+  }
+}

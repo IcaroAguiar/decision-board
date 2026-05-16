@@ -12,6 +12,13 @@ coverage/
 .next/
 .cache/
 
+docs/ai/quality-gate/agentic-review-packet.json
+docs/ai/quality-gate/quality-gate-report.json
+docs/ai/quality-gate/quality-gate-report.md
+docs/ai/quality-gate/quality-trend-entry.json
+docs/ai/quality-gate/quality-trend.jsonl
+docs/ai/quality-gate/auto-improvement-queue.json
+
 *.log
 .DS_Store
 
