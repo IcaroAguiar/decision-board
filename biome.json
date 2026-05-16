@@ -15,7 +15,8 @@
 			"!.turbo",
 			"!.vite",
 			"!node_modules",
-			"!prisma/generated"
+			"!prisma/generated",
+			"!docs/ai/quality-gate"
 		]
 	},
 	"formatter": {
