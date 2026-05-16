@@ -1488,7 +1488,7 @@ function scanWebAndRuntimeSecurity(repo) {
 
 function scanUnboundedDataAccess(repo) {
   const findings = [];
-  const listQueryPattern = /\b(findMany|findAll|all|scan|query)\s*\(|\bSELECT\s+.+\s+FROM\b/i;
+  const listQueryPattern = /\b(findMany|findAll|scan|query)\s*\(|\b(?:db|repo|repository|client|prisma|knex|sequelize|mongoose|typeorm|entityManager|em|ActiveRecord)\b[\w.$]*\.all\s*\(|\bSELECT\s+.+\s+FROM\b/i;
   const boundedPattern = /\b(take|limit|skip|offset|cursor|pageSize|perPage|first|top|paginate|pagination|batchSize)\b|\.limit\s*\(|LIMIT\s+\d+/i;
 
   for (const file of existingFiles(repo.root, repo.entries).filter((value) => isCode(value) && !isTest(value))) {
