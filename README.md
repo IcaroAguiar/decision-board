@@ -136,6 +136,37 @@ effective metadata with any user-specific override applied.
 `customSegment`, `customRiskCategory`, and `notes`. These fields affect only the
 authenticated user's effective asset metadata.
 
+## API Positions
+
+Position endpoints require the Better Auth session cookie. They derive ownership
+from the authenticated session and never accept `userId` in the request body or
+query.
+
+```txt
+POST  /portfolios/:portfolioId/positions
+GET   /portfolios/:portfolioId/positions
+PATCH /positions/:positionId
+```
+
+`POST /portfolios/:portfolioId/positions` accepts:
+
+```json
+{
+  "assetId": "uuid",
+  "quantity": "10.5",
+  "averagePrice": "90",
+  "manualCurrentPrice": "100.25",
+  "notes": "entrada manual"
+}
+```
+
+`quantity` must be greater than zero. Decimal fields accept at most 12 whole
+digits and 8 decimal places, matching the persisted `Decimal(20,8)` columns.
+`averagePrice` and `manualCurrentPrice` are optional and must be non-negative
+when provided. Until external price snapshots exist, `currentPrice` is
+`manualCurrentPrice` and `totalValue` is `quantity * manualCurrentPrice`; both
+are `null` when no manual current price is available.
+
 ## Security And Financial Boundaries
 
 - Do not store broker credentials.

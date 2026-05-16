@@ -356,18 +356,23 @@ classificação subjetiva de um usuário altere o catálogo global.
 **Checklist de implementação:**
 
 ```txt
-- [ ] Criar PositionsModule
-- [ ] Criar PositionRepository com userId obrigatório
-- [ ] Validar quantity > 0
-- [ ] Validar preços >= 0
-- [ ] Calcular totalValue = quantity * currentPrice
-- [ ] Usar manual_current_price se não houver snapshot externo
-- [ ] Testar isolamento por usuário
+- [x] Criar PositionsModule
+- [x] Criar PositionRepository com userId obrigatório
+- [x] Validar quantity > 0
+- [x] Validar preços >= 0
+- [x] Calcular totalValue = quantity * currentPrice
+- [x] Usar manual_current_price se não houver snapshot externo
+- [x] Testar isolamento por usuário
 ```
 
 **Fora do escopo:** ledger de transações, IR, importação.
 
 **Aceite:** usuário cadastra CYCR11, WHGR11 ou qualquer ativo manualmente e vê valor calculado.
+
+**Evidência local do corte:** teste HTTP real cobre autenticação obrigatória,
+validação de DTOs, criação/listagem/edição de posições, bloqueio de acesso
+cruzado a portfolio/position e cálculo de `totalValue` a partir de
+`manualCurrentPrice` contra Postgres local.
 
 ---
 
