@@ -69,9 +69,10 @@ Application code should use the session helper output shape:
 `GET /me` returns that shape for an authenticated session cookie and returns `401` without
 a valid session.
 
-Auth rate limiting uses the normalized Express client IP. Keep `TRUST_PROXY_HOPS=0`
-when the API is directly exposed, and set it to the number of trusted reverse-proxy
-hops only when that proxy sanitizes forwarded IP headers.
+Auth rate limiting and auth request protocol use the normalized Express proxy
+context. Keep `TRUST_PROXY_HOPS=0` when the API is directly exposed, and set it
+to the number of trusted reverse-proxy hops only when that proxy sanitizes
+forwarded IP/protocol headers.
 
 ## Security And Financial Boundaries
 

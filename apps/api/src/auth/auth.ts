@@ -6,13 +6,13 @@ import {
 	DEFAULT_AUTH_RATE_LIMIT_WINDOW_SECONDS,
 } from "./auth.constants.js";
 import { authLogger } from "./auth.logger.js";
-import { getRequiredEnv, getTrustedOrigins } from "./env.js";
+import { getRequiredEnv, getRequiredPublicOrigin, getTrustedOrigins } from "./env.js";
 import { prisma } from "./prisma.client.js";
 
 export const auth = betterAuth({
 	appName: "Decision Board",
 	basePath: AUTH_BASE_PATH,
-	baseURL: getRequiredEnv("BETTER_AUTH_URL"),
+	baseURL: getRequiredPublicOrigin("BETTER_AUTH_URL"),
 	secret: getRequiredEnv("BETTER_AUTH_SECRET"),
 	trustedOrigins: getTrustedOrigins(),
 	logger: authLogger,

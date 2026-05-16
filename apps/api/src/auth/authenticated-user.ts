@@ -7,19 +7,32 @@ export interface AuthenticatedUser {
 	email: string;
 }
 
-export async function getAuthenticatedUser(
+export interface AuthenticatedSessionResult {
+	user: AuthenticatedUser | null;
+	headers: Headers;
+}
+
+export async function getAuthenticatedSession(
 	headers: IncomingHttpHeaders,
-): Promise<AuthenticatedUser | null> {
-	const session = await auth.api.getSession({
+): Promise<AuthenticatedSessionResult> {
+	const result = await auth.api.getSession({
 		headers: fromNodeHeaders(headers),
+		returnHeaders: true,
 	});
+	const session = result.response;
 
 	if (!session?.user.id || !session.user.email) {
-		return null;
+		return {
+			user: null,
+			headers: result.headers,
+		};
 	}
 
 	return {
-		userId: session.user.id,
-		email: session.user.email,
+		user: {
+			userId: session.user.id,
+			email: session.user.email,
+		},
+		headers: result.headers,
 	};
 }
