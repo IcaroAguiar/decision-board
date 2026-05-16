@@ -1,24 +1,25 @@
 {
   "schemaVersion": 1,
-  "reviewer": "security-reviewer:019e3174-d787-7a82-a015-77de3e800668",
-  "reviewedAt": "2026-05-16T16:39:30Z",
+  "reviewer": "security-reviewer:019e31af-1078-75d2-a3cc-4d1d677c1923",
+  "reviewedAt": "2026-05-16T17:32:41Z",
   "verdict": "approved",
   "deterministicSignalsReviewed": true,
   "allowedBases": [
     "main"
   ],
-  "reviewedFingerprint": "b99c56265a8cfa3d56b241b0aaf3688166e443514d93c8c7204f639026216c3a",
+  "reviewedFingerprint": "223fa3da9939a9176a3e93f0b93a7994b20627e8898cc2bdd831fcde649494b5",
   "reviewedDeterministicSignals": {
     "blocking": 5,
     "high": 0,
-    "medium": 9
+    "medium": 11
   },
   "scope": [
-    "PR-006 asset identity and user overrides",
-    "authenticated asset metadata API",
-    "global ticker/exchange/currency identity boundaries",
-    "user-specific asset override isolation",
-    "Postgres-backed auth and assets tests"
+    "PR-007 positions API MVP",
+    "authenticated position create/list/update routes",
+    "portfolio and position user isolation",
+    "Decimal(20,8) request validation",
+    "manual current price total value calculation",
+    "Postgres-backed auth and positions tests"
   ],
-  "residualRisk": "Reviewer found no blocking or residual security findings after global asset metadata was limited to canonical ticker/exchange/currency identity and subjective metadata moved to user overrides."
+  "residualRisk": "Reviewer approved after decimal inputs were bounded to Prisma Decimal(20,8) and HTTP regressions covered oversized quantity and manualCurrentPrice. Residual risk is low and limited to API-only scope; OpenAPI, advanced pagination beyond take: 200, UI consumers, and global hardening were not reviewed."
 }
