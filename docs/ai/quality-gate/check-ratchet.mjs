@@ -3,6 +3,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } fr
 import { basename, dirname, extname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 
 const root = process.cwd();
 const gateDir = dirname(fileURLToPath(import.meta.url));
@@ -115,22 +116,78 @@ function duplicationMetric() {
   const value = total?.percentage ?? total?.duplicatedLinesPercentage ?? total?.duplicatedPercentage;
   return value === undefined ? null : Number(value);
 }
-function agenticReviewMetric() {
+function stableJson(value) {
+  if (Array.isArray(value)) return value.map(stableJson);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).sort(([left], [right]) => left.localeCompare(right)).map(([key, item]) => [key, stableJson(item)]));
+  }
+  return value;
+}
+function fingerprintReviewSignals(repos, files) {
+  const payload = {
+    changedFiles: [...files].sort(),
+    repositories: repos.map((repo) => ({
+      name: repo.name,
+      normalizedGateSummary: repo.normalizedGateSummary || {},
+      findingsSummary: repo.findingsSummary || {},
+      findings: (Array.isArray(repo.findings) ? repo.findings : []).map((finding) => ({
+        rule: finding.rule,
+        severity: finding.severity,
+        file: finding.file,
+        line: finding.line,
+        text: finding.text,
+        domain: finding.domain,
+        importance: finding.importance,
+        count: finding.count,
+        lines: finding.lines || [],
+      })).sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right))),
+    })).sort((left, right) => String(left.name).localeCompare(String(right.name))),
+  };
+  return createHash("sha256").update(JSON.stringify(stableJson(payload))).digest("hex");
+}
+function normalizeBaseName(base) {
+  return String(base || "").replace(/^refs\/heads\//, "").replace(/^origin\//, "");
+}
+function agenticReviewMetric(files) {
   const packet = readJson(config.reportPaths.agenticReviewPacket);
   if (!packet) return null;
   const repos = Array.isArray(packet.repositories) ? packet.repositories : [];
-  let blocking = 0, high = 0, medium = 0;
+  let deterministicBlocking = 0, highSignals = 0, mediumSignals = 0;
   for (const repo of repos) {
-    blocking += Number(repo.normalizedGateSummary?.blocking || 0);
-    high += Number(repo.findingsSummary?.high || 0);
-    medium += Number(repo.findingsSummary?.medium || 0);
+    deterministicBlocking += Number(repo.normalizedGateSummary?.blocking || 0);
+    highSignals += Number(repo.findingsSummary?.high || 0);
+    mediumSignals += Number(repo.findingsSummary?.medium || 0);
   }
+  let blocking = 0, high = 0, medium = 0;
   if (packet.findings) {
     high += packet.findings.filter((finding) => finding.severity === "high").length;
     medium += packet.findings.filter((finding) => finding.severity === "medium").length;
     blocking += packet.findings.filter((finding) => ["high", "medium"].includes(finding.severity)).length;
   }
-  return { blocking, high, medium };
+  return { blocking, high, medium, deterministicBlocking, highSignals, mediumSignals, fingerprint: fingerprintReviewSignals(repos, files) };
+}
+function agenticReviewAttestationMetric(review) {
+  const path = config.reportPaths.agenticReviewAttestation || "docs/ai/quality-gate/agentic-review-attestation.json";
+  const required = Boolean(review && (review.deterministicBlocking > 0 || review.highSignals > 0));
+  if (!required) return { required, valid: true, path, status: "not-required" };
+  const attestation = readJson(path);
+  if (!attestation) return { required, valid: false, path, status: "missing", errors: ["missing attestation"] };
+  const errors = [];
+  const verdict = String(attestation.verdict || "").toLowerCase().replace(/\s+/g, "_");
+  const acceptedVerdicts = new Set(["approved", "approved_with_risk", "pode_aprovar", "pode_aprovar_com_ressalvas"]);
+  if (!acceptedVerdicts.has(verdict)) errors.push("verdict must approve the reviewed deterministic signals");
+  if (attestation.deterministicSignalsReviewed !== true) errors.push("deterministicSignalsReviewed must be true");
+  if (!attestation.reviewer) errors.push("reviewer is required");
+  if (Number.isNaN(Date.parse(String(attestation.reviewedAt || "")))) errors.push("reviewedAt must be an ISO timestamp");
+  if (attestation.reviewedFingerprint !== review.fingerprint) errors.push("reviewedFingerprint does not match current deterministic review packet");
+  const reviewedSignals = attestation.reviewedDeterministicSignals || {};
+  if (Number(reviewedSignals.blocking) !== review.deterministicBlocking) errors.push("reviewed blocking signal count does not match current packet");
+  if (Number(reviewedSignals.high) !== review.highSignals) errors.push("reviewed high signal count does not match current packet");
+  if (Number(reviewedSignals.medium) !== review.mediumSignals) errors.push("reviewed medium signal count does not match current packet");
+  const currentBase = normalizeBaseName(process.env.AGENTIC_REVIEW_BASE || config.base || "origin/main");
+  const allowedBases = Array.isArray(attestation.allowedBases) ? attestation.allowedBases.map(normalizeBaseName) : [];
+  if (allowedBases.length > 0 && !allowedBases.includes(currentBase)) errors.push("current review base is not covered by attestation");
+  return { required, valid: errors.length === 0, path, status: errors.length === 0 ? "valid" : "invalid", errors, reviewer: attestation.reviewer || null, verdict, reviewedAt: attestation.reviewedAt || null };
 }
 function feedbackMetric() {
   const feedback = readJson(config.reportPaths.feedback);
@@ -147,7 +204,8 @@ const files = changedFiles();
 const code = collectCodeMetrics();
 const coverage = coverageMetric();
 const duplication = duplicationMetric();
-const review = agenticReviewMetric();
+const review = agenticReviewMetric(files);
+const reviewAttestation = agenticReviewAttestationMetric(review);
 const feedback = feedbackMetric();
 const baselineCoverage = baseline.metrics.coverage?.linesPct;
 const baselineDuplication = baseline.metrics.duplication?.duplicatedLinesPct;
@@ -180,6 +238,8 @@ if (config.requiredChecks.agenticReviewPacket && review === null) fail("agentic-
 else if (review) {
   if (review.high > config.thresholds.maxHighReviewFindings) fail("agentic-review.high", "Agentic review has " + review.high + " high findings.");
   if (review.blocking > config.thresholds.maxBlockingReviewFindings) fail("agentic-review.blocking", "Agentic review has " + review.blocking + " blocking findings.");
+  if (review.deterministicBlocking > 0 || review.highSignals > 0) warn("agentic-review.deterministic-signals", "Deterministic review packet has " + review.deterministicBlocking + " blocking signal(s) and " + review.highSignals + " high signal(s); reviewer interpretation is required before merge-ready claims.");
+  if (reviewAttestation.required && !reviewAttestation.valid) fail("agentic-review.attestation", "Deterministic review signals require a valid independent review attestation at " + reviewAttestation.path + ": " + (reviewAttestation.errors || []).join("; "));
 }
 
 const rows = [
@@ -187,6 +247,7 @@ const rows = [
   { metric: "Duplication", baseline: pct(baselineDuplication), current: pct(duplication), target: "<= " + pct(config.thresholds.newDuplicationMax), delta: delta(duplication, baselineDuplication), status: !failures.some((f) => f.id.startsWith("duplication.")) },
   { metric: "Large files", baseline: baseline.metrics.code.largeFiles, current: code.largeFiles, target: "no increase", delta: code.largeFiles - baseline.metrics.code.largeFiles, status: !failures.some((f) => f.id.startsWith("code.") || f.id.startsWith("file.") || f.id.startsWith("touched-bad-area")) },
   { metric: "Agentic review blocking", baseline: 0, current: review?.blocking ?? "n/a", target: 0, delta: review?.blocking ?? null, status: !failures.some((f) => f.id.startsWith("agentic-review.")) },
+  { metric: "Deterministic review signals", baseline: "reviewed", current: review?.deterministicBlocking ?? "n/a", target: "valid attestation", delta: review?.deterministicBlocking ?? null, status: review !== null && reviewAttestation.valid },
   { metric: "Feedback false negatives", baseline: "tracked", current: feedback.falseNegative, target: 0, delta: feedback.falseNegative, status: feedback.falseNegative === 0 },
 ];
 const markdown = [
@@ -208,7 +269,7 @@ const markdown = [
   improvements.length ? improvements.map((item) => "- **" + item.type + " / " + item.rule + "**: " + item.recommendation + " (source: " + item.source + ")").join("\n") : "- None",
   "",
 ].join("\n");
-const report = { status: failures.length ? "fail" : "pass", generatedAt: new Date().toISOString(), failures, warnings, improvements, metrics: { coverage, duplication, code, review, feedback, rows }, changedFiles: files };
+const report = { status: failures.length ? "fail" : "pass", generatedAt: new Date().toISOString(), failures, warnings, improvements, metrics: { coverage, duplication, code, review, reviewAttestation, feedback, rows }, changedFiles: files };
 mkdirSync(gateDir, { recursive: true });
 writeFileSync(join(gateDir, "quality-gate-report.json"), JSON.stringify(report, null, 2) + "\n");
 writeFileSync(join(gateDir, "quality-gate-report.md"), markdown + "\n");

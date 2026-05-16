@@ -40,6 +40,7 @@
     "coverageSummary": "coverage/coverage-summary.json",
     "jscpd": "report/jscpd-report.json",
     "agenticReviewPacket": "docs/ai/quality-gate/agentic-review-packet.json",
+    "agenticReviewAttestation": "docs/ai/quality-gate/agentic-review-attestation.json",
     "feedback": "docs/ai/quality-gate/review-feedback.json",
     "trend": "docs/ai/quality-gate/quality-trend.jsonl"
   },
