@@ -27,11 +27,15 @@ It is not a broker, trading system, financial advisor, or automated recommendati
 ```bash
 corepack prepare pnpm@11.0.6 --activate
 pnpm install
+cp .env.example .env
 docker compose up -d
 pnpm db:generate
 pnpm db:migrate
 pnpm dev
 ```
+
+Before starting the API, set `BETTER_AUTH_SECRET` in `.env` to a locally generated
+value.
 
 ## Validation
 
@@ -49,6 +53,26 @@ pnpm db:generate
 pnpm db:migrate
 pnpm db:status
 ```
+
+## API Authentication
+
+The API uses Better Auth mounted under `/auth/*` with local e-mail/password for the MVP.
+The first auth cut supports `/auth/sign-up/email`, `/auth/sign-in/email`,
+`/auth/get-session`, and `/auth/sign-out`.
+
+Application code should use the session helper output shape:
+
+```json
+{ "userId": "uuid", "email": "user@example.com" }
+```
+
+`GET /me` returns that shape for an authenticated session cookie and returns `401` without
+a valid session.
+
+Auth rate limiting and auth request protocol use the normalized Express proxy
+context. Keep `TRUST_PROXY_HOPS=0` when the API is directly exposed, and set it
+to the number of trusted reverse-proxy hops only when that proxy sanitizes
+forwarded IP/protocol headers.
 
 ## Security And Financial Boundaries
 

@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "reviewer": "security-reviewer:019e2ffe-c8a6-78d3-a8c4-2325e934f67d",
+  "reviewedAt": "2026-05-16T12:19:26.833Z",
+  "verdict": "approved_with_risk",
+  "deterministicSignalsReviewed": true,
+  "allowedBases": [
+    "chore/pr-quality-gate",
+    "main"
+  ],
+  "reviewedFingerprint": "ce5a9b3a954899d5765eaa14e5f0d716104307478e7baae66e13c71e947458f5",
+  "reviewedDeterministicSignals": {
+    "blocking": 30,
+    "high": 11,
+    "medium": 27
+  },
+  "scope": [
+    "PR-004 Better Auth API integration",
+    "cookie-only session flow",
+    "Better Auth logging redaction",
+    "proxy protocol trust boundary",
+    "Postgres-backed auth tests"
+  ],
+  "residualRisk": "Deterministic collector signals are noisy and remain visible as warnings; the quality gate now requires this attestation to match the current packet before passing."
+}
