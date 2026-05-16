@@ -5,7 +5,8 @@
   "verdict": "approved_with_risk",
   "deterministicSignalsReviewed": true,
   "allowedBases": [
-    "chore/pr-quality-gate"
+    "chore/pr-quality-gate",
+    "main"
   ],
   "reviewedFingerprint": "ce5a9b3a954899d5765eaa14e5f0d716104307478e7baae66e13c71e947458f5",
   "reviewedDeterministicSignals": {
