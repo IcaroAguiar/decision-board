@@ -96,6 +96,46 @@ DELETE /portfolios/:portfolioId
 `baseCurrency` is optional and defaults to `BRL`. `DELETE /portfolios/:portfolioId`
 only deletes empty portfolios; portfolios with positions or cash accounts return `409`.
 
+## API Assets
+
+Asset endpoints require the Better Auth session cookie. Assets are global
+canonical ticker/exchange/currency identities. User-provided name, type, risk
+category, segment, and notes are stored as authenticated user overrides and
+never accept `userId` in the request body or query.
+
+```txt
+POST  /assets
+GET   /assets
+GET   /assets/:assetId
+PATCH /assets/:assetId/override
+```
+
+`POST /assets` accepts:
+
+```json
+{
+  "ticker": "CYCR11",
+  "name": "Cyrela Credit",
+  "assetType": "FII",
+  "riskCategory": "PAPER",
+  "segment": "recebiveis",
+  "currency": "BRL",
+  "exchange": "B3"
+}
+```
+
+`assetType` accepts `FII`, `STOCK`, `ETF`, `CASH`, or `OTHER`.
+`riskCategory` accepts `BRICK`, `PAPER`, `HYBRID`, `CASH`, or `OTHER`.
+Inputs are normalized to uppercase. Creating an asset ensures the canonical
+ticker/exchange/currency identity exists with neutral global metadata, then
+stores the submitted metadata as the authenticated user's override. Search supports
+`GET /assets?ticker=CYCR` with optional `limit` from `1` to `100`, and returns
+effective metadata with any user-specific override applied.
+
+`PATCH /assets/:assetId/override` accepts `customName`, `customAssetType`,
+`customSegment`, `customRiskCategory`, and `notes`. These fields affect only the
+authenticated user's effective asset metadata.
+
 ## Security And Financial Boundaries
 
 - Do not store broker credentials.

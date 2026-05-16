@@ -317,18 +317,25 @@ negativas de acesso cruzado entre usuários contra Postgres local.
 **Checklist de implementação:**
 
 ```txt
-- [ ] Criar AssetsModule
-- [ ] Criar tabela assets se ainda não existir
-- [ ] Criar tabela user_asset_overrides
-- [ ] Implementar busca por ticker
-- [ ] Permitir classificação: paper, hybrid, brick, cash, stock, etf, other
-- [ ] Permitir segmento: logística, renda urbana, lajes, shopping, recebíveis etc.
-- [ ] Criar seeds mínimos para testes
+- [x] Criar AssetsModule
+- [x] Criar tabela assets se ainda não existir
+- [x] Criar tabela user_asset_overrides
+- [x] Implementar busca por ticker
+- [x] Permitir classificação: paper, hybrid, brick, cash, stock, etf, other
+- [x] Permitir segmento: logística, renda urbana, lajes, shopping, recebíveis etc.
+- [x] Criar seeds mínimos para testes
 ```
 
 **Fora do escopo:** provider externo de cotações.
 
 **Aceite:** usuário consegue cadastrar/ajustar metadados de ativos sem afetar outros usuários.
+
+**Evidência local do corte:** teste HTTP real cobre autenticação obrigatória,
+validação de DTOs, identidade canônica global de ticker/exchange/currency, busca
+por ticker, limite de paginação e overrides de metadados isolados por usuário
+contra Postgres local. A tabela `assets` já existia no schema inicial; o corte
+adiciona `custom_asset_type` em `user_asset_overrides` para evitar que
+classificação subjetiva de um usuário altere o catálogo global.
 
 ---
 
