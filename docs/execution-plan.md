@@ -430,19 +430,25 @@ no bucket `cash` de alocação.
 **Checklist de implementação:**
 
 ```txt
-- [ ] Criar packages/strategies
-- [ ] Criar tipos Strategy, StrategyRule, StrategyAlert
-- [ ] Criar função evaluateStrategy(portfolio, strategy)
-- [ ] Alertar maxSingleAssetPercent
-- [ ] Alertar maxPaperHybridPercent
-- [ ] Alertar maxSectorPercent
-- [ ] Alertar reportIntervalDays
-- [ ] Testes unitários para cada estratégia
+- [x] Criar packages/strategies
+- [x] Criar tipos Strategy, StrategyRule, StrategyAlert
+- [x] Criar função evaluateStrategy(portfolio, strategy)
+- [x] Alertar maxSingleAssetPercent
+- [x] Alertar maxPaperHybridPercent
+- [x] Alertar maxSectorPercent
+- [x] Alertar reportIntervalDays
+- [x] Testes unitários para cada estratégia
 ```
 
 **Fora do escopo:** sugestão exata de compra.
 
 **Aceite:** dado um portfolio fixture, o motor retorna alertas determinísticos.
+
+**Evidência local do corte:** teste unitário do pacote `strategies` cobre as
+cinco estratégias MVP, cadência de relatório, limites por ativo, papel+híbrido,
+setor, caixa mínimo, tijolo mínimo e flags de revisão/checklist sem gerar
+instrução automática de compra ou venda. Os códigos/severidades dos alertas são
+contratos tipados exportados por `@decision-board/types`.
 
 ---
 
