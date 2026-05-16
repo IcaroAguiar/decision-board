@@ -105,6 +105,9 @@ importers:
 
   packages/strategies:
     dependencies:
+      '@decision-board/core':
+        specifier: workspace:*
+        version: link:../core
       '@decision-board/types':
         specifier: workspace:*
         version: link:../types

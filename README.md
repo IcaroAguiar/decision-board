@@ -199,6 +199,15 @@ optional, non-negative, and accepts at most 6 whole digits and 4 decimal places,
 matching `Decimal(10,4)`. Cash accounts are listed separately from positions and
 count toward the `cash` allocation bucket in portfolio summary calculations.
 
+## Strategy Engine
+
+`@decision-board/strategies` exposes the five MVP strategies and
+`evaluateStrategy(portfolio, strategy)`. The engine is deterministic and returns
+review alerts such as strategy mismatches, exposure limits, cash minimums,
+manual-review requirements, risk-checklist requirements, and report cadence. It
+uses typed alert code/severity contracts from `@decision-board/types` and does
+not generate automatic buy/sell instructions.
+
 ## Security And Financial Boundaries
 
 - Do not store broker credentials.
