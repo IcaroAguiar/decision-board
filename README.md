@@ -27,11 +27,15 @@ It is not a broker, trading system, financial advisor, or automated recommendati
 ```bash
 corepack prepare pnpm@11.0.6 --activate
 pnpm install
+cp .env.example .env
 docker compose up -d
 pnpm db:generate
 pnpm db:migrate
 pnpm dev
 ```
+
+Before starting the API, set `BETTER_AUTH_SECRET` in `.env` to a locally generated
+value.
 
 ## Validation
 
