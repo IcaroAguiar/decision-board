@@ -56,6 +56,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_ENABLE_COMMENTS: false
 
+      - name: Clean transient secret scan artifacts
+        run: rm -f results.sarif
+
       - name: Agentic review packet
         env:
           AGENTIC_REVIEW_BASE: origin/${{ github.base_ref || 'main' }}
