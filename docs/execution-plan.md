@@ -216,20 +216,24 @@ Uma tarefa só está concluída se:
 **Checklist de implementação:**
 
 ```txt
-- [ ] Configurar BETTER_AUTH_SECRET
-- [ ] Configurar BETTER_AUTH_URL
-- [ ] Integrar Better Auth ao NestJS
-- [ ] Configurar Better Auth com `basePath: "/auth"`
-- [ ] Montar handler Better Auth sob /auth/* antes do body parser JSON comum
-- [ ] Usar os modelos padrão do Better Auth como base do schema
-- [ ] Criar migration Prisma versionada para as tabelas de auth
-- [ ] Alinhar schema Better Auth com `users` via schema gerado ou model mapping + UUID
-- [ ] Criar helper de sessão que exponha `AuthenticatedUser { userId, email }`
-- [ ] Garantir cookies httpOnly
-- [ ] Configurar rate limiting no Better Auth para rotas de auth
-- [ ] Criar teste de login/logout/session
-- [ ] Rodar teste HTTP de auth contra Postgres real via Docker Compose
+- [x] Configurar BETTER_AUTH_SECRET
+- [x] Configurar BETTER_AUTH_URL
+- [x] Integrar Better Auth ao NestJS
+- [x] Configurar Better Auth com `basePath: "/auth"`
+- [x] Montar handler Better Auth sob /auth/* antes do body parser JSON comum
+- [x] Usar os modelos padrão do Better Auth como base do schema
+- [x] Criar migration Prisma versionada para as tabelas de auth
+- [x] Alinhar schema Better Auth com `users` via schema gerado ou model mapping + UUID
+- [x] Criar helper de sessão que exponha `AuthenticatedUser { userId, email }`
+- [x] Garantir cookies httpOnly
+- [x] Configurar rate limiting no Better Auth para rotas de auth
+- [x] Criar teste de login/logout/session
+- [x] Rodar teste HTTP de auth contra Postgres real via Docker Compose
 ```
+
+**Evidência local do corte:** teste HTTP real cobre `/auth/ok`, sign-up, sessão, `/me`,
+logout e negativa pós-logout contra Postgres local. O workflow de quality gate sobe
+Postgres efêmero e roda `pnpm db:deploy` antes da suíte.
 
 **Fora do escopo:** OAuth social, 2FA, passkeys.
 
@@ -244,6 +248,8 @@ Uma tarefa só está concluída se:
 **Decisão de schema:** PR-004 usa o schema padrão do Better Auth como base e versiona a migration Prisma no repo, com o menor ajuste necessário para manter `users` como tabela canônica de **User**.
 
 **Decisão de rate limit:** PR-004 usa rate limiting no escopo do Better Auth para rotas de auth. Política global de rate limit e hardening amplo continuam reservados para PR-023.
+
+**Decisão de IP de cliente:** PR-004 normaliza o IP usado pelo Better Auth via Express antes do handler de auth. O padrão é `TRUST_PROXY_HOPS=0`; valores maiores só devem ser usados quando o reverse proxy for confiável e sanitizar headers encaminhados.
 
 **Plano de execução paralela:** PR-004 pode ser executado com subagentes em workspaces separados, desde que os write scopes sejam disjuntos e o Codex principal integre o resultado. Divisão inicial:
 

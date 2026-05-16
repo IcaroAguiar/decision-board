@@ -21,6 +21,25 @@ jobs:
   quality-gate:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: decision_board
+          POSTGRES_USER: decision_board
+          POSTGRES_PASSWORD: decision_board
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U decision_board -d decision_board"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://decision_board:decision_board@localhost:5432/decision_board?schema=public
+      BETTER_AUTH_SECRET: ci-only-auth-key-at-least-32-characters
+      BETTER_AUTH_URL: http://localhost:3001
+      WEB_ORIGIN: http://localhost:5173
     steps:
       - uses: actions/checkout@v4
         with:
@@ -44,6 +63,9 @@ jobs:
 
       - name: Typecheck
         run: pnpm typecheck
+
+      - name: Database migrations
+        run: pnpm db:deploy
 
       - name: Tests
         run: pnpm test

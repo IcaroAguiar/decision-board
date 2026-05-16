@@ -1,0 +1,4 @@
+export const AUTH_BASE_PATH = "/auth";
+export const AUTH_ROUTE_PATTERN = `${AUTH_BASE_PATH}/*splat`;
+export const DEFAULT_AUTH_RATE_LIMIT_WINDOW_SECONDS = 60;
+export const DEFAULT_AUTH_RATE_LIMIT_MAX_REQUESTS = 20;
