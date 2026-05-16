@@ -167,6 +167,38 @@ when provided. Until external price snapshots exist, `currentPrice` is
 `manualCurrentPrice` and `totalValue` is `quantity * manualCurrentPrice`; both
 are `null` when no manual current price is available.
 
+## API Cash Accounts
+
+Cash account endpoints require the Better Auth session cookie. They derive
+ownership from the authenticated session and never accept `userId` in the
+request body or query.
+
+```txt
+POST  /portfolios/:portfolioId/cash-accounts
+GET   /portfolios/:portfolioId/cash-accounts
+PATCH /cash-accounts/:cashAccountId
+```
+
+`POST /portfolios/:portfolioId/cash-accounts` accepts:
+
+```json
+{
+  "name": "Reserva diaria",
+  "type": "CDB",
+  "balance": "1000.50",
+  "liquidity": "D+0",
+  "benchmark": "CDI",
+  "benchmarkPercent": "100",
+  "notes": "caixa operacional"
+}
+```
+
+`balance` must be non-negative and accepts at most 12 whole digits and 8 decimal
+places, matching the persisted `Decimal(20,8)` column. `benchmarkPercent` is
+optional, non-negative, and accepts at most 6 whole digits and 4 decimal places,
+matching `Decimal(10,4)`. Cash accounts are listed separately from positions and
+count toward the `cash` allocation bucket in portfolio summary calculations.
+
 ## Security And Financial Boundaries
 
 - Do not store broker credentials.

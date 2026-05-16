@@ -1,25 +1,26 @@
 {
   "schemaVersion": 1,
-  "reviewer": "security-reviewer:019e31af-1078-75d2-a3cc-4d1d677c1923",
-  "reviewedAt": "2026-05-16T17:32:41Z",
-  "verdict": "approved",
+  "reviewer": "security-reviewer:019e325c-564b-7720-a2dc-6c3ab7ed4877",
+  "reviewedAt": "2026-05-16T19:57:46Z",
+  "verdict": "approved_with_risk",
   "deterministicSignalsReviewed": true,
   "allowedBases": [
     "main"
   ],
-  "reviewedFingerprint": "b1c989c2bb37a78083f96d681a2f8f721cb2e6261834dab6546df340fe7bad21",
+  "reviewedFingerprint": "18275edd5d7ea787c18d7ed4688bc9568add1d04a305b570b4902efa30c56b4f",
   "reviewedDeterministicSignals": {
     "blocking": 5,
     "high": 0,
-    "medium": 11
+    "medium": 13
   },
   "scope": [
-    "PR-007 positions API MVP",
-    "authenticated position create/list/update routes",
-    "portfolio and position user isolation",
-    "Decimal(20,8) request validation",
-    "manual current price total value calculation",
-    "Postgres-backed auth and positions tests"
+    "PR-008 cash accounts API MVP",
+    "authenticated cash account create/list/update routes",
+    "portfolio and cash account user isolation",
+    "Decimal(20,8) balance request validation",
+    "Decimal(10,4) benchmark percent request validation",
+    "cash account separation from positions",
+    "core cash allocation calculation"
   ],
-  "residualRisk": "Reviewer approved after decimal inputs were bounded to Prisma Decimal(20,8) and HTTP regressions covered oversized quantity and manualCurrentPrice. Residual risk is low and limited to API-only scope; OpenAPI, advanced pagination beyond take: 200, UI consumers, and global hardening were not reviewed."
+  "residualRisk": "Reviewer approved with risk: list endpoints use a defensive take: 200 without public pagination, so portfolios with more than 200 cash accounts may receive a partial list until pagination is implemented. Auth, user isolation, response privacy, decimal validation, and cash allocation were reviewed for this PR scope."
 }

@@ -15,6 +15,14 @@ export interface PortfolioPositionInput {
 	segment?: string;
 }
 
+export interface PortfolioCashAccountInput {
+	id: string;
+	name: string;
+	balance: number;
+	type: string;
+	liquidity?: string;
+}
+
 export interface StrategyAlert {
 	code: string;
 	severity: ReviewSeverity;

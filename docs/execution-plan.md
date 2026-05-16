@@ -392,16 +392,22 @@ cruzado a portfolio/position e cálculo de `totalValue` a partir de
 **Checklist de implementação:**
 
 ```txt
-- [ ] Criar CashModule
-- [ ] Criar CashAccountRepository
-- [ ] Campos: name, type, balance, liquidity, benchmark, benchmarkPercent
-- [ ] Validar balance >= 0
-- [ ] Incluir caixa no cálculo de alocação
+- [x] Criar CashAccountsModule
+- [x] Criar CashAccountRepository
+- [x] Campos: name, type, balance, liquidity, benchmark, benchmarkPercent
+- [x] Validar balance >= 0
+- [x] Incluir caixa no cálculo de alocação
 ```
 
 **Fora do escopo:** atualização automática de CDI ou rentabilidade do CDB.
 
 **Aceite:** caixa aparece separado da carteira de ativos.
+
+**Evidência local do corte:** teste HTTP real cobre autenticação obrigatória,
+validação de DTOs, criação/listagem/edição de cash accounts, bloqueio de acesso
+cruzado a portfolio/cash account e listagem de caixa separada de posições contra
+Postgres local. Teste do pacote core cobre inclusão de cash accounts no total e
+no bucket `cash` de alocação.
 
 ## 5. Fase 2 — Estratégias e recorrência
 
