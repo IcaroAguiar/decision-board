@@ -176,7 +176,7 @@ model Position {
   updatedAt          DateTime       @updatedAt @map("updated_at")
 
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  portfolio Portfolio @relation(fields: [portfolioId, userId], references: [id, userId], onDelete: Cascade)
+  portfolio Portfolio @relation(fields: [portfolioId, userId], references: [id, userId], onDelete: Restrict)
   asset     Asset     @relation(fields: [assetId], references: [id], onDelete: Restrict)
 
   @@index([userId, portfolioId])
@@ -199,7 +199,7 @@ model CashAccount {
   updatedAt        DateTime @updatedAt @map("updated_at")
 
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  portfolio Portfolio @relation(fields: [portfolioId, userId], references: [id, userId], onDelete: Cascade)
+  portfolio Portfolio @relation(fields: [portfolioId, userId], references: [id, userId], onDelete: Restrict)
 
   @@index([userId, portfolioId])
   @@map("cash_accounts")

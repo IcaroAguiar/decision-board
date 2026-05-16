@@ -283,17 +283,21 @@ Postgres efêmero e roda `pnpm db:deploy` antes da suíte.
 **Checklist de implementação:**
 
 ```txt
-- [ ] Criar PortfoliosModule
-- [ ] Criar PortfolioRepository
-- [ ] Toda query recebe `userId`
-- [ ] Criar DTOs validados
-- [ ] Criar testes: usuário A não acessa portfolio do usuário B
-- [ ] Atualizar OpenAPI ou docs de endpoints
+- [x] Criar PortfoliosModule
+- [x] Criar PortfolioRepository
+- [x] Toda query recebe `userId`
+- [x] Criar DTOs validados
+- [x] Criar testes: usuário A não acessa portfolio do usuário B
+- [x] Atualizar OpenAPI ou docs de endpoints
 ```
 
 **Fora do escopo:** posições, ativos, relatórios.
 
 **Aceite:** isolamento multiusuário testado.
+
+**Evidência local do corte:** teste HTTP real cobre autenticação obrigatória,
+validação de DTOs, criação/listagem/leitura/edição/delete de portfolio vazio e
+negativas de acesso cruzado entre usuários contra Postgres local.
 
 ---
 
