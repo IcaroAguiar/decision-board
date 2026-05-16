@@ -74,6 +74,28 @@ context. Keep `TRUST_PROXY_HOPS=0` when the API is directly exposed, and set it
 to the number of trusted reverse-proxy hops only when that proxy sanitizes
 forwarded IP/protocol headers.
 
+## API Portfolios
+
+Portfolio endpoints require the Better Auth session cookie. They derive ownership from
+the authenticated session and never accept `userId` in the request body or query.
+
+```txt
+POST   /portfolios
+GET    /portfolios
+GET    /portfolios/:portfolioId
+PATCH  /portfolios/:portfolioId
+DELETE /portfolios/:portfolioId
+```
+
+`POST /portfolios` accepts:
+
+```json
+{ "name": "Long term income", "baseCurrency": "BRL" }
+```
+
+`baseCurrency` is optional and defaults to `BRL`. `DELETE /portfolios/:portfolioId`
+only deletes empty portfolios; portfolios with positions or cash accounts return `409`.
+
 ## Security And Financial Boundaries
 
 - Do not store broker credentials.
