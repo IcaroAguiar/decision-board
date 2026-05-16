@@ -1,24 +1,24 @@
 {
   "schemaVersion": 1,
-  "reviewer": "security-reviewer:019e3160-b9fb-75e0-b185-b3687b9c58c5",
-  "reviewedAt": "2026-05-16T15:28:07Z",
-  "verdict": "approved_with_risk",
+  "reviewer": "security-reviewer:019e3174-d787-7a82-a015-77de3e800668",
+  "reviewedAt": "2026-05-16T16:39:30Z",
+  "verdict": "approved",
   "deterministicSignalsReviewed": true,
   "allowedBases": [
     "main"
   ],
-  "reviewedFingerprint": "844dce64286e55575807efa88b3986c3e03bc281002a286a95a0bb3c30fdf390",
+  "reviewedFingerprint": "b99c56265a8cfa3d56b241b0aaf3688166e443514d93c8c7204f639026216c3a",
   "reviewedDeterministicSignals": {
-    "blocking": 12,
-    "high": 3,
-    "medium": 12
+    "blocking": 5,
+    "high": 0,
+    "medium": 9
   },
   "scope": [
-    "PR-005 user-scoped portfolios",
-    "authenticated portfolio CRUD",
-    "user isolation repository boundaries",
-    "portfolio delete restrictions",
-    "Postgres-backed auth and portfolio tests"
+    "PR-006 asset identity and user overrides",
+    "authenticated asset metadata API",
+    "global ticker/exchange/currency identity boundaries",
+    "user-specific asset override isolation",
+    "Postgres-backed auth and assets tests"
   ],
-  "residualRisk": "Deterministic cookie signals are scanner noise for Better Auth Set-Cookie forwarding; CSRF/origin hardening for mutable cookie-authenticated endpoints remains a future hardening concern if cross-site cookie policy changes."
+  "residualRisk": "Reviewer found no blocking or residual security findings after global asset metadata was limited to canonical ticker/exchange/currency identity and subjective metadata moved to user overrides."
 }

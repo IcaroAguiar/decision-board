@@ -139,7 +139,7 @@ model Asset {
   positions          Position[]
   userAssetOverrides UserAssetOverride[]
 
-  @@unique([ticker, exchange])
+  @@unique([ticker, exchange, currency])
   @@map("assets")
 }
 
@@ -148,6 +148,7 @@ model UserAssetOverride {
   userId             String        @map("user_id") @db.Uuid
   assetId            String        @map("asset_id") @db.Uuid
   customName         String?       @map("custom_name")
+  customAssetType    AssetType?    @map("custom_asset_type")
   customSegment      String?       @map("custom_segment")
   customRiskCategory RiskCategory? @map("custom_risk_category")
   notes              String?

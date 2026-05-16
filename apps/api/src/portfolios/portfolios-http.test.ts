@@ -1,20 +1,8 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
-import {
-	createTestApp,
-	getSetCookieHeaders,
-	readJson,
-	testWebOrigin,
-	toCookieHeader,
-} from "../test/http-test-app.js";
-
-interface TestUser {
-	userId: string;
-	email: string;
-	password: string;
-	cookieHeader: string;
-}
+import { clearAuthRateLimits, jsonHeaders, signUpTestUser } from "../test/auth-test-user.js";
+import { createTestApp, readJson } from "../test/http-test-app.js";
 
 interface PortfolioPayload {
 	id: string;
@@ -22,77 +10,6 @@ interface PortfolioPayload {
 	baseCurrency: string;
 	createdAt: string;
 	updatedAt: string;
-}
-
-async function clearAuthRateLimits(prisma: {
-	rateLimit: {
-		deleteMany(args: { where: { key: { contains: string } } }): Promise<unknown>;
-	};
-}): Promise<void> {
-	await Promise.all(
-		["/sign-up/email", "/sign-in/email"].map((path) =>
-			prisma.rateLimit.deleteMany({
-				where: {
-					key: {
-						contains: path,
-					},
-				},
-			}),
-		),
-	);
-}
-
-async function signUpTestUser(baseUrl: string, label: string): Promise<TestUser> {
-	const email = `portfolio-${label}-${randomUUID()}@example.test`;
-	const password = "correct horse battery staple";
-	const signUp = await fetch(`${baseUrl}/auth/sign-up/email`, {
-		method: "POST",
-		headers: {
-			"content-type": "application/json",
-			origin: testWebOrigin,
-		},
-		body: JSON.stringify({
-			name: `Portfolio ${label}`,
-			email,
-			password,
-		}),
-	});
-	const signUpPayload = await readJson(signUp);
-	assert.equal(signUp.status, 200, JSON.stringify(signUpPayload));
-
-	const cookies = getSetCookieHeaders(signUp);
-	assert.ok(cookies.length > 0);
-	const cookieHeader = toCookieHeader(cookies);
-
-	const me = await fetch(`${baseUrl}/me`, {
-		headers: {
-			cookie: cookieHeader,
-		},
-	});
-	assert.equal(me.status, 200);
-	const mePayload = assertUserPayload(await readJson(me));
-
-	return {
-		userId: mePayload.userId,
-		email,
-		password,
-		cookieHeader,
-	};
-}
-
-function jsonHeaders(user?: TestUser): Record<string, string> {
-	return {
-		"content-type": "application/json",
-		...(user ? { cookie: user.cookieHeader } : {}),
-	};
-}
-
-function assertUserPayload(payload: unknown): { userId: string; email: string } {
-	assert.ok(isRecord(payload));
-	assert.equal(typeof payload.userId, "string");
-	assert.equal(typeof payload.email, "string");
-
-	return payload as { userId: string; email: string };
 }
 
 function assertPortfolioPayload(payload: unknown): PortfolioPayload {
