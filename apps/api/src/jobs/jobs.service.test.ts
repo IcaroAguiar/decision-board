@@ -1,9 +1,20 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { jobNames } from "./job-names.js";
 import { JobsRepository } from "./jobs.repository.js";
 import { JobsService } from "./jobs.service.js";
 
 type WorkerHandler = (jobs: { data: Record<string, unknown> }[]) => Promise<unknown[]>;
+
+interface CapturedWorker {
+	name: string;
+	options: Record<string, unknown>;
+	handler: WorkerHandler;
+}
+
+interface FakeBossForWorkers {
+	work(name: string, options: Record<string, unknown>, handler: WorkerHandler): Promise<void>;
+}
 
 function restoreEnv(name: string, value: string | undefined): void {
 	if (value === undefined) {
@@ -14,11 +25,14 @@ function restoreEnv(name: string, value: string | undefined): void {
 	process.env[name] = value;
 }
 
-function readWorkerHandler(service: JobsService, methodName: string): WorkerHandler {
-	const handler = Reflect.get(service, methodName);
-	assert.equal(typeof handler, "function");
+function readPrivateMethod<T extends (...args: never[]) => unknown>(
+	service: JobsService,
+	methodName: string,
+): T {
+	const method = Reflect.get(service, methodName);
+	assert.equal(typeof method, "function");
 
-	return handler.bind(service) as WorkerHandler;
+	return method.bind(service) as T;
 }
 
 test("requires a database URL when jobs are enabled at module startup", async () => {
@@ -59,8 +73,11 @@ test("worker handlers process each job payload through the repository", async ()
 		};
 	};
 	const jobs = new JobsService(repository);
-	const handleCycleJobs = readWorkerHandler(jobs, "handleCreateMonthlyContributionCycleJobs");
-	const handleReportJobs = readWorkerHandler(jobs, "handleCheckReportDueJobs");
+	const handleCycleJobs = readPrivateMethod<WorkerHandler>(
+		jobs,
+		"handleCreateMonthlyContributionCycleJobs",
+	);
+	const handleReportJobs = readPrivateMethod<WorkerHandler>(jobs, "handleCheckReportDueJobs");
 
 	const cycleResults = await handleCycleJobs([
 		{ data: { cycleMonth: "2099-05" } },
@@ -84,4 +101,31 @@ test("worker handlers process each job payload through the repository", async ()
 		{ checkedCycles: 1, markedCycles: 1, skippedUnknownStrategies: 0 },
 		{ checkedCycles: 2, markedCycles: 1, skippedUnknownStrategies: 0 },
 	]);
+});
+
+test("registers job workers with conservative batch and polling options", async () => {
+	const workers: CapturedWorker[] = [];
+	const fakeBoss: FakeBossForWorkers = {
+		async work(name, options, handler) {
+			workers.push({ name, options, handler });
+		},
+	};
+	const jobs = new JobsService(new JobsRepository());
+	(jobs as unknown as { boss: FakeBossForWorkers }).boss = fakeBoss;
+	const registerWorkers = readPrivateMethod<() => Promise<void>>(jobs, "registerWorkers");
+
+	await registerWorkers();
+
+	assert.deepEqual(
+		workers.map((worker) => worker.name),
+		[jobNames.createMonthlyContributionCycles, jobNames.checkReportDue],
+	);
+	for (const worker of workers) {
+		assert.deepEqual(worker.options, {
+			batchSize: 1,
+			localConcurrency: 1,
+			pollingIntervalSeconds: 30,
+		});
+		assert.equal(typeof worker.handler, "function");
+	}
 });

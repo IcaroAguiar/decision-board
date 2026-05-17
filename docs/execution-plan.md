@@ -1379,6 +1379,45 @@ Postgres real, mantendo escopo por `userId` e sem enfraquecer ownership de
 
 ---
 
+### PR-017V — Cobertura de workers do JobsService
+
+**Objetivo:** reduzir lacuna produtiva do coverage pós-Fase 4 em registro de
+workers operacionais, sem iniciar UI e sem abrir pg-boss, API HTTP ou porta
+fixa.
+
+**Escopo:**
+
+```txt
+- teste focado para registerWorkers com boss fake
+- verificação das filas createMonthlyContributionCycles e checkReportDue
+- verificação das opções conservadoras de worker
+- manter API/front fechados no teste focado
+- atualizar status público seguro pós-PR #34
+- rerun do complexity-optimizer como triagem periódica
+```
+
+**Checklist de implementação:**
+
+```txt
+- [x] Identificar próximo corte produtivo: apps/api/src/jobs/jobs.service.test.ts
+- [x] Adicionar teste focado sem Postgres, HTTP, pg-boss real ou porta fixa
+- [x] Rodar teste focado compilado
+- [x] Rodar pnpm coverage e comparar jobs.service/total
+- [x] Rodar lint/typecheck/test/build/smoke/ratchet antes do PR
+- [x] Rodar agentic-code-review com reviewer independente
+- [ ] Abrir PR com CI remoto verde
+```
+
+**Fora do escopo:** alterar comportamento de pg-boss, schema/migration, rotas
+HTTP, auth, providers externos, dados reais, secrets, UI/browser e qualquer
+porta fixa de desenvolvimento.
+
+**Aceite:** `JobsService` protege o registro dos workers e suas opções
+operacionais conservadoras, mantendo o gate pós-Fase 4 focado em cobertura,
+smoke real e documentação pública antes de qualquer UI.
+
+---
+
 ### PR-017 — Dashboard web MVP
 
 **Objetivo:** criar tela principal útil.
