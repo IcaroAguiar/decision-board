@@ -216,6 +216,13 @@ start/end dates, active state, default strategy, and optional default cash
 account. List responses include only active plans and expose the next expected
 cycle date; automatic cycle creation remains out of scope.
 
+## Contribution Cycles
+
+Authenticated users can manually open monthly contribution cycles from an
+existing plan, list cycles by portfolio, and confirm a contributed amount that
+differs from the planned amount. Cycles track a bounded status, selected
+strategy, optional notes, and remain scoped to the session user.
+
 ## Security And Financial Boundaries
 
 - Do not store broker credentials.

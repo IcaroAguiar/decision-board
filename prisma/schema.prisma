@@ -32,6 +32,14 @@ enum ContributionFrequency {
   MONTHLY
 }
 
+enum ContributionCycleStatus {
+  PENDING
+  CONFIRMED
+  SKIPPED
+  REPORTED
+  CLOSED
+}
+
 model User {
   id            String   @id @default(uuid()) @db.Uuid
   email         String   @unique
@@ -45,6 +53,7 @@ model User {
   positions          Position[]
   cashAccounts       CashAccount[]
   contributionPlans  ContributionPlan[]
+  contributionCycles ContributionCycle[]
   userAssetOverrides UserAssetOverride[]
   sessions           Session[]
   accounts           Account[]
@@ -123,6 +132,7 @@ model Portfolio {
   positions         Position[]
   cashAccounts      CashAccount[]
   contributionPlans ContributionPlan[]
+  contributionCycles ContributionCycle[]
 
   @@unique([id, userId])
   @@index([userId])
@@ -229,11 +239,36 @@ model ContributionPlan {
   createdAt         DateTime              @default(now()) @map("created_at")
   updatedAt         DateTime              @updatedAt @map("updated_at")
 
-  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  portfolio   Portfolio    @relation(fields: [portfolioId, userId], references: [id, userId], onDelete: Restrict)
-  cashAccount CashAccount? @relation(fields: [cashAccountId, userId, portfolioId], references: [id, userId, portfolioId], onDelete: Restrict)
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  portfolio          Portfolio           @relation(fields: [portfolioId, userId], references: [id, userId], onDelete: Restrict)
+  cashAccount        CashAccount?        @relation(fields: [cashAccountId, userId, portfolioId], references: [id, userId, portfolioId], onDelete: Restrict)
+  contributionCycles ContributionCycle[]
 
+  @@unique([id, userId, portfolioId])
   @@index([userId, portfolioId, isActive])
   @@index([cashAccountId])
   @@map("contribution_plans")
+}
+
+model ContributionCycle {
+  id                 String                  @id @default(uuid()) @db.Uuid
+  userId             String                  @map("user_id") @db.Uuid
+  portfolioId        String                  @map("portfolio_id") @db.Uuid
+  contributionPlanId String                  @map("contribution_plan_id") @db.Uuid
+  cycleMonth         DateTime                @map("cycle_month") @db.Date
+  plannedAmount      Decimal                 @map("planned_amount") @db.Decimal(20, 8)
+  confirmedAmount    Decimal?                @map("confirmed_amount") @db.Decimal(20, 8)
+  status             ContributionCycleStatus @default(PENDING)
+  strategyId         String                  @map("strategy_id") @db.VarChar(64)
+  notes              String?
+  createdAt          DateTime                @default(now()) @map("created_at")
+  updatedAt          DateTime                @updatedAt @map("updated_at")
+
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  portfolio        Portfolio        @relation(fields: [portfolioId, userId], references: [id, userId], onDelete: Restrict)
+  contributionPlan ContributionPlan @relation(fields: [contributionPlanId, userId, portfolioId], references: [id, userId, portfolioId], onDelete: Restrict)
+
+  @@unique([contributionPlanId, cycleMonth])
+  @@index([userId, portfolioId, cycleMonth])
+  @@map("contribution_cycles")
 }

@@ -1,26 +1,26 @@
 {
   "schemaVersion": 1,
-  "reviewer": "security-reviewer:019e328e-4126-7f70-aa9b-24b13d68d6a6",
-  "reviewedAt": "2026-05-17T02:23:23Z",
+  "reviewer": "codex-exec-review:019e33e1-3fa2-7dc2-b343-2b8e0e6c960d",
+  "reviewedAt": "2026-05-17T03:02:15Z",
   "verdict": "approved_with_risk",
   "deterministicSignalsReviewed": true,
   "allowedBases": [
     "main"
   ],
-  "reviewedFingerprint": "08e1565d5573446a7224887307a7ab59e382ec85d726741b59d8183912ca6969",
+  "reviewedFingerprint": "3dd92115dc23a15a5da8e4ec8c581c5c3e5f9088bf3b1d85a72a4611485aba78",
   "reviewedDeterministicSignals": {
-    "blocking": 14,
+    "blocking": 19,
     "high": 0,
-    "medium": 24
+    "medium": 23
   },
   "scope": [
-    "PR-010 contribution plans API MVP",
-    "authenticated contribution plan create/list/update routes",
-    "portfolio, contribution plan, and cash account user isolation",
-    "ContributionPlan cashAccount composite database ownership constraint",
+    "PR-011 contribution cycles API MVP",
+    "authenticated contribution cycle create/list/update routes",
+    "portfolio, contribution plan, and contribution cycle user isolation",
+    "ContributionCycle composite database ownership constraint to contribution plan",
+    "duplicate cycle prevention by contributionPlanId and cycleMonth",
     "DTO rejection of userId and unknown fields",
-    "contribution amount, day-of-month, date, strategy, and cashAccountId validation",
-    "dependency security mitigation for Nest, Prisma, and path-to-regexp"
+    "cycle month, status, strategy, confirmedAmount, and notes validation"
   ],
-  "residualRisk": "Approved with risk: remaining magic-string signals are accepted as bounded DTO/contract vocabulary for this PR; path-to-regexp override should be revisited when upstream dependency resolution no longer needs it."
+  "residualRisk": "Approved with risk: confirmedAmount required for confirmed status is enforced through the API service and HTTP tests but not yet by a database CHECK, so PR-012/jobs must preserve or harden that invariant before direct writes; remaining magic-string signals are accepted as bounded DTO/route/enum mapping vocabulary for this PR."
 }
