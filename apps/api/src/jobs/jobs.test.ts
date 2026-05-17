@@ -8,7 +8,7 @@ import {
 	type TestUser,
 } from "../test/auth-test-user.js";
 import { configureTestEnvironment, createTestApp, readJson } from "../test/http-test-app.js";
-import { reportRecommendationReasons } from "./job-names.js";
+import { jobNames, reportRecommendationReasons } from "./job-names.js";
 import { JobsRepository, toCycleMonthDate } from "./jobs.repository.js";
 import { JobsService } from "./jobs.service.js";
 
@@ -29,6 +29,16 @@ interface ContributionPlanOptions {
 	endsAt?: string | null;
 	isActive?: boolean;
 	defaultStrategyId?: string;
+}
+
+interface CapturedJobSend {
+	name: string;
+	data: unknown;
+	options: Record<string, unknown>;
+}
+
+interface FakeBossForEnqueue {
+	send(name: string, data: unknown, options: Record<string, unknown>): Promise<string | null>;
 }
 
 async function createPortfolio(
@@ -85,18 +95,90 @@ function isRecord(payload: unknown): payload is Record<string, unknown> {
 	return Boolean(payload && typeof payload === "object" && !Array.isArray(payload));
 }
 
-test("starts pg-boss against the existing Postgres connection", async () => {
+function restoreEnv(name: string, value: string | undefined): void {
+	if (value === undefined) {
+		delete process.env[name];
+		return;
+	}
+
+	process.env[name] = value;
+}
+
+test("starts and stops pg-boss idempotently against the existing Postgres connection", async () => {
 	configureTestEnvironment();
 
 	const jobs = new JobsService(new JobsRepository());
 
 	try {
 		await jobs.start({ registerWorkers: false });
+		await jobs.start({ registerWorkers: false });
 	} finally {
+		await jobs.stop();
 		await jobs.stop();
 		const { prisma } = await import("../auth/prisma.client.js");
 		await prisma.$disconnect();
 	}
+});
+
+test("skips pg-boss startup unless jobs are explicitly enabled", async () => {
+	const originalJobsEnabled = process.env.JOBS_ENABLED;
+	const originalDatabaseUrl = process.env.DATABASE_URL;
+	delete process.env.JOBS_ENABLED;
+	delete process.env.DATABASE_URL;
+
+	try {
+		const jobs = new JobsService(new JobsRepository());
+
+		await jobs.onModuleInit();
+		await jobs.onModuleDestroy();
+	} finally {
+		restoreEnv("JOBS_ENABLED", originalJobsEnabled);
+		restoreEnv("DATABASE_URL", originalDatabaseUrl);
+	}
+});
+
+test("requires started pg-boss before enqueueing jobs", async () => {
+	const jobs = new JobsService(new JobsRepository());
+
+	await assert.rejects(
+		jobs.enqueueCreateMonthlyContributionCycles({ cycleMonth: "2099-05" }),
+		/Jobs service has not been started/,
+	);
+	await assert.rejects(
+		jobs.enqueueCheckReportDue({ now: "2099-06-15T00:00:00.000Z" }),
+		/Jobs service has not been started/,
+	);
+});
+
+test("enqueues cycle and report jobs with singleton keys", async () => {
+	const sentJobs: CapturedJobSend[] = [];
+	const fakeBoss: FakeBossForEnqueue = {
+		async send(name, data, options) {
+			sentJobs.push({ name, data, options });
+			return `job-${sentJobs.length}`;
+		},
+	};
+	const jobs = new JobsService(new JobsRepository());
+	(jobs as unknown as { boss: FakeBossForEnqueue }).boss = fakeBoss;
+
+	const cycleJobId = await jobs.enqueueCreateMonthlyContributionCycles({
+		cycleMonth: "2099-05",
+	});
+	const reportJobId = await jobs.enqueueCheckReportDue({
+		now: "2099-06-15T12:34:56.000Z",
+	});
+
+	assert.equal(cycleJobId, "job-1");
+	assert.equal(reportJobId, "job-2");
+	assert.equal(sentJobs.length, 2);
+	assert.equal(sentJobs[0]?.name, jobNames.createMonthlyContributionCycles);
+	assert.deepEqual(sentJobs[0]?.data, { cycleMonth: "2099-05" });
+	assert.equal(sentJobs[0]?.options.singletonKey, "2099-05");
+	assert.equal(sentJobs[0]?.options.singletonSeconds, 86_400);
+	assert.equal(sentJobs[1]?.name, jobNames.checkReportDue);
+	assert.deepEqual(sentJobs[1]?.data, { now: "2099-06-15T12:34:56.000Z" });
+	assert.equal(sentJobs[1]?.options.singletonKey, "2099-06-15");
+	assert.equal(sentJobs[1]?.options.singletonSeconds, 86_400);
 });
 
 test("creates monthly contribution cycles idempotently from active plans", async () => {

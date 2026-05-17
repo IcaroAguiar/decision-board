@@ -814,6 +814,41 @@ cair abaixo do mínimo configurado pelo ratchet.
 
 ---
 
+### PR-017D — Cobertura dirigida de jobs
+
+**Objetivo:** reduzir a maior lacuna produtiva do coverage baseline antes de UI.
+
+**Escopo:**
+
+```txt
+- testes focados em JobsService
+- start/stop idempotente do pg-boss
+- guarda de enqueue antes de start
+- enqueue de jobs com singletonKey/singletonSeconds corretos
+- medição de cobertura comparável ao PR-017C
+```
+
+**Checklist de implementação:**
+
+```txt
+- [x] Identificar menor coverage produtivo no baseline: apps/api/src/jobs/jobs.service.ts
+- [x] Adicionar testes de comportamento sem abrir portas fixas de API/front
+- [x] Rodar teste API contra Postgres real
+- [x] Rodar pnpm coverage e comparar jobs.service/total
+- [x] Rodar `complexity-optimizer` como baseline de leads antes de UI
+```
+
+**Fora do escopo:** refactor de pg-boss, alteração de agendamento, browser/UI e
+novos thresholds por arquivo. A auditoria inicial de complexidade sinalizou
+principalmente falsos positivos em testes HTTP e leads produtivos em
+normalização de DTO, redaction de auth e mapeamento de cycles; nenhum deles foi
+alterado neste PR sem teste e escopo próprios.
+
+**Aceite:** `jobs.service` melhora cobertura e o workspace mantém smoke,
+coverage, ratchet e quality gate verdes.
+
+---
+
 ### PR-017 — Dashboard web MVP
 
 **Objetivo:** criar tela principal útil.
