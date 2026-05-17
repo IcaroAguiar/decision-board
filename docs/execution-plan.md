@@ -1558,7 +1558,7 @@ posição sem preço manual e para recursos inexistentes.
 - [x] Teste snapshot fixture -> markdown esperado
 - [x] Rodar lint/typecheck/test/build/smoke/ratchet antes do PR
 - [x] Rodar agentic-code-review com reviewer independente
-- [ ] Abrir PR com CI remoto verde
+- [x] Abrir PR com CI remoto verde
 ```
 
 **Fora do escopo:** PDF.
@@ -1567,33 +1567,70 @@ posição sem preço manual e para recursos inexistentes.
 
 ---
 
-### PR-019 — Report engine JSON + schema
+### PR-019A — Report engine JSON package
 
-**Objetivo:** gerar snapshot estruturado para IA.
+**Objetivo:** gerar snapshot JSON estruturado para IA dentro de
+`packages/reports`, sem endpoint ou persistência.
 
 **Escopo:**
 
 ```txt
-- JSON generator
-- schemaVersion
-- JSON Schema
-- export endpoint
+- generateJsonReport(report)
+- schemaVersion = "1.0"
+- JSON Schema mínimo exportado
+- validateJsonReport(value)
+- sanitização dos mesmos campos sensíveis usados pelo Markdown
 ```
 
 **Checklist de implementação:**
 
 ```txt
-- [ ] Criar generateJsonReport(snapshot)
-- [ ] Definir schemaVersion = "1.0"
-- [ ] Criar docs/report-schema.md
-- [ ] Validar JSON contra schema
-- [ ] Remover dados sensíveis do payload
-- [ ] Testar com fixtures
+- [x] Criar generateJsonReport(report)
+- [x] Definir schemaVersion = "1.0"
+- [x] Exportar REPORT_JSON_SCHEMA
+- [x] Validar JSON contra shape mínimo com validateJsonReport
+- [x] Remover dados sensíveis do payload
+- [x] Testar com fixtures
+- [x] Rodar lint/typecheck/test/build/smoke/ratchet antes do PR
+- [x] Rodar agentic-code-review com reviewer independente
+- [ ] Abrir PR com CI remoto verde
 ```
 
-**Fora do escopo:** integração com IA dentro do app.
+**Fora do escopo:** integração com IA dentro do app, API/export endpoint,
+persistência, histórico de relatórios e UI.
 
 **Aceite:** JSON exportado é estável, versionado e sem PII desnecessária.
+
+---
+
+### PR-019B — Report API export endpoint
+
+**Objetivo:** expor geração de relatório JSON/Markdown pela API autenticada.
+
+**Escopo:**
+
+```txt
+- export endpoint autenticado
+- montar envelope a partir de dados user-owned
+- manter isolamento por userId
+- smoke/API test real quando Postgres/auth forem exigidos
+```
+
+**Checklist de implementação:**
+
+```txt
+- [ ] Definir rota de export
+- [ ] Buscar portfolio e recursos por userId autenticado
+- [ ] Gerar JSON com generateJsonReport
+- [ ] Gerar Markdown com generateMarkdownReport
+- [ ] Testar isolamento por usuário
+- [ ] Rodar smoke real de API em porta efêmera
+```
+
+**Fora do escopo:** histórico persistido e UI.
+
+**Aceite:** usuário autenticado consegue exportar relatório sem acessar dados de
+outro usuário.
 
 ---
 
