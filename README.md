@@ -234,6 +234,31 @@ mark confirmed cycles as report-due when the selected strategy cadence has
 elapsed. Both jobs are idempotent: cycle creation is unique per plan/month, and
 report-due markers are written once per cycle.
 
+## Market Data
+
+Manual market data is the baseline provider and does not require external API
+tokens. Authenticated users can save their own manual price snapshots for a
+global asset without changing another user's history.
+
+```txt
+POST /assets/:assetId/price-snapshots
+GET  /assets/:assetId/price-snapshots
+```
+
+`POST /assets/:assetId/price-snapshots` accepts:
+
+```json
+{
+  "price": "100.25",
+  "currency": "BRL",
+  "capturedAt": "2026-05-17T12:00:00.000Z"
+}
+```
+
+`currency` is optional and defaults to the asset currency; when provided, it must
+match that asset currency. `capturedAt` is optional and defaults to the current
+server time. Responses never include `userId` or raw provider payloads.
+
 ## Security And Financial Boundaries
 
 - Do not store broker credentials.

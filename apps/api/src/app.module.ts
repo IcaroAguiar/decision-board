@@ -6,6 +6,7 @@ import { ContributionCyclesModule } from "./contribution-cycles/contribution-cyc
 import { ContributionPlansModule } from "./contribution-plans/contribution-plans.module.js";
 import { HealthController } from "./health.controller.js";
 import { JobsModule } from "./jobs/jobs.module.js";
+import { MarketDataModule } from "./market-data/market-data.module.js";
 import { PortfoliosModule } from "./portfolios/portfolios.module.js";
 import { PositionsModule } from "./positions/positions.module.js";
 
@@ -16,6 +17,7 @@ import { PositionsModule } from "./positions/positions.module.js";
 		ContributionCyclesModule,
 		ContributionPlansModule,
 		JobsModule,
+		MarketDataModule,
 		PortfoliosModule,
 		PositionsModule,
 	],

@@ -572,17 +572,24 @@ workers acidentais em processos de teste ou desenvolvimento.
 **Checklist de implementação:**
 
 ```txt
-- [ ] Criar packages/market-data
-- [ ] Definir QuoteSnapshot
-- [ ] Criar ManualMarketDataProvider
-- [ ] Criar endpoint para salvar preço manual
-- [ ] Criar price_snapshots
-- [ ] Não depender de provider externo
+- [x] Criar packages/market-data
+- [x] Definir QuoteSnapshot
+- [x] Criar ManualMarketDataProvider
+- [x] Criar endpoint para salvar preço manual
+- [x] Criar price_snapshots
+- [x] Não depender de provider externo
 ```
 
 **Fora do escopo:** brapi.
 
 **Aceite:** usuário atualiza preço manual e snapshot é salvo.
+
+**Evidência local do corte:** pacote `market-data` testa que o provider manual
+existe sem configuração externa e cria snapshots manuais sem chamadas de rede. A
+API autenticada salva e lista snapshots manuais por asset, valida preço,
+moeda, timestamp, asset inexistente e limite de listagem, e mantém o histórico
+de snapshots isolado por usuário contra Postgres local. Nenhum endpoint aceita
+`userId`, e o teste HTTP roda com porta efêmera.
 
 ---
 

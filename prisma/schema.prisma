@@ -54,6 +54,7 @@ model User {
   cashAccounts       CashAccount[]
   contributionPlans  ContributionPlan[]
   contributionCycles ContributionCycle[]
+  priceSnapshots     PriceSnapshot[]
   userAssetOverrides UserAssetOverride[]
   sessions           Session[]
   accounts           Account[]
@@ -153,6 +154,7 @@ model Asset {
   updatedAt    DateTime     @updatedAt @map("updated_at")
 
   positions          Position[]
+  priceSnapshots     PriceSnapshot[]
   userAssetOverrides UserAssetOverride[]
 
   @@unique([ticker, exchange, currency])
@@ -274,4 +276,23 @@ model ContributionCycle {
   @@index([userId, portfolioId, cycleMonth])
   @@index([userId, portfolioId, status, reportRecommendedAt])
   @@map("contribution_cycles")
+}
+
+model PriceSnapshot {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  assetId        String   @map("asset_id") @db.Uuid
+  price          Decimal  @db.Decimal(20, 8)
+  currency       String   @default("BRL")
+  provider       String   @db.VarChar(64)
+  capturedAt     DateTime @map("captured_at")
+  rawPayloadJson Json?    @map("raw_payload_json")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Restrict)
+
+  @@index([userId, assetId, capturedAt])
+  @@index([assetId, capturedAt])
+  @@map("price_snapshots")
 }
