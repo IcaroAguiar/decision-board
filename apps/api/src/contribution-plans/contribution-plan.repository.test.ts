@@ -159,6 +159,30 @@ test("scopes contribution plan repository references and active listing", async 
 		assert.equal(updateOwnPlan.contributionPlan.amount.toString(), "1300.25");
 		assert.equal(updateOwnPlan.contributionPlan.cashAccountId, null);
 		assert.equal(updateOwnPlan.contributionPlan.endsAt, null);
+
+		const replacementCashAccount = await createCashAccount(
+			userA.id,
+			portfolioA.id,
+			"Replacement cash",
+		);
+		const updateSchedule = await repository.updateByUser(userA.id, laterPlan.contributionPlan.id, {
+			frequency: MONTHLY_FREQUENCY,
+			dayOfMonth: 25,
+			startsAt: "2099-04-01",
+			endsAt: "2099-10-31",
+			defaultStrategyId: strategyIds.highIncome,
+			cashAccountId: replacementCashAccount.id,
+		});
+		assert.equal(updateSchedule.status, UPDATED_STATUS);
+		assert.equal(updateSchedule.contributionPlan.frequency, "MONTHLY");
+		assert.equal(updateSchedule.contributionPlan.dayOfMonth, 25);
+		assert.equal(
+			updateSchedule.contributionPlan.startsAt.toISOString(),
+			"2099-04-01T00:00:00.000Z",
+		);
+		assert.equal(updateSchedule.contributionPlan.endsAt?.toISOString(), "2099-10-31T00:00:00.000Z");
+		assert.equal(updateSchedule.contributionPlan.defaultStrategyId, strategyIds.highIncome);
+		assert.equal(updateSchedule.contributionPlan.cashAccountId, replacementCashAccount.id);
 	} finally {
 		await prisma.user.deleteMany({
 			where: {
