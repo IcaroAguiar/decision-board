@@ -1486,7 +1486,7 @@ ou porta fixa.
 - [x] Rodar pnpm coverage e comparar positions.service/total
 - [x] Rodar lint/typecheck/test/build/smoke/ratchet antes do PR
 - [x] Rodar agentic-code-review com reviewer independente
-- [ ] Abrir PR com CI remoto verde
+- [x] Abrir PR com CI remoto verde
 ```
 
 **Fora do escopo:** alterar schema/migration, rotas HTTP, cálculo de core,
@@ -1547,15 +1547,18 @@ posição sem preço manual e para recursos inexistentes.
 **Checklist de implementação:**
 
 ```txt
-- [ ] Criar generateMarkdownReport(snapshot)
-- [ ] Incluir estratégia
-- [ ] Incluir aporte
-- [ ] Incluir caixa
-- [ ] Incluir posições
-- [ ] Incluir alocação
-- [ ] Incluir alertas
-- [ ] Incluir frequência recomendada
-- [ ] Teste snapshot fixture -> markdown esperado
+- [x] Criar generateMarkdownReport(report)
+- [x] Incluir estratégia
+- [x] Incluir aporte
+- [x] Incluir caixa
+- [x] Incluir posições
+- [x] Incluir alocação
+- [x] Incluir alertas
+- [x] Incluir frequência recomendada
+- [x] Teste snapshot fixture -> markdown esperado
+- [x] Rodar lint/typecheck/test/build/smoke/ratchet antes do PR
+- [x] Rodar agentic-code-review com reviewer independente
+- [ ] Abrir PR com CI remoto verde
 ```
 
 **Fora do escopo:** PDF.

@@ -249,6 +249,13 @@ existing plan, list cycles by portfolio, and confirm a contributed amount that
 differs from the planned amount. Cycles track a bounded status, selected
 strategy, optional notes, and remain scoped to the session user.
 
+## Reports
+
+`@decision-board/reports` can render a deterministic Markdown report from the
+versioned MVP report envelope. The Markdown output includes portfolio,
+strategy, contribution, cash, positions, allocation, alerts, review policy, and
+user notes, while omitting known sensitive field names from nested records.
+
 ## Jobs
 
 Set `JOBS_ENABLED=true` on exactly one API process to run pg-boss workers using
