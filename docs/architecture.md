@@ -444,12 +444,20 @@ Regras puras de domínio:
 - calcular valor total da carteira
 - calcular peso por ativo
 - calcular alocação por categoria
+- calcular alocação por segmento
 - calcular dividendos estimados
 - avaliar limites da estratégia
 - gerar alertas
 ```
 
 Não pode depender de NestJS, React, Prisma ou banco.
+
+Os cálculos de Fase 4 vivem em `@decision-board/core` e aceitam somente entradas
+explícitas de posições/caixa. O pacote retorna valores monetários arredondados a
+2 casas, percentuais arredondados a 2 casas, alocação por ativo/categoria de
+risco/segmento e dividendos mensais/anuais estimados quando a posição informa
+`estimatedMonthlyDividend`. Entradas numéricas negativas ou não finitas devem
+falhar cedo para evitar relatórios silenciosamente incorretos.
 
 ### 12.2. `packages/strategies`
 

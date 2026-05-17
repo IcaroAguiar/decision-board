@@ -1,24 +1,25 @@
 {
   "schemaVersion": 1,
-  "reviewer": "security-reviewer:019e345b-129d-7fa3-aa15-fb79ce241b82",
-  "reviewedAt": "2026-05-17T05:16:55Z",
-  "verdict": "approved_with_risk",
+  "reviewer": "reviewer:019e346e-13ab-7c10-b95f-ad3714719d1e",
+  "reviewedAt": "2026-05-17T05:40:00Z",
+  "verdict": "approved",
   "deterministicSignalsReviewed": true,
   "allowedBases": [
     "main"
   ],
-  "reviewedFingerprint": "5555084cdfdf962d9d6d175de509d5ece04e294064710b1c9c8ff4428c5c0ff0",
+  "reviewedFingerprint": "030138d2a5f682e2bc110229e47c42a50a2b13803bb2ec973923f44d0a822959",
   "reviewedDeterministicSignals": {
-    "blocking": 11,
+    "blocking": 1,
     "high": 0,
-    "medium": 15
+    "medium": 1
   },
   "scope": [
-    "PR-014 brapi provider backend-only",
-    "BrapiMarketDataProvider with optional token, timeout, https/loopback base validation, ticker allowlist, URL encoding, symbol matching, and allowlisted raw payload",
-    "POST /assets/:assetId/price-snapshots/refresh authenticated optional provider refresh",
-    "refresh cooldown per user and asset",
-    "shared mock HTTP test helper using ephemeral loopback ports, docs, and env examples"
+    "PR-016 core calculations backend-only",
+    "calculateAllocation aggregation by asset, risk category, and segment",
+    "calculateEstimatedDividends with explicit numeric input validation",
+    "calculatePortfolioSummary expanded output while preserving strategy engine compatibility",
+    "core and strategies package test scripts build local workspace dependencies before direct package tests",
+    "README, architecture, and execution-plan documentation for the no-UI pivot"
   ],
-  "residualRisk": "Approved with risk: the independent reviewer first found five actionable issues and the final pass confirmed they were resolved: ticker allowlist and URL encoding, refresh cooldown per user and asset, returned symbol matching before persistence, https-only provider base except loopback tests, and allowlisted raw payload without token/header. Remaining deterministic signals are accepted as false positives or bounded warnings: loopback literals are used only for ephemeral local tests, provider Authorization header is constructed from env/config and not persisted, DTO validation is implemented through explicit parsers, the controller calls requireAuthenticatedUser, docs cover the endpoint instead of OpenAPI decorators, and HTTP integration tests exercise real Nest routes on ephemeral ports."
+  "residualRisk": "Approved: the independent reviewer initially found two medium findings, both resolved before final approval. The remaining deterministic signal is package-manifest-without-lockfile; it is accepted because packages/core/package.json and packages/strategies/package.json changed only test scripts to build existing workspace dependencies before direct package tests, with no dependency, version, install, or lockfile change."
 }

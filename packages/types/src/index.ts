@@ -54,6 +54,7 @@ export interface PortfolioPositionInput {
 	currentPrice: number;
 	riskCategory: RiskCategory;
 	segment?: string;
+	estimatedMonthlyDividend?: number;
 }
 
 export interface PortfolioCashAccountInput {

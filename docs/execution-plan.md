@@ -638,30 +638,33 @@ do provider compartilhado.
 
 ### PR-015 — Atualização manual de snapshot
 
-**Objetivo:** criar endpoint e UI para atualizar snapshot de preços.
+**Objetivo:** consolidar a atualização manual de snapshots sem iniciar UI.
 
 **Escopo:**
 
 ```txt
-- botão atualizar
-- status da atualização
-- erro legível
-- data da última atualização
+- endpoint autenticado de refresh já entregue no PR-014
+- status/erro legível no contrato HTTP
+- data da última atualização via price snapshot persistido
+- documentação do contrato antes da tela
 ```
 
 **Checklist de implementação:**
 
 ```txt
-- [ ] Endpoint POST /portfolios/:id/market-data/refresh
-- [ ] UI com botão
-- [ ] Exibir provider usado
-- [ ] Exibir última atualização
-- [ ] Exibir falhas por ativo
+- [x] Endpoint POST /assets/:assetId/price-snapshots/refresh
+- [x] Exibir provider usado na resposta do snapshot
+- [x] Exibir última atualização via `capturedAt`
+- [x] Exibir falhas por ativo com erro HTTP legível
+- [ ] UI com botão, status visual e lista de falhas
 ```
 
-**Fora do escopo:** atualização automática em background.
+**Fora do escopo:** atualização automática em background e qualquer UI antes do
+pivot de cobertura/testabilidade.
 
-**Aceite:** usuário atualiza preços quando desejar.
+**Aceite backend-only:** usuário autenticado atualiza preço de um ativo quando
+desejar via API, com fallback manual preservado. A experiência visual fica
+explicitamente adiada para depois da Fase 4 e da jornada de testes/smokes.
 
 ## 7. Fase 4 — Dashboard e relatórios
 
@@ -682,17 +685,27 @@ do provider compartilhado.
 **Checklist de implementação:**
 
 ```txt
-- [ ] Criar calculatePortfolioSummary
-- [ ] Criar calculateAllocation
-- [ ] Criar calculateEstimatedDividends
-- [ ] Criar fixtures
-- [ ] Testar arredondamento
-- [ ] Testar carteira vazia
+- [x] Criar calculatePortfolioSummary
+- [x] Criar calculateAllocation
+- [x] Criar calculateEstimatedDividends
+- [x] Criar fixtures
+- [x] Testar arredondamento
+- [x] Testar carteira vazia
 ```
 
 **Fora do escopo:** sugestões de compra.
 
 **Aceite:** cálculos são reproduzíveis e testados.
+
+**Aceite backend-only:** `packages/core` calcula valor total, caixa, posições,
+alocação por ativo/categoria/segmento e dividendos estimados sem depender de
+React, NestJS, Prisma, banco ou provider externo.
+
+**Evidência local do corte:** testes unitários do pacote `core` cobrem cálculo
+de posição, resumo de carteira, alocação, dividendos estimados, carteira vazia,
+arredondamento determinístico e rejeição de números negativos/não finitos.
+`packages/strategies` continua consumindo o resumo por categoria para proteger
+compatibilidade do motor de alertas.
 
 ---
 
