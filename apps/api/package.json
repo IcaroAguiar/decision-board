@@ -10,6 +10,7 @@
 		"typecheck": "tsc -p tsconfig.json --noEmit"
 	},
 	"dependencies": {
+		"@decision-board/market-data": "workspace:*",
 		"@decision-board/strategies": "workspace:*",
 		"@decision-board/types": "workspace:*",
 		"@nestjs/common": "11.1.21",

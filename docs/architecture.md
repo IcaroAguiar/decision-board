@@ -665,6 +665,7 @@ strategies
 ```txt
 price_snapshots
 - id
+- user_id
 - asset_id
 - price
 - currency
@@ -672,6 +673,10 @@ price_snapshots
 - captured_at
 - raw_payload_json
 ```
+
+Manual price snapshots are user-owned because manual market data can reflect a
+user-specific source or timing. Queries and API responses must derive ownership
+from the authenticated session and must not expose `user_id`.
 
 ### 13.12. Portfolio snapshots
 
@@ -729,6 +734,9 @@ PATCH  /portfolios/:id/cash-accounts/:cashAccountId
 POST   /portfolios/:id/contribution-plans
 GET    /portfolios/:id/contribution-plans
 PATCH  /portfolios/:id/contribution-plans/:planId
+
+POST   /assets/:assetId/price-snapshots
+GET    /assets/:assetId/price-snapshots
 
 GET    /strategies
 GET    /strategies/:id

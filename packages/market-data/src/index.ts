@@ -1,6 +1,6 @@
 export interface QuoteSnapshot {
 	ticker: string;
-	price: number;
+	price: string;
 	currency: string;
 	provider: string;
 	capturedAt: Date;
@@ -12,7 +12,26 @@ export interface MarketDataProvider {
 	getQuotes(tickers: string[]): Promise<QuoteSnapshot[]>;
 }
 
+export interface ManualQuoteSnapshotInput {
+	ticker: string;
+	price: string;
+	currency: string;
+	capturedAt?: Date;
+}
+
+export const manualMarketDataProviderName = "manual";
+
 export class ManualMarketDataProvider implements MarketDataProvider {
+	createQuoteSnapshot(input: ManualQuoteSnapshotInput): QuoteSnapshot {
+		return {
+			ticker: input.ticker,
+			price: input.price,
+			currency: input.currency,
+			provider: manualMarketDataProviderName,
+			capturedAt: input.capturedAt ?? new Date(),
+		};
+	}
+
 	async getQuote(_ticker: string): Promise<QuoteSnapshot | null> {
 		return null;
 	}

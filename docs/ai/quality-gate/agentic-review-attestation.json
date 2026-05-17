@@ -1,26 +1,24 @@
 {
   "schemaVersion": 1,
-  "reviewer": "codex-exec-review:22482",
-  "reviewedAt": "2026-05-17T03:58:01Z",
+  "reviewer": "security-reviewer:019e3445-5f66-72b0-b055-44615e2e002a",
+  "reviewedAt": "2026-05-17T04:53:23Z",
   "verdict": "approved_with_risk",
   "deterministicSignalsReviewed": true,
   "allowedBases": [
     "main"
   ],
-  "reviewedFingerprint": "b48d9e0f65c130ed0e41b7a6203ef2b397b37cf773e9dd52fbf3a8956fa51284",
+  "reviewedFingerprint": "d2fa5621c587b9c972f82164c9a530c834fba6f4e84073b873e0a757a150e226",
   "reviewedDeterministicSignals": {
-    "blocking": 19,
+    "blocking": 3,
     "high": 0,
-    "medium": 21
+    "medium": 7
   },
   "scope": [
-    "PR-012 pg-boss jobs MVP",
-    "opt-in JobsModule and pg-boss lifecycle",
-    "monthly contribution cycle creation from active plans",
-    "report-due marking for confirmed cycles based on strategy cadence",
-    "ContributionCycle report recommendation schema fields and migrations",
-    "jobs repository user and portfolio scoping safeguards",
-    "Postgres-backed jobs tests and deterministic pagination regression fixture"
+    "PR-013 manual market data provider",
+    "PriceSnapshot Prisma model and additive migration",
+    "POST /assets/:assetId/price-snapshots authenticated manual snapshot creation",
+    "GET /assets/:assetId/price-snapshots authenticated user-scoped history listing",
+    "manual provider package behavior and docs"
   ],
-  "residualRisk": "Approved with risk: the independent reviewer found no blocking issues and flagged only that the pagination regression fixture used random UUID ordering. That fixture was then hardened with deterministic ordered UUIDs and the API test suite was rerun successfully. Remaining deterministic signals are accepted as bounded job names, Prisma enum/status constants, DTO/test vocabulary, and dependency-lockfile changes required by pg-boss."
+  "residualRisk": "Approved with risk: the independent reviewer found no blocking issue for user isolation, auth ownership, userId input, raw payload exposure, migration safety, Prisma scoping, DTO validation, or financial-boundary language. Residual risk is a future concurrent global asset mutation/deactivation race because the repository reads the active Asset before creating the user-owned PriceSnapshot outside a transaction; this is accepted for PR-013 because assets are global catalog data, the snapshot is stamped with session userId, and the foreign key enforces asset existence. Remaining deterministic signals are accepted as false positives or bounded warnings: list query is capped at 100, controller routes call requireAuthenticatedUser, validation uses explicit parser functions, HTTP integration tests exercise the route on an ephemeral port, and duplicated literals are test/domain vocabulary with provider name centralized."
 }
