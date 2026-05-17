@@ -1088,6 +1088,38 @@ quality gate verdes.
 
 ---
 
+### PR-017L — Documentação pública de testabilidade pós-Fase 4
+
+**Objetivo:** versionar um status público e seguro da jornada de testabilidade
+antes de qualquer UI.
+
+**Escopo:**
+
+```txt
+- docs/testability-status.md
+- snapshot público do gate pós-Fase 4 até PR-017K / GitHub PR #24
+- evidência de coverage, test, smoke real, quality gate e review independente
+- política de portas efêmeras para testes e smoke
+- riscos residuais sem secrets, dados reais ou credenciais
+```
+
+**Checklist de implementação:**
+
+```txt
+- [x] Criar documento público seguro de status de testabilidade
+- [x] Linkar o documento a partir de docs/testing.md
+- [x] Rodar lint/gitleaks/ratchet
+- [ ] Abrir PR com CI remoto verde
+```
+
+**Fora do escopo:** alterar código produtivo, testes executáveis, schema,
+contrato HTTP, dados reais, secrets, report engine e qualquer UI.
+
+**Aceite:** o status público fica versionado, sem vazamento de informação
+sensível, e os gates aplicáveis de documentação passam.
+
+---
+
 ### PR-017 — Dashboard web MVP
 
 **Objetivo:** criar tela principal útil.
