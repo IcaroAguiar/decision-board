@@ -46,6 +46,13 @@ pnpm test
 pnpm build
 ```
 
+API changes should also run the real smoke path documented in
+[docs/testing.md](docs/testing.md):
+
+```bash
+pnpm smoke:api
+```
+
 When Prisma schema changes, also run:
 
 ```bash
