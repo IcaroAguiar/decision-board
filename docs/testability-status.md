@@ -21,21 +21,23 @@ post-Phase 4 hardening track focused on:
 The latest validated implementation baseline is commit `84db24a`, merged
 through GitHub PR
 [#33](https://github.com/IcaroAguiar/decision-board/pull/33). Later docs-only
-status refreshes do not unblock UI; the next implementation cut should remain
-inside the post-Phase 4 hardening track until explicitly released.
+status refreshes, including PR
+[#34](https://github.com/IcaroAguiar/decision-board/pull/34), do not unblock
+UI. PR-017V is the current local hardening cut and remains inside the
+post-Phase 4 track until merged and explicitly released.
 
 ## Latest Evidence Snapshot
 
 | Evidence | Latest known result | Public-safe note |
 | --- | ---: | --- |
-| `pnpm coverage` | 97/97 tests, 94.15% lines, 77.83% branches, 98.01% functions | Uses synthetic env values and local Postgres. |
-| `pnpm test` | Workspace passed; API 70/70 | API tests run against local Postgres where required. |
-| `pnpm smoke:api` | Passed on ephemeral port `51751` | The exact port is runtime-assigned and not a contract. |
+| `pnpm coverage` | 98/98 tests, 94.38% lines, 77.87% branches, 98.02% functions | Local PR-017V evidence with synthetic env values and local Postgres. |
+| `pnpm test` | Workspace passed; API 71/71 | API tests run against local Postgres where required. |
+| `pnpm smoke:api` | Passed on ephemeral port `58168` | The exact port is runtime-assigned and not a contract. |
 | GitHub `quality-gate` | Passed for PR #33 in 2m7s | Runs migrations, tests, coverage ratchet, smoke, and build. |
 | GitGuardian | Passed for PR #33 | Remote secret scanning stayed green. |
 | Local `gitleaks detect --redact` | No leaks found | Reports counts/status only, not secret values. |
-| Local ratchet | Passed for PR-017T | Deterministic collector has 0 findings; runtime-required signal was satisfied by real API smoke. |
-| Independent review | PR-017T reviewer finding addressed | Reviewer found one low documentation evidence mismatch; this status now reflects the PR-017T evidence. |
+| Local ratchet | Passed for PR-017V | Ratchet has 0 blocking failures, warnings, or improvements; one low informational unsafe-typing signal was reviewed. |
+| Independent review | PR-017V low docs findings addressed | Reviewer found two low documentation mismatches; this status now reflects the packet and gate evidence. |
 
 ## Completed Post-Phase 4 Cuts
 
@@ -61,6 +63,7 @@ inside the post-Phase 4 hardening track until explicitly released.
 | PR-017R | #31 | Docs-only correction for post-PR #30 public status. |
 | PR-017S | #32 | Docs-only correction for post-PR #31 public status. |
 | PR-017T | #33 | Added focused `ContributionPlanRepository` update coverage. |
+| PR-017V | local branch | Adds focused `JobsService` worker registration coverage; PR pending. |
 
 ## Coverage Movement
 
@@ -70,7 +73,7 @@ thresholds that motivated the post-Phase 4 pivot:
 
 | Surface | Latest focused result |
 | --- | ---: |
-| `jobs.service.js` | 86.91% lines, 80.00% branches |
+| `jobs.service.js` | 92.67% lines, 80.85% branches |
 | `client-ip.js` | 100.00% lines, 100.00% branches |
 | `asset.repository.js` | 97.66% lines, 70.00% branches |
 | `contribution-plan.repository.js` | 86.91% lines, 78.72% branches |
@@ -85,10 +88,10 @@ thresholds that motivated the post-Phase 4 pivot:
 
 ## Complexity Optimizer Triage
 
-`complexity-optimizer` was rerun during the PR-017Q local cut. The first-pass
-scanner reported many loop/query-in-loop leads in HTTP tests; these are treated
-as test-harness leads, not product hot paths. The productive leads manually
-checked in this pass were:
+`complexity-optimizer` was rerun during the PR-017V local cut. The first-pass
+scanner still reports many loop/query-in-loop leads in HTTP tests; these are
+treated as test-harness leads, not product hot paths. The productive leads
+manually checked in this pass were:
 
 | Surface | Current read |
 | --- | --- |
@@ -96,11 +99,11 @@ checked in this pass were:
 | `auth.logger.ts` | URL payload redaction had a small constant-factor cleanup opportunity around fallback payload-index detection; PR-017Q covers that behavior with focused synthetic placeholder tests. |
 | `contribution-cycles.service.ts` | Response mapping is expected O(n) list serialization. |
 | `asset.dto.ts` | Enum map creation is startup/static validation work, not a request-scale nested scan. |
+| `jobs.service.ts` | Worker registration is constant-size over two known queues; PR-017V tests the queue names and conservative worker options without changing runtime behavior. |
 
-No broad production optimization was bundled into PR-017Q. The only cleanup is
-the behavior-preserving payload-index simplification covered by focused tests.
-Any further optimization should be handled as a separate, behavior-preserving
-cut with focused tests.
+No broad production optimization is bundled into PR-017V. The new code change is
+test-only, and further optimization should remain separate, behavior-preserving,
+and backed by focused tests.
 
 ## Public-Repo Fixture Safety
 
