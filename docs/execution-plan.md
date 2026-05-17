@@ -1298,7 +1298,7 @@ iniciar UI.
 - [x] Rodar pnpm coverage e comparar auth.logger/total
 - [x] Rodar lint/typecheck/test/build/smoke/ratchet antes do PR
 - [x] Rodar agentic-code-review com reviewer independente
-- [ ] Abrir PR com CI remoto verde
+- [x] Abrir PR com CI remoto verde
 ```
 
 **Fora do escopo:** alterar Better Auth, cookies, schema/migration, rotas HTTP,
@@ -1307,6 +1307,39 @@ providers externos, UI/browser, dados reais e secrets.
 **Aceite:** `auth.logger` melhora cobertura e mantém redaction de payloads
 sensíveis com fixtures sintéticos/placeholders, sem expor dados reais e sem
 enfraquecer logs de auth.
+
+---
+
+### PR-017R — Status público pós-PR #30
+
+**Objetivo:** corrigir documentação pública versionada após o merge do PR #30,
+sem iniciar UI e sem alterar código executável.
+
+**Escopo:**
+
+```txt
+- marcar PR-017Q como concluído com CI remoto verde
+- atualizar baseline validado para PR #30 / 32b817e
+- atualizar status de GitHub quality-gate e GitGuardian para PR #30
+- registrar PR-017R como corte docs-only de housekeeping
+- preservar política de dados sintéticos, sem secrets e sem portas fixas
+```
+
+**Checklist de implementação:**
+
+```txt
+- [x] Confirmar PR #30 mergeado no GitHub
+- [x] Atualizar docs/execution-plan.md
+- [x] Atualizar docs/testability-status.md
+- [x] Rodar lint/diff/secret scan proporcionais a docs-only
+- [ ] Abrir PR com CI remoto verde
+```
+
+**Fora do escopo:** código produtivo, testes novos, schema/migration, API,
+auth, providers externos, UI/browser, dados reais e secrets.
+
+**Aceite:** documentação pública não contradiz o estado real do GitHub e mantém
+a decisão de bloquear UI até novo desbloqueio explícito.
 
 ---
 
