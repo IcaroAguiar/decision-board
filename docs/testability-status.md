@@ -18,26 +18,25 @@ post-Phase 4 hardening track focused on:
 - public-safe documentation;
 - no fixed common API or frontend ports in tests.
 
-The latest validated implementation baseline is commit `84db24a`, merged
+The latest validated implementation baseline is commit `732cc73`, merged
 through GitHub PR
-[#33](https://github.com/IcaroAguiar/decision-board/pull/33). Later docs-only
-status refreshes, including PR
-[#34](https://github.com/IcaroAguiar/decision-board/pull/34), do not unblock
-UI. PR-017V is the current local hardening cut and remains inside the
-post-Phase 4 track until merged and explicitly released.
+[#35](https://github.com/IcaroAguiar/decision-board/pull/35). Earlier
+docs-only status refreshes do not unblock UI. PR-017W is the current local
+hardening cut and remains inside the post-Phase 4 track until merged and
+explicitly released.
 
 ## Latest Evidence Snapshot
 
 | Evidence | Latest known result | Public-safe note |
 | --- | ---: | --- |
-| `pnpm coverage` | 98/98 tests, 94.38% lines, 77.87% branches, 98.02% functions | Local PR-017V evidence with synthetic env values and local Postgres. |
-| `pnpm test` | Workspace passed; API 71/71 | API tests run against local Postgres where required. |
-| `pnpm smoke:api` | Passed on ephemeral port `58168` | The exact port is runtime-assigned and not a contract. |
-| GitHub `quality-gate` | Passed for PR #33 in 2m7s | Runs migrations, tests, coverage ratchet, smoke, and build. |
-| GitGuardian | Passed for PR #33 | Remote secret scanning stayed green. |
+| `pnpm coverage` | 99/99 tests, 94.38% lines, 77.90% branches, 98.02% functions | Local PR-017W evidence with synthetic env values and local Postgres. |
+| `pnpm test` | Workspace passed; API 72/72 | API tests run against local Postgres where required. |
+| `pnpm smoke:api` | Passed on ephemeral port `62690` | The exact port is runtime-assigned and not a contract. |
+| GitHub `quality-gate` | Passed for PR #35 in 2m17s | Runs migrations, tests, coverage ratchet, smoke, and build. |
+| GitGuardian | Passed for PR #35 | Remote secret scanning stayed green. |
 | Local `gitleaks detect --redact` | No leaks found | Reports counts/status only, not secret values. |
-| Local ratchet | Passed for PR-017V | Ratchet has 0 blocking failures, warnings, or improvements; one low informational unsafe-typing signal was reviewed. |
-| Independent review | PR-017V low docs findings addressed | Reviewer found two low documentation mismatches; this status now reflects the packet and gate evidence. |
+| Local ratchet | Passed for PR-017W | Ratchet has 0 blocking failures, warnings, or improvements; synthetic fixture literals were kept test-local. |
+| Independent review | PR-017W stability finding addressed | Reviewer found one medium test-ordering risk; timestamp-controlled fixture was added and revalidation approved. |
 
 ## Completed Post-Phase 4 Cuts
 
@@ -63,7 +62,8 @@ post-Phase 4 track until merged and explicitly released.
 | PR-017R | #31 | Docs-only correction for post-PR #30 public status. |
 | PR-017S | #32 | Docs-only correction for post-PR #31 public status. |
 | PR-017T | #33 | Added focused `ContributionPlanRepository` update coverage. |
-| PR-017V | local branch | Adds focused `JobsService` worker registration coverage; PR pending. |
+| PR-017V | #35 | Added focused `JobsService` worker registration coverage. |
+| PR-017W | local branch | Adds focused `CashAccountRepository` user-isolation coverage; PR pending. |
 
 ## Coverage Movement
 
@@ -76,6 +76,7 @@ thresholds that motivated the post-Phase 4 pivot:
 | `jobs.service.js` | 92.67% lines, 80.85% branches |
 | `client-ip.js` | 100.00% lines, 100.00% branches |
 | `asset.repository.js` | 97.66% lines, 70.00% branches |
+| `cash-account.repository.js` | 92.98% lines, 64.71% branches |
 | `contribution-plan.repository.js` | 86.91% lines, 78.72% branches |
 | `contribution-cycle.repository.js` | 89.19% lines, 77.14% branches |
 | `env.js` | 88.89% lines, 87.50% branches |
@@ -108,10 +109,12 @@ and backed by focused tests.
 ## Public-Repo Fixture Safety
 
 PR-017Q intentionally uses synthetic placeholder strings to test whether auth
-log redaction removes token-like, e-mail-like, and callback-like payloads. These
-fixtures are not real credentials, cookies, session IDs, raw auth payloads, or
-real user data. Local `gitleaks detect --redact` and the independent reviewer
-both found no real secret exposure in this cut.
+log redaction removes token-like, e-mail-like, and callback-like payloads.
+PR-017W uses synthetic users, portfolios, and cash-account labels to exercise
+repository ownership. These fixtures are not real credentials, cookies, session
+IDs, raw auth payloads, real portfolio data, or real user data. Local
+`gitleaks detect --redact` and independent review must stay green before each
+PR is opened.
 
 ## Required Gate Before UI
 

@@ -1405,7 +1405,7 @@ fixa.
 - [x] Rodar pnpm coverage e comparar jobs.service/total
 - [x] Rodar lint/typecheck/test/build/smoke/ratchet antes do PR
 - [x] Rodar agentic-code-review com reviewer independente
-- [ ] Abrir PR com CI remoto verde
+- [x] Abrir PR com CI remoto verde
 ```
 
 **Fora do escopo:** alterar comportamento de pg-boss, schema/migration, rotas
@@ -1415,6 +1415,45 @@ porta fixa de desenvolvimento.
 **Aceite:** `JobsService` protege o registro dos workers e suas opções
 operacionais conservadoras, mantendo o gate pós-Fase 4 focado em cobertura,
 smoke real e documentação pública antes de qualquer UI.
+
+---
+
+### PR-017W — Cobertura de CashAccountRepository
+
+**Objetivo:** reduzir lacuna produtiva do coverage pós-Fase 4 em persistência
+user-owned de contas de caixa, sem iniciar UI e sem abrir servidor HTTP ou porta
+fixa.
+
+**Escopo:**
+
+```txt
+- teste focado para CashAccountRepository contra Postgres real
+- createByUser bloqueando portfolio de outro usuário
+- findManyByPortfolio listando apenas caixa do usuário dono
+- findByUser respeitando userId
+- updateByUser bloqueando caixa de outro usuário e atualizando campos próprios
+- atualizar status público seguro pós-PR #35
+```
+
+**Checklist de implementação:**
+
+```txt
+- [x] Identificar próximo corte produtivo: apps/api/src/cash-accounts/cash-account.repository.ts
+- [x] Adicionar teste focado de repositório sem API/front ou porta fixa
+- [x] Rodar teste focado compilado contra Postgres local
+- [x] Rodar pnpm coverage e comparar cash-account.repository/total
+- [x] Rodar lint/typecheck/test/build/smoke/ratchet antes do PR
+- [x] Rodar agentic-code-review com reviewer independente
+- [ ] Abrir PR com CI remoto verde
+```
+
+**Fora do escopo:** alterar schema/migration, rotas HTTP, service layer,
+providers externos, dados reais, secrets, UI/browser e qualquer porta fixa de
+desenvolvimento.
+
+**Aceite:** `CashAccountRepository` protege criação, listagem, busca e update
+de contas de caixa com Postgres real, mantendo escopo por `userId` e sem
+enfraquecer a separação entre usuários.
 
 ---
 
