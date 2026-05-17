@@ -49,6 +49,10 @@ contribution plan, and contribution cycle, confirms the cycle, checks a
 cross-user access denial, and then cleans up the synthetic users/assets it
 created.
 
+The GitHub Actions quality gate runs this smoke after migrations and the test
+suite. A PR that changes backend/API behavior should still run it locally before
+opening the PR so failures are diagnosed with local logs and database access.
+
 Expected output is a small JSON object:
 
 ```json

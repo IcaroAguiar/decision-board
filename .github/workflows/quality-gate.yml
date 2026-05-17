@@ -68,6 +68,9 @@ jobs:
       - name: Tests
         run: pnpm test
 
+      - name: API smoke
+        run: pnpm smoke:api
+
       - name: Build
         run: pnpm build
 
