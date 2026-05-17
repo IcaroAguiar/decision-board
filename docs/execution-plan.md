@@ -1145,7 +1145,7 @@ iniciar UI.
 - [x] Rodar pnpm coverage e comparar contribution-plans.service/total
 - [x] Rodar lint/typecheck/test/build/smoke/ratchet antes do PR
 - [x] Rodar agentic-code-review com reviewer independente
-- [ ] Abrir PR com CI remoto verde
+- [x] Abrir PR com CI remoto verde
 ```
 
 **Fora do escopo:** alterar código produtivo, schema/migration, contrato HTTP,
@@ -1154,6 +1154,44 @@ jobs, report engine, dados reais, secrets, browser smoke e qualquer UI.
 **Aceite:** `contribution-plans.service` melhora cobertura de linhas e branches
 sem mudar comportamento produtivo, e o workspace mantém test, coverage, smoke,
 ratchet, review independente e quality gate verdes.
+
+---
+
+### PR-017N — Cobertura dirigida de CashAccount DTO
+
+**Objetivo:** reduzir a próxima lacuna produtiva do coverage pós-Fase 4 em
+validação financeira de caixa, sem iniciar UI.
+
+**Escopo:**
+
+```txt
+- teste unitário focado para cash-account.dto
+- UUIDs de cash account e portfolio
+- create/update DTOs com strings normalizadas, nullable fields e update parcial
+- rejeição de body inválido, campos desconhecidos e update vazio
+- limites de name/type/notes
+- decimais de balance e benchmarkPercent
+- medição de cobertura comparável ao PR-017M
+```
+
+**Checklist de implementação:**
+
+```txt
+- [x] Identificar menor coverage produtivo atual: apps/api/src/cash-accounts/cash-account.dto.ts
+- [x] Adicionar teste focado sem abrir servidor HTTP ou porta fixa
+- [x] Rodar teste focado compilado
+- [x] Rodar pnpm coverage e comparar cash-account.dto/total
+- [x] Rodar lint/typecheck/test/build/smoke/ratchet antes do PR
+- [x] Rodar agentic-code-review com reviewer independente
+- [ ] Abrir PR com CI remoto verde
+```
+
+**Fora do escopo:** alterar código produtivo, schema/migration, contrato HTTP,
+repository/service, dados reais, secrets, browser smoke e qualquer UI.
+
+**Aceite:** `cash-account.dto` melhora cobertura de linhas e branches sem mudar
+comportamento produtivo, e o workspace mantém test, coverage, smoke, ratchet,
+review independente e quality gate verdes.
 
 ---
 
