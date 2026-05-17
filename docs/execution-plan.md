@@ -1051,6 +1051,43 @@ test, coverage, smoke, ratchet e quality gate verdes.
 
 ---
 
+### PR-017K — Cobertura dirigida de MarketDataService
+
+**Objetivo:** reduzir lacuna produtiva de branches antes de UI em uma superfície
+de provider opcional, fallback manual e persistência de snapshots de preço.
+
+**Escopo:**
+
+```txt
+- testes focados em apps/api/src/market-data/market-data.service.ts
+- createManualPriceSnapshot usa defaults do asset e retorna resposta pública
+- listPriceSnapshots mapeia snapshots sem expor payload bruto
+- create/list retornam not-found quando asset não existe
+- refreshPriceSnapshotFromProvider bloqueia rate limit antes de chamar provider
+- refresh mapeia provider desabilitado, falha externa, quote ausente, ticker divergente e moeda divergente
+- refresh persiste rawPayloadJson seguro em sucesso de provider opcional
+```
+
+**Checklist de implementação:**
+
+```txt
+- [x] Identificar próxima lacuna produtiva: branches de apps/api/src/market-data/market-data.service.ts
+- [x] Adicionar teste unitário de serviço com repositório fake e provider mock em porta efêmera
+- [x] Manter API/front fechados no teste focado
+- [x] Rodar teste focado compilado
+- [x] Rodar pnpm coverage e comparar market-data.service/total
+```
+
+**Fora do escopo:** alterar provider manual/brapi, contrato HTTP de market
+data, schema/migration, rate limit produtivo, secrets, dados reais, report
+engine e qualquer UI.
+
+**Aceite:** `market-data.service` melhora cobertura de branches sem mudar
+comportamento produtivo, e o workspace mantém test, coverage, smoke, ratchet e
+quality gate verdes.
+
+---
+
 ### PR-017 — Dashboard web MVP
 
 **Objetivo:** criar tela principal útil.
