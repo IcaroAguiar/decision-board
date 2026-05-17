@@ -24,6 +24,7 @@
 	},
 	"scripts": {
 		"build": "corepack pnpm -r --if-present build",
+		"coverage": "node scripts/run-coverage.mjs",
 		"db:deploy": "prisma migrate deploy",
 		"db:generate": "prisma generate",
 		"db:migrate": "prisma migrate dev",

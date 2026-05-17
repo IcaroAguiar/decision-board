@@ -211,9 +211,9 @@ const baselineCoverage = baseline.metrics.coverage?.linesPct;
 const baselineDuplication = baseline.metrics.duplication?.duplicatedLinesPct;
 
 if (config.requiredChecks.coverage && coverage === null) fail("coverage.missing", "Coverage is required but " + config.reportPaths.coverageSummary + " was not found.");
-else if (coverage !== null && baselineCoverage !== undefined) {
+else if (coverage !== null) {
   if (coverage < config.thresholds.newCoverageMin) fail("coverage.minimum", "Coverage " + coverage + "% is below minimum " + config.thresholds.newCoverageMin + "%.");
-  if (coverage + config.thresholds.coverageDropMax < baselineCoverage) fail("coverage.ratchet", "Coverage dropped from " + baselineCoverage + "% to " + coverage + "%.");
+  if (baselineCoverage !== undefined && coverage + config.thresholds.coverageDropMax < baselineCoverage) fail("coverage.ratchet", "Coverage dropped from " + baselineCoverage + "% to " + coverage + "%.");
 }
 if (config.requiredChecks.duplication && duplication === null) warn("duplication.missing", "Duplication report " + config.reportPaths.jscpd + " was not found; install/run jscpd to enforce this gate.");
 else if (duplication !== null) {

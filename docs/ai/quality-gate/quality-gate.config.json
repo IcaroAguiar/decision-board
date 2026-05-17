@@ -31,7 +31,7 @@
     "typecheck": true,
     "test": true,
     "build": true,
-    "coverage": false,
+    "coverage": true,
     "duplication": false,
     "secretScan": true,
     "agenticReviewPacket": true
@@ -50,7 +50,7 @@
     "lint": "pnpm lint",
     "typecheck": "pnpm typecheck",
     "test": "pnpm test",
-    "coverage": "",
+    "coverage": "pnpm coverage",
     "build": "pnpm build"
   }
 }

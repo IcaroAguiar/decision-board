@@ -13,6 +13,7 @@ is considered ready.
 pnpm lint
 pnpm typecheck
 pnpm test
+pnpm coverage
 pnpm build
 ```
 
@@ -29,6 +30,25 @@ pnpm test
 
 The API integration tests start Nest on an ephemeral loopback port. Do not change
 them to a fixed common port such as `3000`, `3001`, or `5173`.
+
+## Coverage
+
+Run coverage before UI work and before PRs that touch API, domain packages,
+reports, strategies, providers, jobs, or quality-gate behavior:
+
+```bash
+DATABASE_URL="postgresql://decision_board:<local-password>@localhost:55432/decision_board?schema=public" \
+BETTER_AUTH_URL="http://127.0.0.1:0" \
+BETTER_AUTH_SECRET="test-secret-with-at-least-32-characters" \
+WEB_ORIGIN="http://localhost:5173" \
+pnpm coverage
+```
+
+The coverage command uses Node's native test coverage against compiled
+JavaScript tests for `packages/*` and `apps/api`. It generates
+`coverage/coverage-summary.json` for the quality ratchet and `coverage/lcov.info`
+for detailed inspection. The current command intentionally excludes browser/UI
+coverage because the pre-UI gate is backend/domain focused.
 
 ## API Smoke
 

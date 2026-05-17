@@ -782,6 +782,38 @@ autenticada backend quebrar.
 
 ---
 
+### PR-017C — Coverage baseline no quality gate
+
+**Objetivo:** tornar cobertura uma evidência reproduzível antes de UI.
+
+**Escopo:**
+
+```txt
+- comando pnpm coverage sem dependência nova
+- cobertura nativa do Node para packages/* e apps/api
+- coverage/coverage-summary.json consumido pelo ratchet
+- quality-gate remoto exige gerar cobertura antes do ratchet
+- documentação pública do comando e do escopo pré-UI
+```
+
+**Checklist de implementação:**
+
+```txt
+- [x] Criar script de cobertura com artefatos coverage-summary.json e lcov.info
+- [x] Rodar cobertura com Postgres real e porta HTTP efêmera nos testes da API
+- [x] Ativar requiredChecks.coverage no quality gate
+- [x] Publicar artefatos de cobertura no upload do workflow
+- [x] Documentar que coverage não substitui smoke/API tests nem browser evidence futura
+```
+
+**Fora do escopo:** browser/UI coverage, mutation testing e aumento dirigido de
+cobertura por módulo.
+
+**Aceite:** antes de iniciar UI, o CI falha se a cobertura não for gerada ou se
+cair abaixo do mínimo configurado pelo ratchet.
+
+---
+
 ### PR-017 — Dashboard web MVP
 
 **Objetivo:** criar tela principal útil.
