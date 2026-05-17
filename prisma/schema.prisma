@@ -128,10 +128,10 @@ model Portfolio {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  positions         Position[]
-  cashAccounts      CashAccount[]
-  contributionPlans ContributionPlan[]
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  positions          Position[]
+  cashAccounts       CashAccount[]
+  contributionPlans  ContributionPlan[]
   contributionCycles ContributionCycle[]
 
   @@unique([id, userId])
@@ -251,18 +251,20 @@ model ContributionPlan {
 }
 
 model ContributionCycle {
-  id                 String                  @id @default(uuid()) @db.Uuid
-  userId             String                  @map("user_id") @db.Uuid
-  portfolioId        String                  @map("portfolio_id") @db.Uuid
-  contributionPlanId String                  @map("contribution_plan_id") @db.Uuid
-  cycleMonth         DateTime                @map("cycle_month") @db.Date
-  plannedAmount      Decimal                 @map("planned_amount") @db.Decimal(20, 8)
-  confirmedAmount    Decimal?                @map("confirmed_amount") @db.Decimal(20, 8)
-  status             ContributionCycleStatus @default(PENDING)
-  strategyId         String                  @map("strategy_id") @db.VarChar(64)
-  notes              String?
-  createdAt          DateTime                @default(now()) @map("created_at")
-  updatedAt          DateTime                @updatedAt @map("updated_at")
+  id                         String                  @id @default(uuid()) @db.Uuid
+  userId                     String                  @map("user_id") @db.Uuid
+  portfolioId                String                  @map("portfolio_id") @db.Uuid
+  contributionPlanId         String                  @map("contribution_plan_id") @db.Uuid
+  cycleMonth                 DateTime                @map("cycle_month") @db.Date
+  plannedAmount              Decimal                 @map("planned_amount") @db.Decimal(20, 8)
+  confirmedAmount            Decimal?                @map("confirmed_amount") @db.Decimal(20, 8)
+  status                     ContributionCycleStatus @default(PENDING)
+  strategyId                 String                  @map("strategy_id") @db.VarChar(64)
+  reportRecommendedAt        DateTime?               @map("report_recommended_at")
+  reportRecommendationReason String?                 @map("report_recommendation_reason") @db.VarChar(120)
+  notes                      String?
+  createdAt                  DateTime                @default(now()) @map("created_at")
+  updatedAt                  DateTime                @updatedAt @map("updated_at")
 
   user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   portfolio        Portfolio        @relation(fields: [portfolioId, userId], references: [id, userId], onDelete: Restrict)
@@ -270,5 +272,6 @@ model ContributionCycle {
 
   @@unique([contributionPlanId, cycleMonth])
   @@index([userId, portfolioId, cycleMonth])
+  @@index([userId, portfolioId, status, reportRecommendedAt])
   @@map("contribution_cycles")
 }

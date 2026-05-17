@@ -1,0 +1,2 @@
+ALTER INDEX "contribution_cycles_user_id_portfolio_id_status_report_recommen"
+    RENAME TO "contribution_cycles_user_id_portfolio_id_status_report_reco_idx";

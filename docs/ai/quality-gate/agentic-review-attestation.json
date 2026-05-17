@@ -1,26 +1,26 @@
 {
   "schemaVersion": 1,
-  "reviewer": "codex-exec-review:019e33e1-3fa2-7dc2-b343-2b8e0e6c960d",
-  "reviewedAt": "2026-05-17T03:02:15Z",
+  "reviewer": "codex-exec-review:22482",
+  "reviewedAt": "2026-05-17T03:58:01Z",
   "verdict": "approved_with_risk",
   "deterministicSignalsReviewed": true,
   "allowedBases": [
     "main"
   ],
-  "reviewedFingerprint": "3dd92115dc23a15a5da8e4ec8c581c5c3e5f9088bf3b1d85a72a4611485aba78",
+  "reviewedFingerprint": "b48d9e0f65c130ed0e41b7a6203ef2b397b37cf773e9dd52fbf3a8956fa51284",
   "reviewedDeterministicSignals": {
     "blocking": 19,
     "high": 0,
-    "medium": 23
+    "medium": 21
   },
   "scope": [
-    "PR-011 contribution cycles API MVP",
-    "authenticated contribution cycle create/list/update routes",
-    "portfolio, contribution plan, and contribution cycle user isolation",
-    "ContributionCycle composite database ownership constraint to contribution plan",
-    "duplicate cycle prevention by contributionPlanId and cycleMonth",
-    "DTO rejection of userId and unknown fields",
-    "cycle month, status, strategy, confirmedAmount, and notes validation"
+    "PR-012 pg-boss jobs MVP",
+    "opt-in JobsModule and pg-boss lifecycle",
+    "monthly contribution cycle creation from active plans",
+    "report-due marking for confirmed cycles based on strategy cadence",
+    "ContributionCycle report recommendation schema fields and migrations",
+    "jobs repository user and portfolio scoping safeguards",
+    "Postgres-backed jobs tests and deterministic pagination regression fixture"
   ],
-  "residualRisk": "Approved with risk: confirmedAmount required for confirmed status is enforced through the API service and HTTP tests but not yet by a database CHECK, so PR-012/jobs must preserve or harden that invariant before direct writes; remaining magic-string signals are accepted as bounded DTO/route/enum mapping vocabulary for this PR."
+  "residualRisk": "Approved with risk: the independent reviewer found no blocking issues and flagged only that the pagination regression fixture used random UUID ordering. That fixture was then hardened with deterministic ordered UUIDs and the API test suite was rerun successfully. Remaining deterministic signals are accepted as bounded job names, Prisma enum/status constants, DTO/test vocabulary, and dependency-lockfile changes required by pg-boss."
 }

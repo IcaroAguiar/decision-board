@@ -12,6 +12,7 @@ export function configureTestEnvironment(): void {
 	process.env.BETTER_AUTH_URL ??= "http://localhost:3001";
 	process.env.BETTER_AUTH_SECRET ??= "test-only-auth-key-at-least-32-characters";
 	process.env.WEB_ORIGIN ??= testWebOrigin;
+	process.env.JOBS_ENABLED = "false";
 	process.env.NODE_ENV ??= "test";
 }
 

@@ -538,16 +538,22 @@ no mesmo usuário/portfolio do plano; job recorrente automático fica no PR-012.
 **Checklist de implementação:**
 
 ```txt
-- [ ] Configurar pg-boss usando Postgres existente
-- [ ] Criar job createMonthlyContributionCycles
-- [ ] Criar job checkReportDue
-- [ ] Garantir idempotência por mês/plano
-- [ ] Testar execução local
+- [x] Configurar pg-boss usando Postgres existente
+- [x] Criar job createMonthlyContributionCycles
+- [x] Criar job checkReportDue
+- [x] Garantir idempotência por mês/plano
+- [x] Testar execução local
 ```
 
 **Fora do escopo:** notificações por e-mail.
 
 **Aceite:** jobs podem rodar sem duplicar ciclos.
+
+**Evidência local do corte:** teste de jobs inicia e encerra pg-boss contra o
+Postgres local, roda a criação de ciclos mensal duas vezes sem duplicar por
+plano/mês e marca relatório recomendado somente para ciclo confirmado cuja
+cadência da estratégia venceu. `JOBS_ENABLED` permanece opt-in para evitar
+workers acidentais em processos de teste ou desenvolvimento.
 
 ## 6. Fase 3 — Market data
 
