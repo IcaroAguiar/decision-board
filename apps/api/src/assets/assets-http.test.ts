@@ -102,6 +102,18 @@ test("requires authentication and validates asset DTOs", async () => {
 		});
 		assert.equal(invalidClassification.status, 400);
 
+		const invalidTicker = await fetch(`${baseUrl}/assets`, {
+			method: "POST",
+			headers: jsonHeaders(user),
+			body: JSON.stringify({
+				ticker: "PETR4,VALE3",
+				name: "Unsafe ticker",
+				assetType: "fii",
+				riskCategory: "paper",
+			}),
+		});
+		assert.equal(invalidTicker.status, 400);
+
 		const invalidSearch = await fetch(`${baseUrl}/assets?provider=brapi`, {
 			headers: {
 				cookie: user.cookieHeader,

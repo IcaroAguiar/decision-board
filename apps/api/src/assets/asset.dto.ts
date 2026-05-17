@@ -36,6 +36,7 @@ const DEFAULT_SEARCH_LIMIT = 50;
 const MAX_SEARCH_LIMIT = 100;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const CURRENCY_CODE_PATTERN = /^[A-Z]{3}$/;
+const TICKER_PATTERN = /^[A-Z0-9.]{1,24}$/;
 const ASSET_TYPE_BY_INPUT = createEnumMap(AssetType);
 const RISK_CATEGORY_BY_INPUT = createEnumMap(RiskCategory);
 
@@ -60,7 +61,7 @@ export function parseCreateAssetDto(body: unknown): CreateAssetDto {
 	]);
 
 	return {
-		ticker: readRequiredString(input.ticker, "ticker", MAX_TICKER_LENGTH).toUpperCase(),
+		ticker: readTicker(input.ticker),
 		name: readRequiredString(input.name, "name", MAX_NAME_LENGTH),
 		assetType: readEnum(input.assetType, "assetType", ASSET_TYPE_BY_INPUT),
 		riskCategory: readEnum(input.riskCategory, "riskCategory", RISK_CATEGORY_BY_INPUT),
@@ -75,7 +76,7 @@ export function parseAssetSearchDto(query: unknown): AssetSearchDto {
 	assertAllowedFields(input, ["ticker", "q", "limit"]);
 
 	return {
-		ticker: readOptionalString(input.ticker, "ticker", MAX_TICKER_LENGTH)?.toUpperCase(),
+		ticker: input.ticker === undefined ? undefined : readTicker(input.ticker),
 		q: readOptionalString(input.q, "q", MAX_NAME_LENGTH),
 		limit: readSearchLimit(input.limit),
 	};
@@ -197,6 +198,16 @@ function readCurrency(value: unknown): string {
 	}
 
 	return currency;
+}
+
+function readTicker(value: unknown): string {
+	const ticker = readRequiredString(value, "ticker", MAX_TICKER_LENGTH).toUpperCase();
+
+	if (!TICKER_PATTERN.test(ticker)) {
+		throw new BadRequestException("ticker must contain only letters, numbers, or dots");
+	}
+
+	return ticker;
 }
 
 function readExchange(value: unknown): string {

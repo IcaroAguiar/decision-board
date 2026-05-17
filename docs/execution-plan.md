@@ -609,17 +609,30 @@ de snapshots isolado por usuário contra Postgres local. Nenhum endpoint aceita
 **Checklist de implementação:**
 
 ```txt
-- [ ] Implementar BrapiMarketDataProvider
-- [ ] Configurar timeout
-- [ ] Tratar rate limit/erro sem quebrar app
-- [ ] Salvar provider e capturedAt
-- [ ] Adicionar testes com mock HTTP
-- [ ] Documentar limitações de plano/token
+- [x] Implementar BrapiMarketDataProvider
+- [x] Configurar timeout
+- [x] Tratar rate limit/erro sem quebrar app
+- [x] Salvar provider e capturedAt
+- [x] Adicionar testes com mock HTTP
+- [x] Documentar limitações de plano/token
 ```
 
 **Fora do escopo:** dividendos de FIIs, relatórios CVM.
 
-**Aceite:** botão “Atualizar snapshot” busca preços via brapi quando configurada.
+**Aceite backend-only:** endpoint autenticado atualiza snapshot via brapi quando
+`MARKET_DATA_PROVIDER=brapi`, usando token opcional por env, timeout e erro
+legível sem apagar snapshots manuais. Botão/UI ficam fora deste corte pelo
+pivot de execução antes de UI.
+
+**Evidência local do corte:** pacote `market-data` testa parser da resposta
+brapi, token opcional, múltiplos tickers, erro HTTP/rate-limit e payload
+malformado com `fetch` mockado. A API autenticada testa `POST
+/assets/:assetId/price-snapshots/refresh` contra um mock brapi em porta
+efêmera, persiste provider/capturedAt/rawPayload seguro em Postgres local e
+comprova que o endpoint manual continua funcionando quando brapi está desligada.
+O refresh também valida ticker allowlisted, símbolo retornado igual ao ativo,
+base HTTPS ou loopback de teste e cooldown por usuário+ativo para proteger quota
+do provider compartilhado.
 
 ---
 

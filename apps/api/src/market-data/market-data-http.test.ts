@@ -9,8 +9,16 @@ import {
 	type TestUser,
 } from "../test/auth-test-user.js";
 import { createTestApp, readJson } from "../test/http-test-app.js";
+import { createMockHttpServer, sendJson } from "../test/mock-http-server.js";
 
 const TEST_EMAIL_PREFIX = "test-market-data-";
+
+interface MarketDataEnvSnapshot {
+	BRAPI_API_BASE_URL: string | undefined;
+	BRAPI_TIMEOUT_MS: string | undefined;
+	BRAPI_TOKEN: string | undefined;
+	MARKET_DATA_PROVIDER: string | undefined;
+}
 
 interface AssetPayload {
 	id: string;
@@ -97,6 +105,39 @@ function readStringField(payload: Record<string, unknown>, field: string): strin
 	}
 
 	return value;
+}
+
+function captureMarketDataEnv(): MarketDataEnvSnapshot {
+	return {
+		BRAPI_API_BASE_URL: process.env.BRAPI_API_BASE_URL,
+		BRAPI_TIMEOUT_MS: process.env.BRAPI_TIMEOUT_MS,
+		BRAPI_TOKEN: process.env.BRAPI_TOKEN,
+		MARKET_DATA_PROVIDER: process.env.MARKET_DATA_PROVIDER,
+	};
+}
+
+function restoreMarketDataEnv(snapshot: MarketDataEnvSnapshot): void {
+	for (const [key, value] of Object.entries(snapshot)) {
+		if (value === undefined) {
+			delete process.env[key];
+		} else {
+			process.env[key] = value;
+		}
+	}
+}
+
+async function clearMarketDataRefreshLimits(prisma: {
+	rateLimit: {
+		deleteMany(args: { where: { key: { startsWith: string } } }): Promise<unknown>;
+	};
+}): Promise<void> {
+	await prisma.rateLimit.deleteMany({
+		where: {
+			key: {
+				startsWith: "market-data-refresh:",
+			},
+		},
+	});
 }
 
 test("requires authentication and validates manual price snapshot DTOs", async () => {
@@ -256,5 +297,181 @@ test("saves manual price snapshots and keeps user histories isolated", async () 
 		await clearAuthRateLimits(prisma);
 		await app.close();
 		await prisma.$disconnect();
+	}
+});
+
+test("refreshes a price snapshot from brapi when the optional provider is enabled", async () => {
+	const env = captureMarketDataEnv();
+	let observedAuthorization: string | undefined;
+	const brapi = await createMockHttpServer((request, response) => {
+		observedAuthorization = request.headers.authorization;
+		assert.equal(request.url, "/api/quote/MDP12345");
+
+		sendJson(response, 200, {
+			results: [
+				{
+					symbol: "MDP12345",
+					regularMarketPrice: 123.45,
+					regularMarketTime: "2026-05-17T13:00:00.000Z",
+					currency: "BRL",
+				},
+			],
+		});
+	});
+
+	process.env.MARKET_DATA_PROVIDER = "brapi";
+	process.env.BRAPI_API_BASE_URL = brapi.baseUrl;
+	process.env.BRAPI_TIMEOUT_MS = "1000";
+	process.env.BRAPI_TOKEN = ["unit", "test", "value"].join("-");
+
+	const { app, baseUrl } = await createTestApp();
+	const { prisma } = await import("../auth/prisma.client.js");
+	await prisma.user.deleteMany({ where: { email: { startsWith: TEST_EMAIL_PREFIX } } });
+	await clearAuthRateLimits(prisma);
+	await clearMarketDataRefreshLimits(prisma);
+	const user = await signUpTestUser(baseUrl, "market-data-brapi");
+	const asset = await createAsset(baseUrl, user, "MDP12345");
+
+	try {
+		const refresh = await fetch(`${baseUrl}/assets/${asset.id}/price-snapshots/refresh`, {
+			method: "POST",
+			headers: jsonHeaders(user),
+		});
+		const snapshot = assertPriceSnapshotPayload(await readJson(refresh));
+
+		assert.equal(refresh.status, 201);
+		assert.equal(snapshot.assetId, asset.id);
+		assert.equal(snapshot.price, "123.45");
+		assert.equal(snapshot.currency, "BRL");
+		assert.equal(snapshot.provider, "brapi");
+		assert.equal(snapshot.capturedAt, "2026-05-17T13:00:00.000Z");
+		assert.equal(observedAuthorization, "Bearer unit-test-value");
+
+		const storedSnapshot = await prisma.priceSnapshot.findUniqueOrThrow({
+			where: {
+				id: snapshot.id,
+			},
+		});
+		assert.equal(storedSnapshot.userId, user.userId);
+		assert.deepEqual(storedSnapshot.rawPayloadJson, {
+			symbol: "MDP12345",
+			regularMarketPrice: 123.45,
+			regularMarketTime: "2026-05-17T13:00:00.000Z",
+			currency: "BRL",
+		});
+
+		const limitedRefresh = await fetch(`${baseUrl}/assets/${asset.id}/price-snapshots/refresh`, {
+			method: "POST",
+			headers: jsonHeaders(user),
+		});
+		assert.equal(limitedRefresh.status, 409);
+	} finally {
+		await prisma.user.deleteMany({ where: { email: user.email } });
+		await prisma.asset.deleteMany({ where: { ticker: asset.ticker } });
+		await clearMarketDataRefreshLimits(prisma);
+		await clearAuthRateLimits(prisma);
+		await app.close();
+		await prisma.$disconnect();
+		await brapi.close();
+		restoreMarketDataEnv(env);
+	}
+});
+
+test("keeps manual snapshots available when brapi is disabled or failing", async () => {
+	const env = captureMarketDataEnv();
+	delete process.env.BRAPI_API_BASE_URL;
+	delete process.env.BRAPI_TOKEN;
+	process.env.MARKET_DATA_PROVIDER = "manual";
+
+	const { app, baseUrl } = await createTestApp();
+	const { prisma } = await import("../auth/prisma.client.js");
+	await prisma.user.deleteMany({ where: { email: { startsWith: TEST_EMAIL_PREFIX } } });
+	await clearAuthRateLimits(prisma);
+	await clearMarketDataRefreshLimits(prisma);
+	const user = await signUpTestUser(baseUrl, "market-data-provider-disabled");
+	const asset = await createAsset(baseUrl, user, uniqueTicker("MDD"));
+
+	try {
+		const disabledRefresh = await fetch(`${baseUrl}/assets/${asset.id}/price-snapshots/refresh`, {
+			method: "POST",
+			headers: jsonHeaders(user),
+		});
+		assert.equal(disabledRefresh.status, 503);
+
+		const manualCreate = await fetch(`${baseUrl}/assets/${asset.id}/price-snapshots`, {
+			method: "POST",
+			headers: jsonHeaders(user),
+			body: JSON.stringify({
+				price: "77.77",
+				capturedAt: "2026-05-17T14:00:00.000Z",
+			}),
+		});
+		const snapshot = assertPriceSnapshotPayload(await readJson(manualCreate));
+		assert.equal(manualCreate.status, 201);
+		assert.equal(snapshot.provider, manualMarketDataProviderName);
+		assert.equal(snapshot.price, "77.77");
+	} finally {
+		await prisma.user.deleteMany({ where: { email: user.email } });
+		await prisma.asset.deleteMany({ where: { ticker: asset.ticker } });
+		await clearMarketDataRefreshLimits(prisma);
+		await clearAuthRateLimits(prisma);
+		await app.close();
+		await prisma.$disconnect();
+		restoreMarketDataEnv(env);
+	}
+});
+
+test("rejects mismatched brapi symbols without persisting a snapshot", async () => {
+	const env = captureMarketDataEnv();
+	const brapi = await createMockHttpServer((_request, response) => {
+		sendJson(response, 200, {
+			results: [
+				{
+					symbol: "OTHER123",
+					regularMarketPrice: 123.45,
+					regularMarketTime: "2026-05-17T15:00:00.000Z",
+					currency: "BRL",
+				},
+			],
+		});
+	});
+
+	process.env.MARKET_DATA_PROVIDER = "brapi";
+	process.env.BRAPI_API_BASE_URL = brapi.baseUrl;
+	process.env.BRAPI_TIMEOUT_MS = "1000";
+	delete process.env.BRAPI_TOKEN;
+
+	const { app, baseUrl } = await createTestApp();
+	const { prisma } = await import("../auth/prisma.client.js");
+	await prisma.user.deleteMany({ where: { email: { startsWith: TEST_EMAIL_PREFIX } } });
+	await clearAuthRateLimits(prisma);
+	await clearMarketDataRefreshLimits(prisma);
+	const user = await signUpTestUser(baseUrl, "market-data-brapi-mismatch");
+	const asset = await createAsset(baseUrl, user, "MDM12345");
+
+	try {
+		const refresh = await fetch(`${baseUrl}/assets/${asset.id}/price-snapshots/refresh`, {
+			method: "POST",
+			headers: jsonHeaders(user),
+		});
+		assert.equal(refresh.status, 502);
+		assert.equal(
+			await prisma.priceSnapshot.count({
+				where: {
+					userId: user.userId,
+					assetId: asset.id,
+				},
+			}),
+			0,
+		);
+	} finally {
+		await prisma.user.deleteMany({ where: { email: user.email } });
+		await prisma.asset.deleteMany({ where: { ticker: asset.ticker } });
+		await clearMarketDataRefreshLimits(prisma);
+		await clearAuthRateLimits(prisma);
+		await app.close();
+		await prisma.$disconnect();
+		await brapi.close();
+		restoreMarketDataEnv(env);
 	}
 });

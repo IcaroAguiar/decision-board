@@ -1,24 +1,24 @@
 {
   "schemaVersion": 1,
-  "reviewer": "security-reviewer:019e3445-5f66-72b0-b055-44615e2e002a",
-  "reviewedAt": "2026-05-17T04:53:23Z",
+  "reviewer": "security-reviewer:019e345b-129d-7fa3-aa15-fb79ce241b82",
+  "reviewedAt": "2026-05-17T05:16:55Z",
   "verdict": "approved_with_risk",
   "deterministicSignalsReviewed": true,
   "allowedBases": [
     "main"
   ],
-  "reviewedFingerprint": "d2fa5621c587b9c972f82164c9a530c834fba6f4e84073b873e0a757a150e226",
+  "reviewedFingerprint": "5555084cdfdf962d9d6d175de509d5ece04e294064710b1c9c8ff4428c5c0ff0",
   "reviewedDeterministicSignals": {
-    "blocking": 3,
+    "blocking": 11,
     "high": 0,
-    "medium": 7
+    "medium": 15
   },
   "scope": [
-    "PR-013 manual market data provider",
-    "PriceSnapshot Prisma model and additive migration",
-    "POST /assets/:assetId/price-snapshots authenticated manual snapshot creation",
-    "GET /assets/:assetId/price-snapshots authenticated user-scoped history listing",
-    "manual provider package behavior and docs"
+    "PR-014 brapi provider backend-only",
+    "BrapiMarketDataProvider with optional token, timeout, https/loopback base validation, ticker allowlist, URL encoding, symbol matching, and allowlisted raw payload",
+    "POST /assets/:assetId/price-snapshots/refresh authenticated optional provider refresh",
+    "refresh cooldown per user and asset",
+    "shared mock HTTP test helper using ephemeral loopback ports, docs, and env examples"
   ],
-  "residualRisk": "Approved with risk: the independent reviewer found no blocking issue for user isolation, auth ownership, userId input, raw payload exposure, migration safety, Prisma scoping, DTO validation, or financial-boundary language. Residual risk is a future concurrent global asset mutation/deactivation race because the repository reads the active Asset before creating the user-owned PriceSnapshot outside a transaction; this is accepted for PR-013 because assets are global catalog data, the snapshot is stamped with session userId, and the foreign key enforces asset existence. Remaining deterministic signals are accepted as false positives or bounded warnings: list query is capped at 100, controller routes call requireAuthenticatedUser, validation uses explicit parser functions, HTTP integration tests exercise the route on an ephemeral port, and duplicated literals are test/domain vocabulary with provider name centralized."
+  "residualRisk": "Approved with risk: the independent reviewer first found five actionable issues and the final pass confirmed they were resolved: ticker allowlist and URL encoding, refresh cooldown per user and asset, returned symbol matching before persistence, https-only provider base except loopback tests, and allowlisted raw payload without token/header. Remaining deterministic signals are accepted as false positives or bounded warnings: loopback literals are used only for ephemeral local tests, provider Authorization header is constructed from env/config and not persisted, DTO validation is implemented through explicit parsers, the controller calls requireAuthenticatedUser, docs cover the endpoint instead of OpenAPI decorators, and HTTP integration tests exercise real Nest routes on ephemeral ports."
 }

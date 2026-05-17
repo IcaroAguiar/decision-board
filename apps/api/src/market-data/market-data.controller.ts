@@ -33,6 +33,19 @@ export class MarketDataController {
 		);
 	}
 
+	@Post("refresh")
+	async refreshPriceSnapshotFromProvider(
+		@Req() request: RequestWithHeaders,
+		@Res({ passthrough: true }) response: ResponseWithCookieHeaders,
+		@Param("assetId") assetId: string,
+	): Promise<PriceSnapshotResponse> {
+		const user = await requireAuthenticatedUser(request, response);
+		return this.marketData.refreshPriceSnapshotFromProvider(
+			user.userId,
+			parseMarketDataAssetId(assetId),
+		);
+	}
+
 	@Get()
 	async listPriceSnapshots(
 		@Req() request: RequestWithHeaders,
