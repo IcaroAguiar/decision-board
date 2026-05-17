@@ -18,11 +18,11 @@ post-Phase 4 hardening track focused on:
 - public-safe documentation;
 - no fixed common API or frontend ports in tests.
 
-The current validated baseline before the active local cut is commit `2020503`,
-merged through GitHub PR
-[#32](https://github.com/IcaroAguiar/decision-board/pull/32). No UI work is
-unblocked by this status refresh; the active local cut remains inside the
-post-Phase 4 hardening track.
+The latest validated implementation baseline is commit `84db24a`, merged
+through GitHub PR
+[#33](https://github.com/IcaroAguiar/decision-board/pull/33). Later docs-only
+status refreshes do not unblock UI; the next implementation cut should remain
+inside the post-Phase 4 hardening track until explicitly released.
 
 ## Latest Evidence Snapshot
 
@@ -31,8 +31,8 @@ post-Phase 4 hardening track.
 | `pnpm coverage` | 97/97 tests, 94.15% lines, 77.83% branches, 98.01% functions | Uses synthetic env values and local Postgres. |
 | `pnpm test` | Workspace passed; API 70/70 | API tests run against local Postgres where required. |
 | `pnpm smoke:api` | Passed on ephemeral port `51751` | The exact port is runtime-assigned and not a contract. |
-| GitHub `quality-gate` | Passed for PR #32 in 2m13s | Runs migrations, tests, coverage ratchet, smoke, and build. |
-| GitGuardian | Passed for PR #32 | Remote secret scanning stayed green. |
+| GitHub `quality-gate` | Passed for PR #33 in 2m7s | Runs migrations, tests, coverage ratchet, smoke, and build. |
+| GitGuardian | Passed for PR #33 | Remote secret scanning stayed green. |
 | Local `gitleaks detect --redact` | No leaks found | Reports counts/status only, not secret values. |
 | Local ratchet | Passed for PR-017T | Deterministic collector has 0 findings; runtime-required signal was satisfied by real API smoke. |
 | Independent review | PR-017T reviewer finding addressed | Reviewer found one low documentation evidence mismatch; this status now reflects the PR-017T evidence. |
@@ -60,7 +60,7 @@ post-Phase 4 hardening track.
 | PR-017Q | #30 | Added focused `auth.logger` redaction coverage and a small payload-index cleanup. |
 | PR-017R | #31 | Docs-only correction for post-PR #30 public status. |
 | PR-017S | #32 | Docs-only correction for post-PR #31 public status. |
-| PR-017T | local branch | Adds focused `ContributionPlanRepository` update coverage; PR pending. |
+| PR-017T | #33 | Added focused `ContributionPlanRepository` update coverage. |
 
 ## Coverage Movement
 
