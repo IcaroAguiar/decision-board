@@ -223,6 +223,17 @@ existing plan, list cycles by portfolio, and confirm a contributed amount that
 differs from the planned amount. Cycles track a bounded status, selected
 strategy, optional notes, and remain scoped to the session user.
 
+## Jobs
+
+Set `JOBS_ENABLED=true` on exactly one API process to run pg-boss workers using
+the existing `DATABASE_URL`. Jobs use Postgres only; Redis and external market
+providers are not required.
+
+The first jobs create monthly contribution cycles from active monthly plans and
+mark confirmed cycles as report-due when the selected strategy cadence has
+elapsed. Both jobs are idempotent: cycle creation is unique per plan/month, and
+report-due markers are written once per cycle.
+
 ## Security And Financial Boundaries
 
 - Do not store broker credentials.

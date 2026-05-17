@@ -34,7 +34,7 @@
 		"format:unsafe": "biome check --write --unsafe .",
 		"lint": "biome ci .",
 		"test": "corepack pnpm -r --if-present test",
-		"typecheck": "corepack pnpm --filter @decision-board/types build && corepack pnpm --filter @decision-board/core build && corepack pnpm -r --if-present typecheck"
+		"typecheck": "corepack pnpm --filter @decision-board/types build && corepack pnpm --filter @decision-board/core build && corepack pnpm --filter @decision-board/strategies build && corepack pnpm -r --if-present typecheck"
 	},
 	"dependencies": {
 		"@prisma/client": "6.19.3"
