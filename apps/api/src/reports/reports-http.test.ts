@@ -28,6 +28,15 @@ interface TestResources {
 	userEmails: string[];
 }
 
+interface SavedReportMetadata {
+	id: string;
+	schemaVersion: string;
+	generatedAt: string;
+	strategyId: string | null;
+	alertCount: number;
+	createdAt: string;
+}
+
 test("exports sanitized JSON and Markdown reports for the authenticated portfolio", async () => {
 	const { app, baseUrl } = await createTestApp();
 	const { prisma } = await import("../auth/prisma.client.js");
@@ -98,6 +107,66 @@ test("exports sanitized JSON and Markdown reports for the authenticated portfoli
 		assert.equal(markdown.includes(owner.userId), false);
 		assert.equal(markdown.includes(owner.email), false);
 		assert.equal(markdown.includes("userId"), false);
+
+		const anonymousSave = await fetch(`${baseUrl}/portfolios/${portfolio.id}/reports`, {
+			method: httpMethods.post,
+		});
+		assert.equal(anonymousSave.status, 401);
+
+		const saveResponse = await fetch(`${baseUrl}/portfolios/${portfolio.id}/reports`, {
+			method: httpMethods.post,
+			headers: jsonHeaders(owner),
+		});
+		const savedReport = assertSavedReportMetadata(await readJson(saveResponse));
+		assert.equal(saveResponse.status, 201);
+		assert.equal(savedReport.schemaVersion, "1.0");
+		assert.equal(savedReport.strategyId, strategyIds.opportunistic);
+		assert.ok(savedReport.alertCount > 0);
+
+		const listResponse = await fetch(`${baseUrl}/portfolios/${portfolio.id}/reports`, {
+			headers: jsonHeaders(owner),
+		});
+		const savedReports = assertSavedReportMetadataList(await readJson(listResponse));
+		assert.equal(listResponse.status, 200);
+		assert.deepEqual(
+			savedReports.map((candidate) => candidate.id),
+			[savedReport.id],
+		);
+
+		const savedJsonResponse = await fetch(
+			`${baseUrl}/portfolios/${portfolio.id}/reports/${savedReport.id}.json`,
+			{
+				headers: jsonHeaders(owner),
+			},
+		);
+		const savedJson = await readJson(savedJsonResponse);
+		assert.equal(savedJsonResponse.status, 200, JSON.stringify(savedJson));
+		assertReportJson(savedJson, owner, resources.ticker);
+
+		const savedMarkdownResponse = await fetch(
+			`${baseUrl}/portfolios/${portfolio.id}/reports/${savedReport.id}.md`,
+			{
+				headers: jsonHeaders(owner),
+			},
+		);
+		const savedMarkdown = await savedMarkdownResponse.text();
+		assert.equal(savedMarkdownResponse.status, 200, savedMarkdown);
+		assert.match(savedMarkdown, new RegExp(resources.ticker ?? ""));
+		assert.equal(savedMarkdown.includes(owner.userId), false);
+		assert.equal(savedMarkdown.includes(owner.email), false);
+
+		const invalidReportId = await fetch(`${baseUrl}/portfolios/${portfolio.id}/reports/nope.json`, {
+			headers: jsonHeaders(owner),
+		});
+		assert.equal(invalidReportId.status, 400);
+
+		const crossUserSavedJson = await fetch(
+			`${baseUrl}/portfolios/${portfolio.id}/reports/${savedReport.id}.json`,
+			{
+				headers: jsonHeaders(otherUser),
+			},
+		);
+		assert.equal(crossUserSavedJson.status, 404);
 	} finally {
 		await cleanupReportData(prisma, resources);
 		await app.close();
@@ -282,6 +351,28 @@ function assertReportJson(payload: unknown, owner: TestUser, ticker: string | un
 	assert.equal(serialized.includes("token"), false);
 }
 
+function assertSavedReportMetadata(payload: unknown): SavedReportMetadata {
+	assert.ok(isRecord(payload));
+	const metadata = {
+		id: readStringField(payload, "id"),
+		schemaVersion: readStringField(payload, "schemaVersion"),
+		generatedAt: readStringField(payload, "generatedAt"),
+		strategyId: readNullableStringField(payload, "strategyId"),
+		alertCount: readNumberField(payload, "alertCount"),
+		createdAt: readStringField(payload, "createdAt"),
+	};
+	assert.equal("userId" in payload, false);
+	assert.equal("json" in payload, false);
+	assert.equal("markdown" in payload, false);
+
+	return metadata;
+}
+
+function assertSavedReportMetadataList(payload: unknown): SavedReportMetadata[] {
+	assert.ok(Array.isArray(payload));
+	return payload.map(assertSavedReportMetadata);
+}
+
 async function cleanupReportData(
 	prisma: {
 		user: {
@@ -321,4 +412,35 @@ function assertIdPayload(payload: unknown): IdPayload {
 
 function isRecord(payload: unknown): payload is Record<string, unknown> {
 	return Boolean(payload && typeof payload === "object" && !Array.isArray(payload));
+}
+
+function readStringField(payload: Record<string, unknown>, field: string): string {
+	const value = payload[field];
+	if (typeof value !== "string") {
+		assert.fail(`${field} must be a string`);
+	}
+
+	return value;
+}
+
+function readNullableStringField(payload: Record<string, unknown>, field: string): string | null {
+	const value = payload[field];
+	if (value === null) {
+		return null;
+	}
+
+	if (typeof value !== "string") {
+		assert.fail(`${field} must be a string or null`);
+	}
+
+	return value;
+}
+
+function readNumberField(payload: Record<string, unknown>, field: string): number {
+	const value = payload[field];
+	if (typeof value !== "number") {
+		assert.fail(`${field} must be a number`);
+	}
+
+	return value;
 }

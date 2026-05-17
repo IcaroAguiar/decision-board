@@ -81,3 +81,20 @@ strategy evaluation, and deterministic allocation calculations. It omits account
 e-mail, `userId`, cookies, session tokens, raw auth payloads, and internal
 resource IDs that are not required for external analysis. Report history and UI
 remain separate future cuts.
+
+## API History
+
+The API can persist generated snapshots without requiring UI:
+
+```txt
+POST /portfolios/:portfolioId/reports
+GET /portfolios/:portfolioId/reports
+GET /portfolios/:portfolioId/reports/:reportId.json
+GET /portfolios/:portfolioId/reports/:reportId.md
+```
+
+Saved report metadata includes only the report id, schema version, generated
+timestamp, strategy id, alert count, and creation timestamp. Metadata responses
+must not include `userId`, account e-mail, JSON report content, or Markdown
+content. Saved content routes return the already-sanitized JSON or Markdown
+snapshot for the authenticated owner.

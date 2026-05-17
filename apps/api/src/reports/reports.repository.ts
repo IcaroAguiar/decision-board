@@ -3,6 +3,7 @@ import type {
 	AssetType,
 	ContributionCycleStatus,
 	ContributionFrequency,
+	Prisma,
 	RiskCategory,
 } from "@prisma/client";
 import { prisma } from "../auth/prisma.client.js";
@@ -11,6 +12,7 @@ const REPORT_POSITION_LIMIT = 200;
 const REPORT_CASH_ACCOUNT_LIMIT = 200;
 const REPORT_CONTRIBUTION_PLAN_LIMIT = 50;
 const REPORT_CONTRIBUTION_CYCLE_LIMIT = 5;
+const SAVED_REPORT_LIST_LIMIT = 100;
 
 export interface DecimalValue {
 	toString(): string;
@@ -78,6 +80,29 @@ export interface ReportContributionCycleData {
 	strategyId: string;
 	reportRecommendedAt: Date | null;
 	reportRecommendationReason: string | null;
+}
+
+export interface CreateSavedReportData {
+	schemaVersion: string;
+	generatedAt: Date;
+	strategyId: string | null;
+	alertCount: number;
+	jsonReport: Prisma.InputJsonValue;
+	markdownReport: string;
+}
+
+export interface SavedReportMetadataData {
+	id: string;
+	schemaVersion: string;
+	generatedAt: Date;
+	strategyId: string | null;
+	alertCount: number;
+	createdAt: Date;
+}
+
+export interface SavedReportContentData extends SavedReportMetadataData {
+	jsonReport: Prisma.JsonValue;
+	markdownReport: string;
 }
 
 @Injectable()
@@ -213,4 +238,90 @@ export class ReportsRepository {
 			},
 		});
 	}
+
+	async createSavedReport(
+		userId: string,
+		portfolioId: string,
+		data: CreateSavedReportData,
+	): Promise<SavedReportMetadataData> {
+		return prisma.report.create({
+			data: {
+				userId,
+				portfolioId,
+				schemaVersion: data.schemaVersion,
+				generatedAt: data.generatedAt,
+				strategyId: data.strategyId,
+				alertCount: data.alertCount,
+				jsonReport: data.jsonReport,
+				markdownReport: data.markdownReport,
+			},
+			select: savedReportMetadataSelect,
+		});
+	}
+
+	async findSavedReportsByPortfolio(
+		userId: string,
+		portfolioId: string,
+	): Promise<SavedReportMetadataData[] | null> {
+		const portfolio = await prisma.portfolio.findUnique({
+			where: {
+				id_userId: {
+					id: portfolioId,
+					userId,
+				},
+			},
+			select: {
+				id: true,
+			},
+		});
+
+		if (!portfolio) {
+			return null;
+		}
+
+		return prisma.report.findMany({
+			where: {
+				userId,
+				portfolioId,
+			},
+			take: SAVED_REPORT_LIST_LIMIT,
+			orderBy: [
+				{
+					createdAt: "desc",
+				},
+				{
+					id: "asc",
+				},
+			],
+			select: savedReportMetadataSelect,
+		});
+	}
+
+	findSavedReportByUser(
+		userId: string,
+		portfolioId: string,
+		reportId: string,
+	): Promise<SavedReportContentData | null> {
+		return prisma.report.findFirst({
+			where: {
+				id: reportId,
+				userId,
+				portfolioId,
+			},
+			select: {
+				...savedReportMetadataSelect,
+				jsonReport: true,
+				markdownReport: true,
+			},
+		});
+	}
 }
+
+const savedReportMetadataSelect = {
+	id: true,
+	schemaVersion: true,
+	generatedAt: true,
+	strategyId: true,
+	alertCount: true,
+	createdAt: true,
+} as const;

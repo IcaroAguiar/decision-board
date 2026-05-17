@@ -3,6 +3,7 @@ import {
 	generateJsonReport,
 	generateMarkdownReport,
 	type ReportEnvelope,
+	validateJsonReport,
 } from "@decision-board/reports";
 import { evaluateStrategy, getStrategyById } from "@decision-board/strategies";
 import type {
@@ -13,7 +14,13 @@ import type {
 	StrategyId,
 } from "@decision-board/types";
 import { strategyIds } from "@decision-board/types";
-import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import {
+	Inject,
+	Injectable,
+	InternalServerErrorException,
+	NotFoundException,
+} from "@nestjs/common";
+import type { Prisma } from "@prisma/client";
 import type {
 	DecimalValue,
 	ReportCashAccountData,
@@ -21,6 +28,8 @@ import type {
 	ReportContributionPlanData,
 	ReportPortfolioData,
 	ReportPositionData,
+	SavedReportContentData,
+	SavedReportMetadataData,
 } from "./reports.repository.js";
 import { ReportsRepository } from "./reports.repository.js";
 
@@ -30,6 +39,20 @@ const DATE_ONLY_LENGTH = 10;
 const CYCLE_MONTH_LENGTH = 7;
 
 export interface ReportExportResponse {
+	json: ReportEnvelope;
+	markdown: string;
+}
+
+export interface SavedReportMetadataResponse {
+	id: string;
+	schemaVersion: string;
+	generatedAt: string;
+	strategyId: string | null;
+	alertCount: number;
+	createdAt: string;
+}
+
+export interface SavedReportContentResponse extends SavedReportMetadataResponse {
 	json: ReportEnvelope;
 	markdown: string;
 }
@@ -70,6 +93,50 @@ export class ReportsService {
 			json: generateJsonReport(envelope),
 			markdown: generateMarkdownReport(envelope),
 		};
+	}
+
+	async createSavedReport(
+		userId: string,
+		portfolioId: string,
+	): Promise<SavedReportMetadataResponse> {
+		const report = await this.exportPortfolioReport(userId, portfolioId);
+		const metadata = await this.reports.createSavedReport(userId, portfolioId, {
+			schemaVersion: report.json.schemaVersion,
+			generatedAt: new Date(report.json.generatedAt),
+			strategyId: readReportStrategyIdFromEnvelope(report.json),
+			alertCount: report.json.alerts.length,
+			jsonReport: toPrismaJson(report.json),
+			markdownReport: report.markdown,
+		});
+
+		return toSavedReportMetadataResponse(metadata);
+	}
+
+	async listSavedReports(
+		userId: string,
+		portfolioId: string,
+	): Promise<SavedReportMetadataResponse[]> {
+		const reports = await this.reports.findSavedReportsByPortfolio(userId, portfolioId);
+
+		if (!reports) {
+			throw new NotFoundException("Portfolio not found");
+		}
+
+		return reports.map(toSavedReportMetadataResponse);
+	}
+
+	async getSavedReport(
+		userId: string,
+		portfolioId: string,
+		reportId: string,
+	): Promise<SavedReportContentResponse> {
+		const report = await this.reports.findSavedReportByUser(userId, portfolioId, reportId);
+
+		if (!report) {
+			throw new NotFoundException("Report not found");
+		}
+
+		return toSavedReportContentResponse(report);
 	}
 }
 
@@ -246,6 +313,11 @@ function readKnownStrategyId(value: string): StrategyId {
 		: strategyIds.balancedGrowth;
 }
 
+function readReportStrategyIdFromEnvelope(report: ReportEnvelope): string | null {
+	const strategyId = report.strategy.id;
+	return typeof strategyId === "string" ? strategyId : null;
+}
+
 function toAssetType(value: Uppercase<AssetType>): AssetType {
 	return value.toLowerCase() as AssetType;
 }
@@ -272,4 +344,37 @@ function toDateOnly(value: Date): string {
 
 function toCycleMonth(value: Date): string {
 	return value.toISOString().slice(0, CYCLE_MONTH_LENGTH);
+}
+
+function toPrismaJson(report: ReportEnvelope): Prisma.InputJsonValue {
+	return JSON.parse(JSON.stringify(report)) as Prisma.InputJsonValue;
+}
+
+function toSavedReportMetadataResponse(
+	report: SavedReportMetadataData,
+): SavedReportMetadataResponse {
+	return {
+		id: report.id,
+		schemaVersion: report.schemaVersion,
+		generatedAt: report.generatedAt.toISOString(),
+		strategyId: report.strategyId,
+		alertCount: report.alertCount,
+		createdAt: report.createdAt.toISOString(),
+	};
+}
+
+function toSavedReportContentResponse(report: SavedReportContentData): SavedReportContentResponse {
+	return {
+		...toSavedReportMetadataResponse(report),
+		json: readSavedJsonReport(report.jsonReport),
+		markdown: report.markdownReport,
+	};
+}
+
+function readSavedJsonReport(value: Prisma.JsonValue): ReportEnvelope {
+	if (validateJsonReport(value)) {
+		return value;
+	}
+
+	throw new InternalServerErrorException("Saved report JSON is invalid");
 }

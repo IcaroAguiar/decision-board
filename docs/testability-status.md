@@ -18,25 +18,25 @@ post-Phase 4 hardening track focused on:
 - public-safe documentation;
 - no fixed common API or frontend ports in tests.
 
-The latest validated implementation baseline is commit `240411f`, merged
+The latest validated implementation baseline is commit `e889437`, merged
 through GitHub PR
-[#39](https://github.com/IcaroAguiar/decision-board/pull/39). Earlier
-docs-only status refreshes do not unblock UI. PR-019B is the current local
-authenticated report export cut and remains inside the pre-UI track until merged
-and explicitly released.
+[#40](https://github.com/IcaroAguiar/decision-board/pull/40). Earlier
+docs-only status refreshes do not unblock UI. PR-020 is the current local
+report-history API cut and remains inside the pre-UI track until merged and
+explicitly released.
 
 ## Latest Evidence Snapshot
 
 | Evidence | Latest known result | Public-safe note |
 | --- | ---: | --- |
-| `pnpm coverage` | 109/109 tests, 94.96% lines, 78.09% branches, 98.24% functions | Local PR-019B evidence with synthetic env values and local Postgres. |
+| `pnpm coverage` | 109/109 tests, 95.05% lines, 78.22% branches, 98.30% functions | Local PR-020 evidence with synthetic env values and local Postgres. |
 | `pnpm test` | Workspace passed; API 76/76 | API tests run against local Postgres where required. |
-| `pnpm smoke:api` | Passed on ephemeral port `59600` | The exact port is runtime-assigned and not a contract; smoke now includes `report-json-export`. |
-| GitHub `quality-gate` | Passed for PR #39 in 2m15s | Runs migrations, tests, coverage ratchet, smoke, and build. |
-| GitGuardian | Passed for PR #39 | Remote secret scanning stayed green. |
+| `pnpm smoke:api` | Passed on ephemeral port `58874` | The exact port is runtime-assigned and not a contract; smoke now includes `report-history-create-list`. |
+| GitHub `quality-gate` | Passed for PR #40 | Runs migrations, tests, coverage ratchet, smoke, and build. |
+| GitGuardian | Passed for PR #40 | Remote secret scanning stayed green. |
 | Local `gitleaks detect --redact` | No leaks found | Reports counts/status only, not secret values. |
-| Local ratchet | Passed for PR-019B | Attestation updated after reviewer interpreted deterministic signals. |
-| Independent review | Approved for PR-019B | Reviewer found no blocking findings; OpenAPI formal contract remains residual. |
+| Local ratchet | Passed for PR-020 | Attestation updated after reviewer interpreted deterministic signals. |
+| Independent review | Approved for PR-020 | Reviewer found no blocking findings; pagination contract and OpenAPI remain residual. |
 
 ## Completed Post-Phase 4 Cuts
 
@@ -67,7 +67,8 @@ and explicitly released.
 | PR-017X | #37 | Added focused `PositionRepository` and `PositionsService` coverage. |
 | PR-018 | #38 | Added deterministic Markdown report generation from the MVP report envelope. |
 | PR-019A | #39 | Added deterministic sanitized JSON report generation and schema guards. |
-| PR-019B | local branch | Adds authenticated JSON/Markdown report export endpoints with user isolation; PR pending. |
+| PR-019B | #40 | Added authenticated JSON/Markdown report export endpoints with user isolation. |
+| PR-020 | local branch | Adds authenticated saved report history with metadata listing and saved JSON/Markdown retrieval. |
 
 ## Coverage Movement
 
@@ -90,14 +91,16 @@ thresholds that motivated the post-Phase 4 pivot:
 | `position.dto.js` | 98.29% lines, 98.04% branches |
 | `positions.service.js` | 98.46% lines, 76.67% branches |
 | `reports/index.js` | 99.02% lines, 98.59% branches |
-| `reports.service.js` | 99.54% lines, 55.77% branches |
-| `reports.controller.js` | 98.25% lines, 73.68% branches |
+| `reports.service.js` | 98.56% lines, 60.00% branches |
+| `reports.controller.js` | 99.15% lines, 80.00% branches |
+| `reports.repository.js` | 98.62% lines, 50.00% branches |
+| `report.dto.js` | 100.00% lines, 100.00% branches |
 | `auth-http.js` | 90.58% lines, 79.69% branches |
 | `auth.logger.js` | 96.25% lines, 94.12% branches |
 
 ## Complexity Optimizer Triage
 
-`complexity-optimizer` was rerun during the PR-019B local cut. The first-pass
+`complexity-optimizer` was rerun during the PR-020 local cut. The first-pass
 scanner still reports many loop/query-in-loop leads in HTTP tests; these are
 treated as test-harness leads, not product hot paths. The productive leads
 manually checked in the recent passes were:
@@ -110,7 +113,7 @@ manually checked in the recent passes were:
 | `asset.dto.ts` | Enum map creation is startup/static validation work, not a request-scale nested scan. |
 | `jobs.service.ts` | Worker registration is constant-size over two known queues; PR-017V tests the queue names and conservative worker options without changing runtime behavior. |
 
-No broad production optimization is bundled into PR-019B. The productive
+No broad production optimization is bundled into PR-020. The productive
 auth/report surfaces are sensitive enough that future performance refactors
 should stay separate, behavior-preserving, and backed by focused tests.
 
@@ -127,7 +130,10 @@ Markdown formatting and sensitive-field omission. PR-019A extends the same
 synthetic report fixtures to JSON generation, schema guards, and sensitive-field
 omission. PR-019B uses synthetic users, assets, cash accounts, contribution data,
 and report exports to prove auth, isolation, Markdown/JSON export, and omission
-of `userId`, account e-mail, session, and token-like terms. Local
+of `userId`, account e-mail, session, and token-like terms. PR-020 extends those
+synthetic fixtures to saved report history creation, metadata listing, saved
+JSON/Markdown retrieval, invalid report identifiers, and cross-user denial.
+Local
 `gitleaks detect --redact` and independent review must stay green before each PR
 is opened.
 
@@ -174,6 +180,6 @@ Continue only with small, reviewable cuts until the UI unblock decision is
 explicit. Good candidates are:
 
 - close remaining branch gaps in productive services when the behavior matters;
-- add report-engine tests before implementing report persistence/API surfaces;
+- harden remaining report-history branch paths if they become behaviorally important;
 - document public-safe status and verification evidence after each merge;
 - treat complexity findings as leads, not as automatic refactor work.
