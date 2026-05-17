@@ -947,6 +947,40 @@ test, coverage, smoke, ratchet e quality gate verdes.
 
 ---
 
+### PR-017H — Cobertura dirigida de ContributionPlanRepository
+
+**Objetivo:** reduzir a próxima lacuna produtiva abaixo de 85% antes de UI em
+uma superfície de persistência multiusuário.
+
+**Escopo:**
+
+```txt
+- testes focados em apps/api/src/contribution-plans/contribution-plan.repository.ts
+- createByUser com portfolio de outro usuário retorna not-found
+- createByUser com cashAccount de outro usuário retorna not-found
+- findActiveByPortfolio lista apenas planos ativos e em ordem estável
+- findActiveByPortfolio retorna null para portfolio fora do usuário
+- updateByUser bloqueia plano/cashAccount fora do usuário
+- updateByUser atualiza plano próprio com cashAccountId/endsAt nulos
+```
+
+**Checklist de implementação:**
+
+```txt
+- [x] Identificar próxima lacuna produtiva: apps/api/src/contribution-plans/contribution-plan.repository.ts
+- [x] Adicionar teste de repositório contra Postgres real sem abrir API/front
+- [x] Rodar teste focado compilado
+- [x] Rodar pnpm coverage e comparar contribution-plan.repository/total
+```
+
+**Fora do escopo:** alterar contrato HTTP de contribution plans, refactor de
+Prisma, mudança de schema/migration, report engine e qualquer UI.
+
+**Aceite:** `contribution-plan.repository` cruza 85% de cobertura em linhas e o
+workspace mantém test, coverage, smoke, ratchet e quality gate verdes.
+
+---
+
 ### PR-017 — Dashboard web MVP
 
 **Objetivo:** criar tela principal útil.
