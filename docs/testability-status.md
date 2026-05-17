@@ -18,21 +18,21 @@ post-Phase 4 hardening track focused on:
 - public-safe documentation;
 - no fixed common API or frontend ports in tests.
 
-The current validated baseline is commit `a39d5a6`, merged through GitHub PR
-[#26](https://github.com/IcaroAguiar/decision-board/pull/26). The active local
-cut after that baseline is PR-017N, focused on `cash-account.dto` coverage.
+The current validated baseline is commit `29daa4f`, merged through GitHub PR
+[#27](https://github.com/IcaroAguiar/decision-board/pull/27). The active local
+cut after that baseline is PR-017O, focused on `position.dto` coverage.
 
 ## Latest Evidence Snapshot
 
 | Evidence | Latest known result | Public-safe note |
 | --- | ---: | --- |
-| `pnpm coverage` | 84/84 tests, 93.66% lines, 75.92% branches, 97.57% functions | Uses synthetic env values and local Postgres. |
-| `pnpm test` | Workspace passed; API 57/57 | API tests run against local Postgres where required. |
-| `pnpm smoke:api` | Passed on ephemeral port `64678` | The exact port is runtime-assigned and not a contract. |
-| GitHub `quality-gate` | Passed for PR #26 in 2m11s | Runs migrations, tests, coverage ratchet, smoke, and build. |
-| GitGuardian | Passed for PR #26 | Remote secret scanning stayed green. |
+| `pnpm coverage` | 89/89 tests, 93.96% lines, 76.57% branches, 97.57% functions | Uses synthetic env values and local Postgres. |
+| `pnpm test` | Workspace passed; API 62/62 | API tests run against local Postgres where required. |
+| `pnpm smoke:api` | Passed on ephemeral port `54443` | The exact port is runtime-assigned and not a contract. |
+| GitHub `quality-gate` | Passed for PR #27 in 2m07s | Runs migrations, tests, coverage ratchet, smoke, and build. |
+| GitGuardian | Passed for PR #27 | Remote secret scanning stayed green. |
 | Local `gitleaks detect --redact` | No leaks found | Reports counts/status only, not secret values. |
-| Independent review | No findings for local PR-017N cut | Reviewer checked the focused DTO test and public-doc updates. |
+| Independent review | No blocking findings for local PR-017O cut | Reviewer checked the focused DTO test and public-doc updates. |
 
 ## Completed Post-Phase 4 Cuts
 
@@ -51,7 +51,8 @@ cut after that baseline is PR-017N, focused on `cash-account.dto` coverage.
 | PR-017K | #24 | Covered `MarketDataService` provider, fallback, and rate-limit branches. |
 | PR-017L | #25 | Published public-safe post-Phase 4 testability status. |
 | PR-017M | #26 | Added focused `ContributionPlansService` coverage. |
-| PR-017N | local branch | Added focused `cash-account.dto` validation coverage; PR pending. |
+| PR-017N | #27 | Added focused `cash-account.dto` validation coverage. |
+| PR-017O | local branch | Added focused `position.dto` validation coverage; PR pending. |
 
 ## Coverage Movement
 
@@ -70,6 +71,7 @@ thresholds that motivated the post-Phase 4 pivot:
 | `market-data.service.js` | 93.10% lines, 72.41% branches |
 | `contribution-plans.service.js` | 93.18% lines, 83.93% branches |
 | `cash-account.dto.js` | 100.00% lines, 100.00% branches |
+| `position.dto.js` | 98.29% lines, 98.04% branches |
 
 ## Complexity Optimizer Triage
 

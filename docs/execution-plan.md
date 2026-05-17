@@ -1183,13 +1183,51 @@ validação financeira de caixa, sem iniciar UI.
 - [x] Rodar pnpm coverage e comparar cash-account.dto/total
 - [x] Rodar lint/typecheck/test/build/smoke/ratchet antes do PR
 - [x] Rodar agentic-code-review com reviewer independente
-- [ ] Abrir PR com CI remoto verde
+- [x] Abrir PR com CI remoto verde
 ```
 
 **Fora do escopo:** alterar código produtivo, schema/migration, contrato HTTP,
 repository/service, dados reais, secrets, browser smoke e qualquer UI.
 
 **Aceite:** `cash-account.dto` melhora cobertura de linhas e branches sem mudar
+comportamento produtivo, e o workspace mantém test, coverage, smoke, ratchet,
+review independente e quality gate verdes.
+
+---
+
+### PR-017O — Cobertura dirigida de Position DTO
+
+**Objetivo:** reduzir a próxima lacuna produtiva do coverage pós-Fase 4 em
+validação financeira de posições, sem iniciar UI.
+
+**Escopo:**
+
+```txt
+- teste unitário focado para position.dto
+- UUIDs de position, portfolio e asset
+- create/update DTOs com trim, nullable fields e update parcial
+- rejeição de body inválido, campos desconhecidos e update vazio
+- limites de notes
+- quantity positiva e preços opcionais não negativos
+- medição de cobertura comparável ao PR-017N
+```
+
+**Checklist de implementação:**
+
+```txt
+- [x] Identificar menor coverage produtivo atual: apps/api/src/positions/position.dto.ts
+- [x] Adicionar teste focado sem abrir servidor HTTP ou porta fixa
+- [x] Rodar teste focado compilado
+- [x] Rodar pnpm coverage e comparar position.dto/total
+- [x] Rodar lint/typecheck/test/build/smoke/ratchet antes do PR
+- [x] Rodar agentic-code-review com reviewer independente
+- [ ] Abrir PR com CI remoto verde
+```
+
+**Fora do escopo:** alterar código produtivo, schema/migration, contrato HTTP,
+repository/service, dados reais, secrets, browser smoke e qualquer UI.
+
+**Aceite:** `position.dto` melhora cobertura de linhas e branches sem mudar
 comportamento produtivo, e o workspace mantém test, coverage, smoke, ratchet,
 review independente e quality gate verdes.
 
