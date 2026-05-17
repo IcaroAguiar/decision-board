@@ -505,16 +505,21 @@ automática de ciclos fica para o PR-011/PR-012.
 **Checklist de implementação:**
 
 ```txt
-- [ ] Criar ContributionCyclesModule
-- [ ] Criar ciclo pendente a partir de um ContributionPlan
-- [ ] Permitir confirmedAmount diferente do plannedAmount
-- [ ] Status: pending, confirmed, skipped, reported, closed
-- [ ] Testar isolamento por usuário
+- [x] Criar ContributionCyclesModule
+- [x] Criar ciclo pendente a partir de um ContributionPlan
+- [x] Permitir confirmedAmount diferente do plannedAmount
+- [x] Status: pending, confirmed, skipped, reported, closed
+- [x] Testar isolamento por usuário
 ```
 
 **Fora do escopo:** job recorrente automático.
 
 **Aceite:** usuário abre ciclo de maio, confirma aporte de R$ 1.200 e escolhe estratégia.
+
+**Evidência local do corte:** API autenticada cria ciclo mensal manual a partir
+de um plano, lista ciclos por portfolio e confirma valor aportado diferente do
+planejado com estratégia escolhida. A tabela usa FK composta para manter o ciclo
+no mesmo usuário/portfolio do plano; job recorrente automático fica no PR-012.
 
 ---
 

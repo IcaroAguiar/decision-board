@@ -14,6 +14,17 @@ export const strategyIds = {
 
 export type StrategyId = (typeof strategyIds)[keyof typeof strategyIds];
 
+export const contributionCycleStatuses = {
+	pending: "pending",
+	confirmed: "confirmed",
+	skipped: "skipped",
+	reported: "reported",
+	closed: "closed",
+} as const;
+
+export type ContributionCycleStatus =
+	(typeof contributionCycleStatuses)[keyof typeof contributionCycleStatuses];
+
 export const reviewSeverities = {
 	info: "info",
 	warning: "warning",
