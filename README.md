@@ -208,6 +208,24 @@ manual-review requirements, risk-checklist requirements, and report cadence. It
 uses typed alert code/severity contracts from `@decision-board/types` and does
 not generate automatic buy/sell instructions.
 
+## Core Calculations
+
+`@decision-board/core` exposes deterministic pure functions for portfolio math:
+
+```txt
+calculatePositionValue(position)
+calculatePortfolioSummary(positions, cashAccounts)
+calculateAllocation(positions, cashAccounts)
+calculateEstimatedDividends(positions, totalValue?)
+```
+
+The summary includes total value, positions value, cash value, asset/cash
+account counts, allocation by asset/risk category/segment, and estimated
+monthly/annual dividends when positions include `estimatedMonthlyDividend`.
+Core calculations round money and percentages deterministically, reject negative
+or non-finite numeric inputs, and do not depend on React, NestJS, Prisma,
+database state, or external market-data providers.
+
 ## Contribution Plans
 
 Authenticated users can create recurring monthly contribution plans per

@@ -11,7 +11,7 @@
 	},
 	"scripts": {
 		"build": "tsc -p tsconfig.json",
-		"test": "corepack pnpm build && node --test \"dist/**/*.test.js\"",
+		"test": "corepack pnpm --filter @decision-board/types build && corepack pnpm --filter @decision-board/core build && corepack pnpm build && node --test \"dist/**/*.test.js\"",
 		"typecheck": "tsc -p tsconfig.json --noEmit"
 	},
 	"dependencies": {
