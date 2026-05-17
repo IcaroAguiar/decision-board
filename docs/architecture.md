@@ -779,6 +779,18 @@ Regras:
 2. Falha de provider não pode apagar dados manuais.
 3. Todo snapshot deve salvar provider, horário e payload bruto opcional.
 4. Dados externos devem ser tratados como informacionais, não como verdade absoluta.
+5. Tokens de provider devem entrar somente por env/config; nunca em payload bruto, logs ou fixtures.
+
+O provider brapi usa `GET /api/quote/{tickers}` e mapeia `results[].symbol`,
+`results[].regularMarketPrice`, `results[].regularMarketTime` e
+`results[].currency` para `QuoteSnapshot`. O token é enviado por header
+Authorization quando configurado. Para testes locais, a base da brapi pode ser
+sobrescrita por `BRAPI_API_BASE_URL`, mantendo chamadas reais fora da suíte. A
+base deve usar HTTPS, exceto loopback HTTP em testes. Tickers aceitos pelo
+refresh externo devem ser allowlisted antes de compor a URL, e o símbolo
+retornado pelo provider deve bater com o ativo solicitado antes de persistir o
+snapshot. O payload bruto salvo deve ser allowlisted para evitar persistir
+headers, tokens ou campos desnecessários do provider.
 
 ## 16. Relatórios
 
@@ -937,6 +949,8 @@ BETTER_AUTH_SECRET=
 BETTER_AUTH_URL=
 WEB_ORIGIN=
 BRAPI_TOKEN=
+BRAPI_API_BASE_URL=https://brapi.dev
+BRAPI_TIMEOUT_MS=5000
 MARKET_DATA_PROVIDER=manual|brapi
 NODE_ENV=production
 ```

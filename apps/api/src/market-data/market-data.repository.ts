@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import type { Asset, PriceSnapshot } from "@prisma/client";
+import type { Asset, PriceSnapshot, Prisma } from "@prisma/client";
 import { prisma } from "../auth/prisma.client.js";
 import type { PriceSnapshotSearchDto } from "./market-data.dto.js";
 
@@ -12,6 +12,12 @@ export interface CreateManualPriceSnapshotData {
 	currency: string;
 	provider: string;
 	capturedAt: Date;
+	rawPayloadJson?: Prisma.InputJsonValue;
+}
+
+export interface RefreshRateLimitData {
+	key: string;
+	windowStartedAt: bigint;
 }
 
 @Injectable()
@@ -39,6 +45,7 @@ export class MarketDataRepository {
 				currency: data.currency,
 				provider: data.provider,
 				capturedAt: data.capturedAt,
+				rawPayloadJson: data.rawPayloadJson,
 			},
 		});
 	}
@@ -63,5 +70,18 @@ export class MarketDataRepository {
 				},
 			],
 		});
+	}
+
+	async tryCreateRefreshRateLimit(data: RefreshRateLimitData): Promise<boolean> {
+		const result = await prisma.rateLimit.createMany({
+			data: {
+				key: data.key,
+				count: 1,
+				lastRequest: data.windowStartedAt,
+			},
+			skipDuplicates: true,
+		});
+
+		return result.count === 1;
 	}
 }

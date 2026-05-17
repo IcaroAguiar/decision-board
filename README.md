@@ -242,6 +242,7 @@ global asset without changing another user's history.
 
 ```txt
 POST /assets/:assetId/price-snapshots
+POST /assets/:assetId/price-snapshots/refresh
 GET  /assets/:assetId/price-snapshots
 ```
 
@@ -258,6 +259,14 @@ GET  /assets/:assetId/price-snapshots
 `currency` is optional and defaults to the asset currency; when provided, it must
 match that asset currency. `capturedAt` is optional and defaults to the current
 server time. Responses never include `userId` or raw provider payloads.
+
+`POST /assets/:assetId/price-snapshots/refresh` uses the optional configured
+market-data provider. Set `MARKET_DATA_PROVIDER=brapi` to enable brapi refreshes;
+`BRAPI_TOKEN` is optional only for brapi test tickers and should be configured
+for production usage. `BRAPI_TIMEOUT_MS` defaults to 5000. Provider failures
+return a clear API error and do not remove or overwrite existing manual
+snapshots. Refreshes are rate-limited per user and asset, and provider payloads
+are allowlisted before persistence.
 
 ## Security And Financial Boundaries
 
