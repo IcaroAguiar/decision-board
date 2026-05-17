@@ -18,23 +18,24 @@ post-Phase 4 hardening track focused on:
 - public-safe documentation;
 - no fixed common API or frontend ports in tests.
 
-The current validated baseline is commit `222e64a`, merged through GitHub PR
-[#31](https://github.com/IcaroAguiar/decision-board/pull/31). No UI work is
-unblocked by this status refresh; the next implementation cut should still stay
-inside the post-Phase 4 hardening track until explicitly released.
+The current validated baseline before the active local cut is commit `2020503`,
+merged through GitHub PR
+[#32](https://github.com/IcaroAguiar/decision-board/pull/32). No UI work is
+unblocked by this status refresh; the active local cut remains inside the
+post-Phase 4 hardening track.
 
 ## Latest Evidence Snapshot
 
 | Evidence | Latest known result | Public-safe note |
 | --- | ---: | --- |
-| `pnpm coverage` | 97/97 tests, 94.15% lines, 77.71% branches, 98.01% functions | Uses synthetic env values and local Postgres. |
+| `pnpm coverage` | 97/97 tests, 94.15% lines, 77.83% branches, 98.01% functions | Uses synthetic env values and local Postgres. |
 | `pnpm test` | Workspace passed; API 70/70 | API tests run against local Postgres where required. |
-| `pnpm smoke:api` | Passed on ephemeral port `59436` | The exact port is runtime-assigned and not a contract. |
-| GitHub `quality-gate` | Passed for PR #31 in 2m8s | Runs migrations, tests, coverage ratchet, smoke, and build. |
-| GitGuardian | Passed for PR #31 | Remote secret scanning stayed green. |
+| `pnpm smoke:api` | Passed on ephemeral port `51751` | The exact port is runtime-assigned and not a contract. |
+| GitHub `quality-gate` | Passed for PR #32 in 2m13s | Runs migrations, tests, coverage ratchet, smoke, and build. |
+| GitGuardian | Passed for PR #32 | Remote secret scanning stayed green. |
 | Local `gitleaks detect --redact` | No leaks found | Reports counts/status only, not secret values. |
-| Local ratchet | Passed for PR-017Q | Deterministic collector has 0 findings; runtime-required signal was satisfied by real API smoke. |
-| Independent review | PR-017Q security reviewer found no issues | Reviewer accepted synthetic redaction fixtures and boundary literals as intentional. |
+| Local ratchet | Passed for PR-017T | Deterministic collector has 0 findings; runtime-required signal was satisfied by real API smoke. |
+| Independent review | PR-017T reviewer finding addressed | Reviewer found one low documentation evidence mismatch; this status now reflects the PR-017T evidence. |
 
 ## Completed Post-Phase 4 Cuts
 
@@ -58,6 +59,8 @@ inside the post-Phase 4 hardening track until explicitly released.
 | PR-017P | #29 | Added focused `auth-http` pseudo-header regression coverage. |
 | PR-017Q | #30 | Added focused `auth.logger` redaction coverage and a small payload-index cleanup. |
 | PR-017R | #31 | Docs-only correction for post-PR #30 public status. |
+| PR-017S | #32 | Docs-only correction for post-PR #31 public status. |
+| PR-017T | local branch | Adds focused `ContributionPlanRepository` update coverage; PR pending. |
 
 ## Coverage Movement
 
@@ -70,7 +73,7 @@ thresholds that motivated the post-Phase 4 pivot:
 | `jobs.service.js` | 86.91% lines, 80.00% branches |
 | `client-ip.js` | 100.00% lines, 100.00% branches |
 | `asset.repository.js` | 97.66% lines, 70.00% branches |
-| `contribution-plan.repository.js` | 86.91% lines, 75.00% branches |
+| `contribution-plan.repository.js` | 86.91% lines, 78.72% branches |
 | `contribution-cycle.repository.js` | 89.19% lines, 77.14% branches |
 | `env.js` | 88.89% lines, 87.50% branches |
 | `market-data.service.js` | 93.10% lines, 72.41% branches |

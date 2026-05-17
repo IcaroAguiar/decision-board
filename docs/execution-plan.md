@@ -1343,6 +1343,42 @@ a decisão de bloquear UI até novo desbloqueio explícito.
 
 ---
 
+### PR-017T — Cobertura de update do ContributionPlanRepository
+
+**Objetivo:** reduzir lacuna produtiva do coverage pós-Fase 4 em persistência
+user-owned de planos de aporte, sem iniciar UI.
+
+**Escopo:**
+
+```txt
+- teste focado para updateByUser com cashAccountId próprio
+- teste focado para updateByUser convertendo frequência, startsAt e endsAt
+- teste focado para troca de dayOfMonth e defaultStrategyId
+- manter teste em Prisma/Postgres real, sem servidor HTTP e sem porta fixa
+- atualizar status público seguro pós-PR #32
+```
+
+**Checklist de implementação:**
+
+```txt
+- [x] Identificar próximo corte produtivo: apps/api/src/contribution-plans/contribution-plan.repository.test.ts
+- [x] Adicionar teste focado de update persistente sem porta fixa
+- [x] Rodar teste focado compilado contra Postgres local
+- [x] Rodar pnpm coverage e comparar contribution-plan.repository/total
+- [x] Rodar lint/typecheck/test/build/smoke/ratchet antes do PR
+- [x] Rodar agentic-code-review com reviewer independente
+- [ ] Abrir PR com CI remoto verde
+```
+
+**Fora do escopo:** alterar schema/migration, rotas HTTP, service layer,
+provider externo, UI/browser, dados reais e secrets.
+
+**Aceite:** `ContributionPlanRepository` protege update de agenda/plano com
+Postgres real, mantendo escopo por `userId` e sem enfraquecer ownership de
+`cashAccountId`.
+
+---
+
 ### PR-017 — Dashboard web MVP
 
 **Objetivo:** criar tela principal útil.
