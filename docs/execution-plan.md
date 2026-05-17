@@ -1444,7 +1444,7 @@ fixa.
 - [x] Rodar pnpm coverage e comparar cash-account.repository/total
 - [x] Rodar lint/typecheck/test/build/smoke/ratchet antes do PR
 - [x] Rodar agentic-code-review com reviewer independente
-- [ ] Abrir PR com CI remoto verde
+- [x] Abrir PR com CI remoto verde
 ```
 
 **Fora do escopo:** alterar schema/migration, rotas HTTP, service layer,
@@ -1454,6 +1454,48 @@ desenvolvimento.
 **Aceite:** `CashAccountRepository` protege criação, listagem, busca e update
 de contas de caixa com Postgres real, mantendo escopo por `userId` e sem
 enfraquecer a separação entre usuários.
+
+---
+
+### PR-017X — Cobertura de positions repository/service
+
+**Objetivo:** reduzir lacunas produtivas do coverage pós-Fase 4 em posições
+user-owned e mapeamento de resposta, sem iniciar UI e sem abrir servidor HTTP
+ou porta fixa.
+
+**Escopo:**
+
+```txt
+- teste focado para PositionRepository contra Postgres real
+- createByUser bloqueando portfolio de outro usuário e asset inexistente
+- findManyByPortfolio e findByUser respeitando userId
+- updateByUser bloqueando posição de outro usuário e atualizando campos próprios
+- teste unitário de PositionsService com repository fake
+- mapeamento de posição sem preço manual para currentPrice/totalValue nulos
+- tradução de misses do repository para NotFoundException
+- atualizar status público seguro pós-PR #36
+```
+
+**Checklist de implementação:**
+
+```txt
+- [x] Identificar próximo corte produtivo: apps/api/src/positions
+- [x] Adicionar teste focado de repositório sem API/front ou porta fixa
+- [x] Adicionar teste focado de service sem Postgres ou HTTP
+- [x] Rodar testes focados compilados
+- [x] Rodar pnpm coverage e comparar positions.service/total
+- [x] Rodar lint/typecheck/test/build/smoke/ratchet antes do PR
+- [x] Rodar agentic-code-review com reviewer independente
+- [ ] Abrir PR com CI remoto verde
+```
+
+**Fora do escopo:** alterar schema/migration, rotas HTTP, cálculo de core,
+providers externos, dados reais, secrets, UI/browser e qualquer porta fixa de
+desenvolvimento.
+
+**Aceite:** `PositionRepository` protege criação, listagem, busca e update de
+posições por `userId`, e `PositionsService` preserva respostas seguras para
+posição sem preço manual e para recursos inexistentes.
 
 ---
 
