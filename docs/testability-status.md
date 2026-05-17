@@ -18,20 +18,22 @@ post-Phase 4 hardening track focused on:
 - public-safe documentation;
 - no fixed common API or frontend ports in tests.
 
-The current validated baseline is commit `53566f7`, merged through GitHub PR
-[#24](https://github.com/IcaroAguiar/decision-board/pull/24).
+The current validated baseline is commit `dc230cb`, merged through GitHub PR
+[#25](https://github.com/IcaroAguiar/decision-board/pull/25). The active local
+cut after that baseline is PR-017M, focused on `ContributionPlansService`
+coverage.
 
 ## Latest Evidence Snapshot
 
 | Evidence | Latest known result | Public-safe note |
 | --- | ---: | --- |
-| `pnpm coverage` | 75/75 tests, 93.03% lines, 74.33% branches, 97.57% functions | Uses synthetic env values and local Postgres. |
-| `pnpm test` | Workspace passed; API 48/48 | API tests run against local Postgres where required. |
-| `pnpm smoke:api` | Passed on ephemeral port `49313` | The exact port is runtime-assigned and not a contract. |
-| GitHub `quality-gate` | Passed for PR #24 in 2m15s | Runs migrations, tests, coverage ratchet, smoke, and build. |
-| GitGuardian | Passed for PR #24 | Remote secret scanning stayed green. |
+| `pnpm coverage` | 79/79 tests, 93.24% lines, 74.85% branches, 97.57% functions | Uses synthetic env values and local Postgres. |
+| `pnpm test` | Workspace passed; API 52/52 | API tests run against local Postgres where required. |
+| `pnpm smoke:api` | Passed on ephemeral port `59042` | The exact port is runtime-assigned and not a contract. |
+| GitHub `quality-gate` | Passed for PR #25 in 2m08s | Runs migrations, tests, coverage ratchet, smoke, and build. |
+| GitGuardian | Passed for PR #25 | Remote secret scanning stayed green. |
 | Local `gitleaks detect --redact` | No leaks found | Reports counts/status only, not secret values. |
-| Independent review | Finding resolved for PR #24 | Reviewer required proof that rate limit blocks before provider call. |
+| Independent review | No findings for PR #25 | Reviewer checked public-doc safety and factual consistency. |
 
 ## Completed Post-Phase 4 Cuts
 
@@ -48,6 +50,8 @@ The current validated baseline is commit `53566f7`, merged through GitHub PR
 | PR-017I | #22 | Covered `ContributionCycleRepository`. |
 | PR-017J | #23 | Covered auth/env helpers. |
 | PR-017K | #24 | Covered `MarketDataService` provider, fallback, and rate-limit branches. |
+| PR-017L | #25 | Published public-safe post-Phase 4 testability status. |
+| PR-017M | local branch | Added focused `ContributionPlansService` coverage; PR pending. |
 
 ## Coverage Movement
 
@@ -64,6 +68,7 @@ thresholds that motivated the post-Phase 4 pivot:
 | `contribution-cycle.repository.js` | 89.19% lines, 77.14% branches |
 | `env.js` | 88.89% lines, 87.50% branches |
 | `market-data.service.js` | 93.10% lines, 72.41% branches |
+| `contribution-plans.service.js` | 93.18% lines, 83.93% branches |
 
 ## Required Gate Before UI
 

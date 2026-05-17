@@ -1109,7 +1109,7 @@ antes de qualquer UI.
 - [x] Criar documento público seguro de status de testabilidade
 - [x] Linkar o documento a partir de docs/testing.md
 - [x] Rodar lint/gitleaks/ratchet
-- [ ] Abrir PR com CI remoto verde
+- [x] Abrir PR com CI remoto verde
 ```
 
 **Fora do escopo:** alterar código produtivo, testes executáveis, schema,
@@ -1117,6 +1117,43 @@ contrato HTTP, dados reais, secrets, report engine e qualquer UI.
 
 **Aceite:** o status público fica versionado, sem vazamento de informação
 sensível, e os gates aplicáveis de documentação passam.
+
+---
+
+### PR-017M — Cobertura dirigida de ContributionPlansService
+
+**Objetivo:** reduzir a próxima lacuna produtiva do coverage pós-Fase 4 sem
+iniciar UI.
+
+**Escopo:**
+
+```txt
+- teste unitário focado para ContributionPlansService
+- casos de not-found vindos do repository
+- validação de range efetivo antes de update
+- cálculo de nextCycleDate em fim de mês, plano inativo e plano encerrado
+- falha fechada quando persistence retorna frequência não suportada
+- medição de cobertura comparável ao PR-017K
+```
+
+**Checklist de implementação:**
+
+```txt
+- [x] Identificar menor coverage produtivo atual: apps/api/src/contribution-plans/contribution-plans.service.ts
+- [x] Adicionar teste focado sem abrir servidor HTTP ou porta fixa
+- [x] Rodar teste focado compilado
+- [x] Rodar pnpm coverage e comparar contribution-plans.service/total
+- [x] Rodar lint/typecheck/test/build/smoke/ratchet antes do PR
+- [x] Rodar agentic-code-review com reviewer independente
+- [ ] Abrir PR com CI remoto verde
+```
+
+**Fora do escopo:** alterar código produtivo, schema/migration, contrato HTTP,
+jobs, report engine, dados reais, secrets, browser smoke e qualquer UI.
+
+**Aceite:** `contribution-plans.service` melhora cobertura de linhas e branches
+sem mudar comportamento produtivo, e o workspace mantém test, coverage, smoke,
+ratchet, review independente e quality gate verdes.
 
 ---
 
