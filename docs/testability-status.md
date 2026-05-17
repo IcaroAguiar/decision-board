@@ -18,10 +18,10 @@ post-Phase 4 hardening track focused on:
 - public-safe documentation;
 - no fixed common API or frontend ports in tests.
 
-The current validated baseline is commit `32b817e`, merged through GitHub PR
-[#30](https://github.com/IcaroAguiar/decision-board/pull/30). The active local
-cut after that baseline is PR-017R, a docs-only correction that keeps this
-public status page aligned with the merged PR #30 evidence.
+The current validated baseline is commit `222e64a`, merged through GitHub PR
+[#31](https://github.com/IcaroAguiar/decision-board/pull/31). No UI work is
+unblocked by this status refresh; the next implementation cut should still stay
+inside the post-Phase 4 hardening track until explicitly released.
 
 ## Latest Evidence Snapshot
 
@@ -30,8 +30,8 @@ public status page aligned with the merged PR #30 evidence.
 | `pnpm coverage` | 97/97 tests, 94.15% lines, 77.71% branches, 98.01% functions | Uses synthetic env values and local Postgres. |
 | `pnpm test` | Workspace passed; API 70/70 | API tests run against local Postgres where required. |
 | `pnpm smoke:api` | Passed on ephemeral port `59436` | The exact port is runtime-assigned and not a contract. |
-| GitHub `quality-gate` | Passed for PR #30 in 2m20s | Runs migrations, tests, coverage ratchet, smoke, and build. |
-| GitGuardian | Passed for PR #30 | Remote secret scanning stayed green. |
+| GitHub `quality-gate` | Passed for PR #31 in 2m8s | Runs migrations, tests, coverage ratchet, smoke, and build. |
+| GitGuardian | Passed for PR #31 | Remote secret scanning stayed green. |
 | Local `gitleaks detect --redact` | No leaks found | Reports counts/status only, not secret values. |
 | Local ratchet | Passed for PR-017Q | Deterministic collector has 0 findings; runtime-required signal was satisfied by real API smoke. |
 | Independent review | PR-017Q security reviewer found no issues | Reviewer accepted synthetic redaction fixtures and boundary literals as intentional. |
@@ -57,7 +57,7 @@ public status page aligned with the merged PR #30 evidence.
 | PR-017O | #28 | Added focused `position.dto` validation coverage. |
 | PR-017P | #29 | Added focused `auth-http` pseudo-header regression coverage. |
 | PR-017Q | #30 | Added focused `auth.logger` redaction coverage and a small payload-index cleanup. |
-| PR-017R | local branch | Docs-only correction for post-PR #30 public status; PR pending. |
+| PR-017R | #31 | Docs-only correction for post-PR #30 public status. |
 
 ## Coverage Movement
 
