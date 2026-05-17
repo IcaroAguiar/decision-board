@@ -55,6 +55,7 @@ model User {
   contributionPlans  ContributionPlan[]
   contributionCycles ContributionCycle[]
   priceSnapshots     PriceSnapshot[]
+  reports            Report[]
   userAssetOverrides UserAssetOverride[]
   sessions           Session[]
   accounts           Account[]
@@ -134,6 +135,7 @@ model Portfolio {
   cashAccounts       CashAccount[]
   contributionPlans  ContributionPlan[]
   contributionCycles ContributionCycle[]
+  reports            Report[]
 
   @@unique([id, userId])
   @@index([userId])
@@ -295,4 +297,23 @@ model PriceSnapshot {
   @@index([userId, assetId, capturedAt])
   @@index([assetId, capturedAt])
   @@map("price_snapshots")
+}
+
+model Report {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  portfolioId    String   @map("portfolio_id") @db.Uuid
+  schemaVersion  String   @map("schema_version") @db.VarChar(16)
+  generatedAt    DateTime @map("generated_at")
+  strategyId     String?  @map("strategy_id") @db.VarChar(64)
+  alertCount     Int      @default(0) @map("alert_count")
+  jsonReport     Json     @map("json_report")
+  markdownReport String   @map("markdown_report")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  portfolio Portfolio @relation(fields: [portfolioId, userId], references: [id, userId], onDelete: Restrict)
+
+  @@index([userId, portfolioId, createdAt])
+  @@map("reports")
 }

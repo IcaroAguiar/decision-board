@@ -259,14 +259,22 @@ user notes, while omitting known sensitive field names from nested records.
 The API exposes authenticated, non-persisted report exports for a portfolio:
 
 ```txt
+POST /portfolios/:portfolioId/reports
+GET /portfolios/:portfolioId/reports
 GET /portfolios/:portfolioId/reports/current.json
 GET /portfolios/:portfolioId/reports/current.md
+GET /portfolios/:portfolioId/reports/:reportId.json
+GET /portfolios/:portfolioId/reports/:reportId.md
 ```
 
-Both endpoints derive ownership from the Better Auth session cookie and return
+These endpoints derive ownership from the Better Auth session cookie and return
 `404` when the portfolio does not belong to the authenticated user. Report
 exports avoid `userId`, account e-mail, cookies, session tokens, raw auth
 payloads, and unnecessary internal resource IDs.
+
+`current.*` routes generate the latest snapshot without persistence. `POST`
+stores the current snapshot in the report history, `GET` lists saved report
+metadata, and report-id routes return the saved JSON or Markdown content.
 
 ## Jobs
 

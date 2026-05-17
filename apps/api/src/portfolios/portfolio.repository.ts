@@ -78,6 +78,7 @@ export class PortfolioRepository {
 					select: {
 						positions: true,
 						cashAccounts: true,
+						reports: true,
 					},
 				},
 			},
@@ -87,7 +88,11 @@ export class PortfolioRepository {
 			return "not-found";
 		}
 
-		if (portfolio._count.positions > 0 || portfolio._count.cashAccounts > 0) {
+		if (
+			portfolio._count.positions > 0 ||
+			portfolio._count.cashAccounts > 0 ||
+			portfolio._count.reports > 0
+		) {
 			return "not-empty";
 		}
 

@@ -66,6 +66,7 @@ async function main(): Promise<void> {
 		);
 		assert.equal(contributionCycle.status, contributionCycleStatuses.confirmed);
 		await assertReportExport(baseUrl, user, portfolio.id);
+		await createAndListSavedReport(baseUrl, user, portfolio.id);
 
 		const secondUser = await signUpSmokeUser(baseUrl, "isolated", resources);
 		const crossUserPortfolioRead = await fetch(`${baseUrl}/portfolios/${portfolio.id}`, {
@@ -87,6 +88,7 @@ async function main(): Promise<void> {
 				"contribution-plan",
 				"contribution-cycle-confirm",
 				"report-json-export",
+				"report-history-create-list",
 				"user-isolation",
 			],
 		});
@@ -310,6 +312,40 @@ async function assertReportExport(
 	assert.ok(Array.isArray(payload.positions));
 	assert.equal(payload.positions.length, 1);
 	assert.equal("userId" in payload, false);
+}
+
+async function createAndListSavedReport(
+	baseUrl: string,
+	user: TestUser,
+	portfolioId: string,
+): Promise<void> {
+	const createResponse = await fetch(`${baseUrl}/portfolios/${portfolioId}/reports`, {
+		method: httpMethods.post,
+		headers: jsonHeaders(user),
+	});
+	const createPayload = await readJson(createResponse);
+	assert.equal(createResponse.status, 201, JSON.stringify(createPayload));
+	const report = assertIdPayload(createPayload);
+
+	const listResponse = await fetch(`${baseUrl}/portfolios/${portfolioId}/reports`, {
+		headers: jsonHeaders(user),
+	});
+	const listPayload = await readJson(listResponse);
+	assert.equal(listResponse.status, 200, JSON.stringify(listPayload));
+	assert.ok(Array.isArray(listPayload));
+	assert.ok(listPayload.some((candidate) => isRecord(candidate) && candidate.id === report.id));
+
+	const savedReportResponse = await fetch(
+		`${baseUrl}/portfolios/${portfolioId}/reports/${report.id}.json`,
+		{
+			headers: jsonHeaders(user),
+		},
+	);
+	const savedReportPayload = await readJson(savedReportResponse);
+	assert.equal(savedReportResponse.status, 200, JSON.stringify(savedReportPayload));
+	assert.ok(isRecord(savedReportPayload));
+	assert.equal(savedReportPayload.schemaVersion, "1.0");
+	assert.equal("userId" in savedReportPayload, false);
 }
 
 async function cleanupSmokeData(

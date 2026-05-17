@@ -1654,16 +1654,20 @@ de auth e IDs internos desnecessários no corpo do relatório.
 **Checklist de implementação:**
 
 ```txt
-- [ ] Salvar relatório no banco
-- [ ] Listar relatórios por portfolio
-- [ ] Mostrar data, estratégia e alertas principais
-- [ ] Permitir copiar conteúdo
-- [ ] Testar isolamento por usuário
+- [x] Salvar relatório no banco
+- [x] Listar relatórios por portfolio
+- [x] Mostrar data, estratégia e alertas principais
+- [x] Permitir copiar conteúdo
+- [x] Testar isolamento por usuário
 ```
 
 **Fora do escopo:** comparação entre relatórios.
 
 **Aceite:** usuário consegue recuperar relatório anterior.
+
+**Aceite backend-only:** API autenticada permite criar histórico, listar
+metadados e recuperar JSON/Markdown salvo. UI de copiar/download fica para
+corte visual posterior.
 
 ## 8. Fase 5 — UX de aporte e estratégia
 
