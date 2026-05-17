@@ -4,6 +4,9 @@ Decision Board treats tests and smoke checks as public, reproducible evidence.
 Do not put real portfolio data, real e-mail addresses, API tokens, cookies, or
 credentials in fixtures, logs, screenshots, reports, or PR descriptions.
 
+The current post-Phase 4 evidence snapshot is maintained in
+[testability-status.md](testability-status.md).
+
 ## Test Levels
 
 Use the lightest command while iterating, then run the broader gate before a PR
