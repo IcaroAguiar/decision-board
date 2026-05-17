@@ -4,8 +4,9 @@ import type {
 	PortfolioPositionInput,
 	RiskCategory,
 	StrategyAlert,
+	StrategyId,
 } from "@decision-board/types";
-import { reviewSeverities, strategyAlertCodes } from "@decision-board/types";
+import { reviewSeverities, strategyAlertCodes, strategyIds } from "@decision-board/types";
 
 export interface StrategyRules {
 	maxSingleAssetPercent?: number;
@@ -18,7 +19,7 @@ export interface StrategyRules {
 }
 
 export interface StrategyDefinition {
-	id: "low_maintenance" | "high_income" | "balanced_growth" | "opportunistic" | "defensive";
+	id: StrategyId;
 	name: string;
 	riskLevel: "low" | "low_medium" | "medium" | "moderate_high" | "high";
 	reportIntervalDays: number;
@@ -45,7 +46,7 @@ const PERCENT_ROUNDING_SCALE = 100;
 
 export const strategies: StrategyDefinition[] = [
 	{
-		id: "low_maintenance",
+		id: strategyIds.lowMaintenance,
 		name: "Pouca manutenção",
 		riskLevel: "low_medium",
 		reportIntervalDays: 30,
@@ -58,7 +59,7 @@ export const strategies: StrategyDefinition[] = [
 		},
 	},
 	{
-		id: "high_income",
+		id: strategyIds.highIncome,
 		name: "Renda mensal alta",
 		riskLevel: "moderate_high",
 		reportIntervalDays: 15,
@@ -69,7 +70,7 @@ export const strategies: StrategyDefinition[] = [
 		},
 	},
 	{
-		id: "balanced_growth",
+		id: strategyIds.balancedGrowth,
 		name: "Crescimento equilibrado",
 		riskLevel: "medium",
 		reportIntervalDays: 30,
@@ -81,7 +82,7 @@ export const strategies: StrategyDefinition[] = [
 		},
 	},
 	{
-		id: "opportunistic",
+		id: strategyIds.opportunistic,
 		name: "Oportunista",
 		riskLevel: "high",
 		reportIntervalDays: 7,
@@ -93,7 +94,7 @@ export const strategies: StrategyDefinition[] = [
 		},
 	},
 	{
-		id: "defensive",
+		id: strategyIds.defensive,
 		name: "Defensiva",
 		riskLevel: "low",
 		reportIntervalDays: 30,

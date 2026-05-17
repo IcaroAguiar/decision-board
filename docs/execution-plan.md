@@ -469,17 +469,23 @@ contratos tipados exportados por `@decision-board/types`.
 **Checklist de implementação:**
 
 ```txt
-- [ ] Criar ContributionPlansModule
-- [ ] Campos: amount, frequency, dayOfMonth, startsAt, endsAt, defaultStrategyId
-- [ ] Validar amount > 0
-- [ ] Validar dayOfMonth 1..31
-- [ ] Listar planos ativos
-- [ ] Exibir próximo ciclo previsto
+- [x] Criar ContributionPlansModule
+- [x] Campos: amount, frequency, dayOfMonth, startsAt, endsAt, defaultStrategyId
+- [x] Validar amount > 0
+- [x] Validar dayOfMonth 1..31
+- [x] Listar planos ativos
+- [x] Exibir próximo ciclo previsto
 ```
 
 **Fora do escopo:** job automático criando ciclos.
 
 **Aceite:** usuário define aporte recorrente de R$ 1.000/mês ou outro valor.
+
+**Evidência local do corte:** API autenticada cria, lista planos ativos e
+atualiza planos de aporte mensal com isolamento por usuário, validação de valor
+positivo, dia do mês, datas, estratégia padrão e conta de caixa opcional do
+mesmo portfolio. O próximo ciclo previsto é calculado na resposta; criação
+automática de ciclos fica para o PR-011/PR-012.
 
 ---
 

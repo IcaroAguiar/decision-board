@@ -208,6 +208,14 @@ manual-review requirements, risk-checklist requirements, and report cadence. It
 uses typed alert code/severity contracts from `@decision-board/types` and does
 not generate automatic buy/sell instructions.
 
+## Contribution Plans
+
+Authenticated users can create recurring monthly contribution plans per
+portfolio through the API. Plans store a positive planned amount, day of month,
+start/end dates, active state, default strategy, and optional default cash
+account. List responses include only active plans and expose the next expected
+cycle date; automatic cycle creation remains out of scope.
+
 ## Security And Financial Boundaries
 
 - Do not store broker credentials.
