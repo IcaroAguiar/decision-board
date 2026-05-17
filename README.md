@@ -43,6 +43,7 @@ value.
 pnpm lint
 pnpm typecheck
 pnpm test
+pnpm coverage
 pnpm build
 ```
 

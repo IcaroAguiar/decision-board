@@ -1,25 +1,24 @@
 {
   "schemaVersion": 1,
-  "reviewer": "reviewer:019e347e-d4dd-7863-95c3-c409a9ece23d",
-  "reviewedAt": "2026-05-17T05:57:00Z",
+  "reviewer": "reviewer:019e3497-58b0-75b3-a28d-fd67a7b6d938",
+  "reviewedAt": "2026-05-17T06:23:00Z",
   "verdict": "approved_with_risk",
   "deterministicSignalsReviewed": true,
   "allowedBases": [
     "main"
   ],
-  "reviewedFingerprint": "bdcb6529584da0e2cca70552e02a6ae453ba3e55891cee63477f6a8bcf8e1193",
+  "reviewedFingerprint": "a8709fdf684fc3af2c1a2938ee295396672234394725f9f8c869ac4e04cbe687",
   "reviewedDeterministicSignals": {
-    "blocking": 3,
-    "high": 0,
-    "medium": 4
+    "blocking": 6,
+    "high": 1,
+    "medium": 6
   },
   "scope": [
-    "PR-017A API smoke and testability documentation",
-    "pnpm smoke:api root and api package scripts",
-    "apps/api/src/smoke/api-smoke.ts authenticated API journey on ephemeral loopback port",
-    "synthetic smoke data cleanup for generated users and asset",
-    "docs/testing.md public-safe testing and smoke guidance",
-    "README and execution-plan updates for the no-UI testability gate"
+    "PR-017C coverage baseline before UI",
+    "pnpm coverage root script and scripts/run-coverage.mjs",
+    "Node native coverage artifacts coverage/coverage-summary.json and coverage/lcov.info",
+    "quality-gate coverage step and required coverage ratchet",
+    "docs/testing.md README and execution-plan updates for public-safe coverage guidance"
   ],
-  "residualRisk": "Approved with risk: the independent reviewer found no blocker. Deterministic worker/consumer signals are false positives because the file is a sequential HTTP smoke script, not an event worker or consumer. no-test-file-changed is accepted because this PR introduces an executable smoke command and the workspace test suite plus smoke were run against real local Postgres. package-manifest-without-lockfile is accepted because package.json changes add scripts only, with no dependency or lockfile change expected. The remaining operational risk is that pnpm smoke:api must be kept as an explicit gate before UI work until it is wired into CI."
+  "residualRisk": "Approved with risk: the independent reviewer found the initial untracked script and coverage-minimum bootstrap findings, both corrected. Deterministic command-injection is accepted because the runner uses spawnSync without shell and static commands. Debug logs are intentional command/progress output. Magic strings and numbers are lcov format tokens and coverage percentage defaults. no-test-file-changed is accepted because pnpm coverage exercised the new runner with 55 tests against real local Postgres. package-manifest-without-lockfile is accepted because package.json adds only a script and no dependency. Remaining risk: actionlint is not installed locally, so workflow syntax is ultimately verified by GitHub Actions."
 }

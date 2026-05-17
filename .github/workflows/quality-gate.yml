@@ -68,6 +68,9 @@ jobs:
       - name: Tests
         run: pnpm test
 
+      - name: Coverage
+        run: pnpm coverage
+
       - name: API smoke
         run: pnpm smoke:api
 
@@ -116,3 +119,5 @@ jobs:
             docs/ai/quality-gate/quality-trend.jsonl
             docs/ai/quality-gate/auto-improvement-queue.json
             docs/ai/quality-gate/agentic-review-packet.json
+            coverage/coverage-summary.json
+            coverage/lcov.info
