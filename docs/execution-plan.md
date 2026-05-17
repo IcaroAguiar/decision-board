@@ -1016,6 +1016,41 @@ workspace mantém test, coverage, smoke, ratchet e quality gate verdes.
 
 ---
 
+### PR-017J — Cobertura dirigida de auth/env
+
+**Objetivo:** reduzir a próxima lacuna produtiva abaixo de 85% antes de UI em
+uma superfície sensível de configuração/auth.
+
+**Escopo:**
+
+```txt
+- testes focados em apps/api/src/auth/env.ts
+- getRequiredEnv e getRequiredPublicOrigin falham quando variável obrigatória falta
+- getTrustedOrigins retorna lista vazia sem origins configurados
+- getRequiredPublicOrigin normaliza origin de URL pública
+- getRequiredPublicOrigin rejeita HTTP em produção
+- getTrustedOrigins deduplica WEB_ORIGIN e BETTER_AUTH_URL para o mesmo origin
+- getTrustedOrigins rejeita URL inválida
+```
+
+**Checklist de implementação:**
+
+```txt
+- [x] Identificar próxima lacuna produtiva: apps/api/src/auth/env.ts
+- [x] Adicionar teste de configuração/auth sem abrir API/front
+- [x] Rodar teste focado compilado
+- [x] Rodar pnpm coverage e comparar auth/env/total
+```
+
+**Fora do escopo:** alterar contrato de env, política de HTTPS, Better Auth,
+proxy/CORS, secrets, side effect de leitura de `.env`, arquivo `.env` real do
+repo, schema/migration e qualquer UI.
+
+**Aceite:** `auth/env` cruza 85% de cobertura em linhas e o workspace mantém
+test, coverage, smoke, ratchet e quality gate verdes.
+
+---
+
 ### PR-017 — Dashboard web MVP
 
 **Objetivo:** criar tela principal útil.
