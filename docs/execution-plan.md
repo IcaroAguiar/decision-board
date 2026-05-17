@@ -709,6 +709,41 @@ compatibilidade do motor de alertas.
 
 ---
 
+## 7.1. Gate pós-Fase 4 — Cobertura, testabilidade e smoke real antes de UI
+
+### PR-017A — API smoke e documentação de testabilidade
+
+**Objetivo:** criar uma barreira reproduzível antes de iniciar qualquer UI.
+
+**Escopo:**
+
+```txt
+- comando pnpm smoke:api
+- jornada autenticada real da API em porta efêmera
+- Postgres local real
+- dados sintéticos com cleanup
+- documentação pública de testes/smoke
+```
+
+**Checklist de implementação:**
+
+```txt
+- [x] Criar smoke autenticado de API sem porta fixa
+- [x] Cobrir criação de portfolio, asset, snapshot manual, posição, caixa, plano e ciclo
+- [x] Cobrir negativa sem auth e isolamento básico entre usuários
+- [x] Limpar dados sintéticos após execução
+- [x] Documentar comando e cuidados para repositório público
+```
+
+**Fora do escopo:** UI, browser smoke, provider externo real e thresholds formais
+de coverage.
+
+**Aceite:** antes de iniciar PRs de UI, o projeto tem um smoke real backend que
+exercita o contrato API atual contra Postgres e pode ser citado em PRs como
+evidência operacional.
+
+---
+
 ### PR-017 — Dashboard web MVP
 
 **Objetivo:** criar tela principal útil.

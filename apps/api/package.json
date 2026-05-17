@@ -6,6 +6,7 @@
 	"scripts": {
 		"build": "tsc -p tsconfig.json",
 		"dev": "tsx watch src/main.ts",
+		"smoke:api": "corepack pnpm --filter @decision-board/types build && corepack pnpm --filter @decision-board/market-data build && corepack pnpm build && node dist/smoke/api-smoke.js",
 		"test": "corepack pnpm build && node --test --test-concurrency=1 \"dist/**/*.test.js\"",
 		"typecheck": "tsc -p tsconfig.json --noEmit"
 	},

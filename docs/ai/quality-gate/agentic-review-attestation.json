@@ -1,25 +1,25 @@
 {
   "schemaVersion": 1,
-  "reviewer": "reviewer:019e346e-13ab-7c10-b95f-ad3714719d1e",
-  "reviewedAt": "2026-05-17T05:40:00Z",
-  "verdict": "approved",
+  "reviewer": "reviewer:019e347e-d4dd-7863-95c3-c409a9ece23d",
+  "reviewedAt": "2026-05-17T05:57:00Z",
+  "verdict": "approved_with_risk",
   "deterministicSignalsReviewed": true,
   "allowedBases": [
     "main"
   ],
-  "reviewedFingerprint": "030138d2a5f682e2bc110229e47c42a50a2b13803bb2ec973923f44d0a822959",
+  "reviewedFingerprint": "bdcb6529584da0e2cca70552e02a6ae453ba3e55891cee63477f6a8bcf8e1193",
   "reviewedDeterministicSignals": {
-    "blocking": 1,
+    "blocking": 3,
     "high": 0,
-    "medium": 1
+    "medium": 4
   },
   "scope": [
-    "PR-016 core calculations backend-only",
-    "calculateAllocation aggregation by asset, risk category, and segment",
-    "calculateEstimatedDividends with explicit numeric input validation",
-    "calculatePortfolioSummary expanded output while preserving strategy engine compatibility",
-    "core and strategies package test scripts build local workspace dependencies before direct package tests",
-    "README, architecture, and execution-plan documentation for the no-UI pivot"
+    "PR-017A API smoke and testability documentation",
+    "pnpm smoke:api root and api package scripts",
+    "apps/api/src/smoke/api-smoke.ts authenticated API journey on ephemeral loopback port",
+    "synthetic smoke data cleanup for generated users and asset",
+    "docs/testing.md public-safe testing and smoke guidance",
+    "README and execution-plan updates for the no-UI testability gate"
   ],
-  "residualRisk": "Approved: the independent reviewer initially found two medium findings, both resolved before final approval. The remaining deterministic signal is package-manifest-without-lockfile; it is accepted because packages/core/package.json and packages/strategies/package.json changed only test scripts to build existing workspace dependencies before direct package tests, with no dependency, version, install, or lockfile change."
+  "residualRisk": "Approved with risk: the independent reviewer found no blocker. Deterministic worker/consumer signals are false positives because the file is a sequential HTTP smoke script, not an event worker or consumer. no-test-file-changed is accepted because this PR introduces an executable smoke command and the workspace test suite plus smoke were run against real local Postgres. package-manifest-without-lockfile is accepted because package.json changes add scripts only, with no dependency or lockfile change expected. The remaining operational risk is that pnpm smoke:api must be kept as an explicit gate before UI work until it is wired into CI."
 }
