@@ -981,6 +981,41 @@ workspace mantém test, coverage, smoke, ratchet e quality gate verdes.
 
 ---
 
+### PR-017I — Cobertura dirigida de ContributionCycleRepository
+
+**Objetivo:** reduzir a próxima lacuna produtiva abaixo de 85% antes de UI em
+uma superfície de persistência multiusuário de ciclos de aporte.
+
+**Escopo:**
+
+```txt
+- testes focados em apps/api/src/contribution-cycles/contribution-cycle.repository.ts
+- createByUser com plano de outro usuário retorna not-found
+- createByUser cria ciclo com strategy override e defaults do plano
+- createByUser retorna duplicate para mesmo plano/mês
+- findManyByPortfolio lista ciclos próprios em ordem estável e bloqueia portfolio de outro usuário
+- findByUser respeita userId
+- updateByUser bloqueia ciclo de outro usuário
+- updateByUser cobre transições confirmed, skipped, reported, closed e pending
+```
+
+**Checklist de implementação:**
+
+```txt
+- [x] Identificar próxima lacuna produtiva: apps/api/src/contribution-cycles/contribution-cycle.repository.ts
+- [x] Adicionar teste de repositório contra Postgres real sem abrir API/front
+- [x] Rodar teste focado compilado
+- [x] Rodar pnpm coverage e comparar contribution-cycle.repository/total
+```
+
+**Fora do escopo:** alterar contrato HTTP de contribution cycles, refactor de
+Prisma/jobs, mudança de schema/migration, report engine e qualquer UI.
+
+**Aceite:** `contribution-cycle.repository` cruza 85% de cobertura em linhas e o
+workspace mantém test, coverage, smoke, ratchet e quality gate verdes.
+
+---
+
 ### PR-017 — Dashboard web MVP
 
 **Objetivo:** criar tela principal útil.
