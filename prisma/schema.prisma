@@ -28,6 +28,10 @@ enum PositionSource {
   PROVIDER
 }
 
+enum ContributionFrequency {
+  MONTHLY
+}
+
 model User {
   id            String   @id @default(uuid()) @db.Uuid
   email         String   @unique
@@ -40,6 +44,7 @@ model User {
   portfolios         Portfolio[]
   positions          Position[]
   cashAccounts       CashAccount[]
+  contributionPlans  ContributionPlan[]
   userAssetOverrides UserAssetOverride[]
   sessions           Session[]
   accounts           Account[]
@@ -114,9 +119,10 @@ model Portfolio {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  positions    Position[]
-  cashAccounts CashAccount[]
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  positions         Position[]
+  cashAccounts      CashAccount[]
+  contributionPlans ContributionPlan[]
 
   @@unique([id, userId])
   @@index([userId])
@@ -199,9 +205,35 @@ model CashAccount {
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  portfolio Portfolio @relation(fields: [portfolioId, userId], references: [id, userId], onDelete: Restrict)
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  portfolio         Portfolio          @relation(fields: [portfolioId, userId], references: [id, userId], onDelete: Restrict)
+  contributionPlans ContributionPlan[]
 
+  @@unique([id, userId, portfolioId])
   @@index([userId, portfolioId])
   @@map("cash_accounts")
+}
+
+model ContributionPlan {
+  id                String                @id @default(uuid()) @db.Uuid
+  userId            String                @map("user_id") @db.Uuid
+  portfolioId       String                @map("portfolio_id") @db.Uuid
+  amount            Decimal               @db.Decimal(20, 8)
+  frequency         ContributionFrequency @default(MONTHLY)
+  dayOfMonth        Int                   @map("day_of_month")
+  startsAt          DateTime              @map("starts_at") @db.Date
+  endsAt            DateTime?             @map("ends_at") @db.Date
+  isActive          Boolean               @default(true) @map("is_active")
+  defaultStrategyId String                @map("default_strategy_id") @db.VarChar(64)
+  cashAccountId     String?               @map("cash_account_id") @db.Uuid
+  createdAt         DateTime              @default(now()) @map("created_at")
+  updatedAt         DateTime              @updatedAt @map("updated_at")
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  portfolio   Portfolio    @relation(fields: [portfolioId, userId], references: [id, userId], onDelete: Restrict)
+  cashAccount CashAccount? @relation(fields: [cashAccountId, userId, portfolioId], references: [id, userId, portfolioId], onDelete: Restrict)
+
+  @@index([userId, portfolioId, isActive])
+  @@index([cashAccountId])
+  @@map("contribution_plans")
 }

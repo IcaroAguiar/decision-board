@@ -7,6 +7,9 @@
 	"type": "module",
 	"packageManager": "pnpm@11.0.6",
 	"pnpm": {
+		"overrides": {
+			"path-to-regexp@8.3.0": "8.4.2"
+		},
 		"onlyBuiltDependencies": [
 			"@nestjs/core",
 			"@prisma/client",
@@ -34,12 +37,12 @@
 		"typecheck": "corepack pnpm --filter @decision-board/types build && corepack pnpm --filter @decision-board/core build && corepack pnpm -r --if-present typecheck"
 	},
 	"dependencies": {
-		"@prisma/client": "6.19.0"
+		"@prisma/client": "6.19.3"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.2.5",
 		"@types/node": "24.10.1",
-		"prisma": "6.19.0",
+		"prisma": "6.19.3",
 		"typescript": "5.9.3"
 	}
 }

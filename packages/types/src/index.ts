@@ -4,6 +4,16 @@ export type AssetType = "fii" | "stock" | "etf" | "cash" | "other";
 
 export type RiskCategory = "brick" | "paper" | "hybrid" | "cash" | "other";
 
+export const strategyIds = {
+	lowMaintenance: "low_maintenance",
+	highIncome: "high_income",
+	balancedGrowth: "balanced_growth",
+	opportunistic: "opportunistic",
+	defensive: "defensive",
+} as const;
+
+export type StrategyId = (typeof strategyIds)[keyof typeof strategyIds];
+
 export const reviewSeverities = {
 	info: "info",
 	warning: "warning",

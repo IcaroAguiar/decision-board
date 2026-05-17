@@ -1,26 +1,26 @@
 {
   "schemaVersion": 1,
-  "reviewer": "security-reviewer:019e325c-564b-7720-a2dc-6c3ab7ed4877",
-  "reviewedAt": "2026-05-16T19:57:46Z",
+  "reviewer": "security-reviewer:019e328e-4126-7f70-aa9b-24b13d68d6a6",
+  "reviewedAt": "2026-05-17T02:23:23Z",
   "verdict": "approved_with_risk",
   "deterministicSignalsReviewed": true,
   "allowedBases": [
     "main"
   ],
-  "reviewedFingerprint": "18275edd5d7ea787c18d7ed4688bc9568add1d04a305b570b4902efa30c56b4f",
+  "reviewedFingerprint": "08e1565d5573446a7224887307a7ab59e382ec85d726741b59d8183912ca6969",
   "reviewedDeterministicSignals": {
-    "blocking": 5,
+    "blocking": 14,
     "high": 0,
-    "medium": 13
+    "medium": 24
   },
   "scope": [
-    "PR-008 cash accounts API MVP",
-    "authenticated cash account create/list/update routes",
-    "portfolio and cash account user isolation",
-    "Decimal(20,8) balance request validation",
-    "Decimal(10,4) benchmark percent request validation",
-    "cash account separation from positions",
-    "core cash allocation calculation"
+    "PR-010 contribution plans API MVP",
+    "authenticated contribution plan create/list/update routes",
+    "portfolio, contribution plan, and cash account user isolation",
+    "ContributionPlan cashAccount composite database ownership constraint",
+    "DTO rejection of userId and unknown fields",
+    "contribution amount, day-of-month, date, strategy, and cashAccountId validation",
+    "dependency security mitigation for Nest, Prisma, and path-to-regexp"
   ],
-  "residualRisk": "Reviewer approved with risk: list endpoints use a defensive take: 200 without public pagination, so portfolios with more than 200 cash accounts may receive a partial list until pagination is implemented. Auth, user isolation, response privacy, decimal validation, and cash allocation were reviewed for this PR scope."
+  "residualRisk": "Approved with risk: remaining magic-string signals are accepted as bounded DTO/contract vocabulary for this PR; path-to-regexp override should be revisited when upstream dependency resolution no longer needs it."
 }
