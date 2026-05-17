@@ -251,8 +251,8 @@ strategy, optional notes, and remain scoped to the session user.
 
 ## Reports
 
-`@decision-board/reports` can render a deterministic Markdown report from the
-versioned MVP report envelope. The Markdown output includes portfolio,
+`@decision-board/reports` can render deterministic Markdown and JSON reports
+from the versioned MVP report envelope. Report output includes portfolio,
 strategy, contribution, cash, positions, allocation, alerts, review policy, and
 user notes, while omitting known sensitive field names from nested records.
 

@@ -18,25 +18,25 @@ post-Phase 4 hardening track focused on:
 - public-safe documentation;
 - no fixed common API or frontend ports in tests.
 
-The latest validated implementation baseline is commit `caa966b`, merged
+The latest validated implementation baseline is commit `f329186`, merged
 through GitHub PR
-[#37](https://github.com/IcaroAguiar/decision-board/pull/37). Earlier
-docs-only status refreshes do not unblock UI. PR-018 is the current local
-report-engine cut and remains inside the pre-UI track until merged and
+[#38](https://github.com/IcaroAguiar/decision-board/pull/38). Earlier
+docs-only status refreshes do not unblock UI. PR-019A is the current local
+report-engine JSON cut and remains inside the pre-UI track until merged and
 explicitly released.
 
 ## Latest Evidence Snapshot
 
 | Evidence | Latest known result | Public-safe note |
 | --- | ---: | --- |
-| `pnpm coverage` | 105/105 tests, 94.36% lines, 78.57% branches, 98.09% functions | Local PR-018 evidence with synthetic env values and local Postgres. |
+| `pnpm coverage` | 108/108 tests, 94.39% lines, 78.89% branches, 98.11% functions | Local PR-019A evidence with synthetic env values and local Postgres. |
 | `pnpm test` | Workspace passed; API 75/75 | API tests run against local Postgres where required. |
-| `pnpm smoke:api` | Passed on ephemeral port `58784` | The exact port is runtime-assigned and not a contract. |
-| GitHub `quality-gate` | Passed for PR #37 in 2m22s | Runs migrations, tests, coverage ratchet, smoke, and build. |
-| GitGuardian | Passed for PR #37 | Remote secret scanning stayed green. |
+| `pnpm smoke:api` | Passed on ephemeral port `49378` | The exact port is runtime-assigned and not a contract; first parallel run hit auth rate limiting, isolated rerun passed. |
+| GitHub `quality-gate` | Passed for PR #38 in 2m16s | Runs migrations, tests, coverage ratchet, smoke, and build. |
+| GitGuardian | Passed for PR #38 | Remote secret scanning stayed green. |
 | Local `gitleaks detect --redact` | No leaks found | Reports counts/status only, not secret values. |
-| Local ratchet | Passed for PR-018 | Ratchet has 0 blocking failures, warnings, or improvements after `EMPTY_SCALAR_LABEL` centralization. |
-| Independent review | Approved for PR-018 | Reviewer blocked on sensitive-field variants and docs drift; both findings were fixed and rechecked. |
+| Local ratchet | Passed for PR-019A | Ratchet has 0 blocking failures, warnings, or improvements after schema literal centralization. |
+| Independent review | Approved for PR-019A | Reviewer blocked on invalid `Date`; the fix was rechecked and approved. |
 
 ## Completed Post-Phase 4 Cuts
 
@@ -65,7 +65,8 @@ explicitly released.
 | PR-017V | #35 | Added focused `JobsService` worker registration coverage. |
 | PR-017W | #36 | Added focused `CashAccountRepository` user-isolation coverage. |
 | PR-017X | #37 | Added focused `PositionRepository` and `PositionsService` coverage. |
-| PR-018 | local branch | Adds deterministic Markdown report generation from the MVP report envelope; PR pending. |
+| PR-018 | #38 | Added deterministic Markdown report generation from the MVP report envelope. |
+| PR-019A | local branch | Adds deterministic sanitized JSON report generation and schema guards; PR pending. |
 
 ## Coverage Movement
 
@@ -87,7 +88,7 @@ thresholds that motivated the post-Phase 4 pivot:
 | `cash-account.dto.js` | 100.00% lines, 100.00% branches |
 | `position.dto.js` | 98.29% lines, 98.04% branches |
 | `positions.service.js` | 98.46% lines, 76.67% branches |
-| `reports/index.js` | 94.39% lines, 90.32% branches |
+| `reports/index.js` | 95.05% lines, 91.94% branches |
 | `auth-http.js` | 90.58% lines, 79.69% branches |
 | `auth.logger.js` | 96.25% lines, 94.12% branches |
 
@@ -119,8 +120,10 @@ repository ownership. PR-017X uses synthetic users, portfolios, assets, and
 positions to exercise repository ownership and service mapping. These fixtures
 are not real credentials, cookies, session IDs, raw auth payloads, real
 portfolio data, or real user data. PR-018 uses synthetic report values to test
-Markdown formatting and sensitive-field omission. Local `gitleaks detect
---redact` and independent review must stay green before each PR is opened.
+Markdown formatting and sensitive-field omission. PR-019A extends the same
+synthetic report fixtures to JSON generation, schema guards, and sensitive-field
+omission. Local `gitleaks detect --redact` and independent review must stay
+green before each PR is opened.
 
 ## Required Gate Before UI
 
