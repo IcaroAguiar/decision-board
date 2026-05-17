@@ -915,6 +915,38 @@ coverage, smoke, ratchet e quality gate verdes.
 
 ---
 
+### PR-017G — Cobertura complementar de JobsService
+
+**Objetivo:** fechar a lacuna remanescente de `JobsService` abaixo de 80% antes
+de UI, sem alterar o comportamento de pg-boss ou abrir portas fixas.
+
+**Escopo:**
+
+```txt
+- testes focados em apps/api/src/jobs/jobs.service.ts
+- startup com JOBS_ENABLED=true sem DATABASE_URL
+- defaults de singletonKey para enqueue sem cycleMonth/now explícitos
+- handlers de workers processando cada payload pelo repositório
+- medição de cobertura comparável ao PR-017F
+```
+
+**Checklist de implementação:**
+
+```txt
+- [x] Identificar lacuna produtiva remanescente: apps/api/src/jobs/jobs.service.ts
+- [x] Adicionar testes sem abrir API/front em porta fixa
+- [x] Rodar teste focado compilado contra Postgres real quando necessário
+- [x] Rodar pnpm coverage e comparar jobs.service/total
+```
+
+**Fora do escopo:** refactor de pg-boss, alteração de schedules, mudança de
+schema/migration, UI/browser e otimizações do `complexity-optimizer`.
+
+**Aceite:** `jobs.service` cruza 80% de cobertura em linhas e o workspace mantém
+test, coverage, smoke, ratchet e quality gate verdes.
+
+---
+
 ### PR-017 — Dashboard web MVP
 
 **Objetivo:** criar tela principal útil.

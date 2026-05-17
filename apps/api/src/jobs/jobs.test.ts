@@ -167,10 +167,14 @@ test("enqueues cycle and report jobs with singleton keys", async () => {
 	const reportJobId = await jobs.enqueueCheckReportDue({
 		now: "2099-06-15T12:34:56.000Z",
 	});
+	const defaultCycleJobId = await jobs.enqueueCreateMonthlyContributionCycles();
+	const defaultReportJobId = await jobs.enqueueCheckReportDue();
 
 	assert.equal(cycleJobId, "job-1");
 	assert.equal(reportJobId, "job-2");
-	assert.equal(sentJobs.length, 2);
+	assert.equal(defaultCycleJobId, "job-3");
+	assert.equal(defaultReportJobId, "job-4");
+	assert.equal(sentJobs.length, 4);
 	assert.equal(sentJobs[0]?.name, jobNames.createMonthlyContributionCycles);
 	assert.deepEqual(sentJobs[0]?.data, { cycleMonth: "2099-05" });
 	assert.equal(sentJobs[0]?.options.singletonKey, "2099-05");
@@ -179,6 +183,12 @@ test("enqueues cycle and report jobs with singleton keys", async () => {
 	assert.deepEqual(sentJobs[1]?.data, { now: "2099-06-15T12:34:56.000Z" });
 	assert.equal(sentJobs[1]?.options.singletonKey, "2099-06-15");
 	assert.equal(sentJobs[1]?.options.singletonSeconds, 86_400);
+	assert.equal(sentJobs[2]?.name, jobNames.createMonthlyContributionCycles);
+	assert.deepEqual(sentJobs[2]?.data, {});
+	assert.match(String(sentJobs[2]?.options.singletonKey), /^\d{4}-\d{2}$/);
+	assert.equal(sentJobs[3]?.name, jobNames.checkReportDue);
+	assert.deepEqual(sentJobs[3]?.data, {});
+	assert.match(String(sentJobs[3]?.options.singletonKey), /^\d{4}-\d{2}-\d{2}$/);
 });
 
 test("creates monthly contribution cycles idempotently from active plans", async () => {
