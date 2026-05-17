@@ -18,21 +18,22 @@ post-Phase 4 hardening track focused on:
 - public-safe documentation;
 - no fixed common API or frontend ports in tests.
 
-The current validated baseline is commit `29daa4f`, merged through GitHub PR
-[#27](https://github.com/IcaroAguiar/decision-board/pull/27). The active local
-cut after that baseline is PR-017O, focused on `position.dto` coverage.
+The current validated baseline is commit `dd9844a`, merged through GitHub PR
+[#28](https://github.com/IcaroAguiar/decision-board/pull/28). The active local
+cut after that baseline is PR-017P, focused on `auth-http` coverage and
+pseudo-header regression coverage.
 
 ## Latest Evidence Snapshot
 
 | Evidence | Latest known result | Public-safe note |
 | --- | ---: | --- |
-| `pnpm coverage` | 89/89 tests, 93.96% lines, 76.57% branches, 97.57% functions | Uses synthetic env values and local Postgres. |
-| `pnpm test` | Workspace passed; API 62/62 | API tests run against local Postgres where required. |
-| `pnpm smoke:api` | Passed on ephemeral port `54443` | The exact port is runtime-assigned and not a contract. |
-| GitHub `quality-gate` | Passed for PR #27 in 2m07s | Runs migrations, tests, coverage ratchet, smoke, and build. |
-| GitGuardian | Passed for PR #27 | Remote secret scanning stayed green. |
+| `pnpm coverage` | 91/91 tests, 94.07% lines, 77.14% branches, 97.57% functions | Uses synthetic env values and local Postgres. |
+| `pnpm test` | Workspace passed; API 64/64 | API tests run against local Postgres where required. |
+| `pnpm smoke:api` | Passed on ephemeral port `52263` | The exact port is runtime-assigned and not a contract. |
+| GitHub `quality-gate` | Passed for PR #28 in 1m59s | Runs migrations, tests, coverage ratchet, smoke, and build. |
+| GitGuardian | Passed for PR #28 | Remote secret scanning stayed green. |
 | Local `gitleaks detect --redact` | No leaks found | Reports counts/status only, not secret values. |
-| Independent review | No blocking findings for local PR-017O cut | Reviewer checked the focused DTO test and public-doc updates. |
+| Independent review | PR-017P reviewer finding resolved after focused test hardening | Reviewer verified collector signals as false positives and required deterministic `:authority` URL coverage. |
 
 ## Completed Post-Phase 4 Cuts
 
@@ -52,7 +53,8 @@ cut after that baseline is PR-017O, focused on `position.dto` coverage.
 | PR-017L | #25 | Published public-safe post-Phase 4 testability status. |
 | PR-017M | #26 | Added focused `ContributionPlansService` coverage. |
 | PR-017N | #27 | Added focused `cash-account.dto` validation coverage. |
-| PR-017O | local branch | Added focused `position.dto` validation coverage; PR pending. |
+| PR-017O | #28 | Added focused `position.dto` validation coverage. |
+| PR-017P | local branch | Added focused `auth-http` pseudo-header regression coverage; PR pending. |
 
 ## Coverage Movement
 
@@ -72,22 +74,24 @@ thresholds that motivated the post-Phase 4 pivot:
 | `contribution-plans.service.js` | 93.18% lines, 83.93% branches |
 | `cash-account.dto.js` | 100.00% lines, 100.00% branches |
 | `position.dto.js` | 98.29% lines, 98.04% branches |
+| `auth-http.js` | 90.58% lines, 79.69% branches |
 
 ## Complexity Optimizer Triage
 
-`complexity-optimizer` was rerun during the PR-017N local cut. The first-pass
+`complexity-optimizer` was rerun during the PR-017P local cut. The first-pass
 scanner reported many loop/query-in-loop leads in HTTP tests; these are treated
 as test-harness leads, not product hot paths. The productive leads manually
 checked in this pass were:
 
 | Surface | Current read |
 | --- | --- |
-| `auth-http.ts` | Header copying and token redaction are linear over request/response size and remain acceptable for the auth adapter path. |
-| `auth.logger.ts` | URL payload redaction has a small constant-factor cleanup opportunity, but no behavior change was made in this coverage PR. |
+| `auth-http.ts` | Header copying and token redaction are linear over request/response size; pseudo-header filtering stays request-local and acceptable for the auth adapter path. |
+| `auth.logger.ts` | URL payload redaction has a small constant-factor cleanup opportunity around fallback payload-index detection, but no behavior change was made in this auth coverage PR. |
 | `contribution-cycles.service.ts` | Response mapping is expected O(n) list serialization. |
 | `asset.dto.ts` | Enum map creation is startup/static validation work, not a request-scale nested scan. |
 
-No production optimization was bundled into PR-017N. Any optimization should be
+No production optimization was bundled into PR-017P beyond the auth pseudo-header
+guard required by the regression test. Any further optimization should be
 handled as a separate, behavior-preserving cut with focused tests.
 
 ## Required Gate Before UI

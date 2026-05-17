@@ -1221,7 +1221,7 @@ validação financeira de posições, sem iniciar UI.
 - [x] Rodar pnpm coverage e comparar position.dto/total
 - [x] Rodar lint/typecheck/test/build/smoke/ratchet antes do PR
 - [x] Rodar agentic-code-review com reviewer independente
-- [ ] Abrir PR com CI remoto verde
+- [x] Abrir PR com CI remoto verde
 ```
 
 **Fora do escopo:** alterar código produtivo, schema/migration, contrato HTTP,
@@ -1230,6 +1230,43 @@ repository/service, dados reais, secrets, browser smoke e qualquer UI.
 **Aceite:** `position.dto` melhora cobertura de linhas e branches sem mudar
 comportamento produtivo, e o workspace mantém test, coverage, smoke, ratchet,
 review independente e quality gate verdes.
+
+---
+
+### PR-017P — Cobertura e regressão de Auth HTTP adapter
+
+**Objetivo:** reduzir lacuna produtiva do coverage pós-Fase 4 em auth e
+proteger o adapter Better Auth contra pseudo-headers HTTP/2, sem iniciar UI.
+
+**Escopo:**
+
+```txt
+- teste focado para fallback de protocolo quando Express não informa http/https
+- teste focado para montagem do handler em contexto Express simulado
+- regressão para request com :authority sem repassar pseudo-header inválido a Headers
+- preservação de redaction/cookie-only response e /auth/ok
+- medição de cobertura comparável ao PR-017O
+```
+
+**Checklist de implementação:**
+
+```txt
+- [x] Identificar menor coverage produtivo atual: apps/api/src/auth/auth-http.ts
+- [x] Adicionar teste focado sem porta fixa
+- [x] Corrigir descarte de pseudo-headers HTTP/2 ao converter headers Node para Web Headers
+- [x] Rodar teste focado compilado
+- [x] Rodar pnpm coverage e comparar auth-http/total
+- [x] Rodar lint/typecheck/test/build/smoke/ratchet antes do PR
+- [x] Rodar agentic-code-review com reviewer independente
+- [ ] Abrir PR com CI remoto verde
+```
+
+**Fora do escopo:** alterar stack de auth, cookies, schema/migration, contratos
+de sessão, UI/browser, dados reais e secrets.
+
+**Aceite:** `auth-http` melhora cobertura e a regressão de pseudo-header fica
+protegida sem enfraquecer auth, redaction, cookie handling, smoke real ou
+quality gate.
 
 ---
 

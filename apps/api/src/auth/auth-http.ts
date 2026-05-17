@@ -19,6 +19,7 @@ interface ExpressIncomingMessage extends IncomingMessage {
 const AUTH_TOKEN_RESPONSE_FIELD = "token";
 const HTTP_PROTOCOL = "http";
 const HTTPS_PROTOCOL = "https";
+const HTTP2_PSEUDO_HEADER_PREFIX = ":";
 type SupportedHttpProtocol = typeof HTTP_PROTOCOL | typeof HTTPS_PROTOCOL;
 
 function getFirstHeaderValue(value: string | string[] | undefined): string | undefined {
@@ -44,6 +45,10 @@ function toWebHeaders(headers: IncomingHttpHeaders): Headers {
 	const webHeaders = new Headers();
 
 	for (const [key, value] of Object.entries(headers)) {
+		if (key.startsWith(HTTP2_PSEUDO_HEADER_PREFIX)) {
+			continue;
+		}
+
 		if (value === undefined) {
 			continue;
 		}
