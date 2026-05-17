@@ -6,12 +6,14 @@
 	"scripts": {
 		"build": "tsc -p tsconfig.json",
 		"dev": "tsx watch src/main.ts",
-		"smoke:api": "corepack pnpm --filter @decision-board/types build && corepack pnpm --filter @decision-board/market-data build && corepack pnpm build && node dist/smoke/api-smoke.js",
+		"smoke:api": "corepack pnpm --filter @decision-board/types build && corepack pnpm --filter @decision-board/core build && corepack pnpm --filter @decision-board/reports build && corepack pnpm --filter @decision-board/market-data build && corepack pnpm --filter @decision-board/strategies build && corepack pnpm build && node dist/smoke/api-smoke.js",
 		"test": "corepack pnpm build && node --test --test-concurrency=1 \"dist/**/*.test.js\"",
 		"typecheck": "tsc -p tsconfig.json --noEmit"
 	},
 	"dependencies": {
+		"@decision-board/core": "workspace:*",
 		"@decision-board/market-data": "workspace:*",
+		"@decision-board/reports": "workspace:*",
 		"@decision-board/strategies": "workspace:*",
 		"@decision-board/types": "workspace:*",
 		"@nestjs/common": "11.1.21",

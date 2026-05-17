@@ -36,7 +36,7 @@
 		"lint": "biome ci .",
 		"smoke:api": "corepack pnpm --filter @decision-board/api smoke:api",
 		"test": "corepack pnpm -r --if-present test",
-		"typecheck": "corepack pnpm --filter @decision-board/types build && corepack pnpm --filter @decision-board/core build && corepack pnpm --filter @decision-board/strategies build && corepack pnpm --filter @decision-board/market-data build && corepack pnpm -r --if-present typecheck"
+		"typecheck": "corepack pnpm --filter @decision-board/types build && corepack pnpm --filter @decision-board/core build && corepack pnpm --filter @decision-board/strategies build && corepack pnpm --filter @decision-board/reports build && corepack pnpm --filter @decision-board/market-data build && corepack pnpm -r --if-present typecheck"
 	},
 	"dependencies": {
 		"@prisma/client": "6.19.3"

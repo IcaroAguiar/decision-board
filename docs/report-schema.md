@@ -61,3 +61,23 @@ The renderer reuses the same sanitization path as `generateJsonReport(report)`,
 so known sensitive field names such as tokens, cookies, session IDs, e-mails,
 CPF, raw auth payloads, and user IDs are omitted from nested records before
 formatting the report.
+
+## API Export
+
+The API exposes the current portfolio snapshot without persisting report history:
+
+```txt
+GET /portfolios/:portfolioId/reports/current.json
+GET /portfolios/:portfolioId/reports/current.md
+```
+
+Both routes require the Better Auth session cookie and derive ownership from the
+authenticated user. A portfolio owned by another user returns `404`; the routes
+must never accept `userId` in the request body or query.
+
+The API export assembles the envelope from user-owned portfolio data, active
+contribution plans, recent contribution cycles, cash accounts, priced positions,
+strategy evaluation, and deterministic allocation calculations. It omits account
+e-mail, `userId`, cookies, session tokens, raw auth payloads, and internal
+resource IDs that are not required for external analysis. Report history and UI
+remain separate future cuts.

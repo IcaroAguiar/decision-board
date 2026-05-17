@@ -27,9 +27,15 @@ importers:
 
   apps/api:
     dependencies:
+      '@decision-board/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@decision-board/market-data':
         specifier: workspace:*
         version: link:../../packages/market-data
+      '@decision-board/reports':
+        specifier: workspace:*
+        version: link:../../packages/reports
       '@decision-board/strategies':
         specifier: workspace:*
         version: link:../../packages/strategies

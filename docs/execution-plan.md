@@ -1593,7 +1593,7 @@ posição sem preço manual e para recursos inexistentes.
 - [x] Testar com fixtures
 - [x] Rodar lint/typecheck/test/build/smoke/ratchet antes do PR
 - [x] Rodar agentic-code-review com reviewer independente
-- [ ] Abrir PR com CI remoto verde
+- [x] Abrir PR com CI remoto verde
 ```
 
 **Fora do escopo:** integração com IA dentro do app, API/export endpoint,
@@ -1619,18 +1619,22 @@ persistência, histórico de relatórios e UI.
 **Checklist de implementação:**
 
 ```txt
-- [ ] Definir rota de export
-- [ ] Buscar portfolio e recursos por userId autenticado
-- [ ] Gerar JSON com generateJsonReport
-- [ ] Gerar Markdown com generateMarkdownReport
-- [ ] Testar isolamento por usuário
-- [ ] Rodar smoke real de API em porta efêmera
+- [x] Definir rota de export
+- [x] Buscar portfolio e recursos por userId autenticado
+- [x] Gerar JSON com generateJsonReport
+- [x] Gerar Markdown com generateMarkdownReport
+- [x] Testar isolamento por usuário
+- [x] Rodar smoke real de API em porta efêmera
 ```
 
 **Fora do escopo:** histórico persistido e UI.
 
 **Aceite:** usuário autenticado consegue exportar relatório sem acessar dados de
 outro usuário.
+
+**Decisão de segurança:** o export de relatório é pensado para análise externa e
+evita expor `userId`, e-mail da conta, cookies, tokens de sessão, payloads crus
+de auth e IDs internos desnecessários no corpo do relatório.
 
 ---
 

@@ -65,6 +65,7 @@ async function main(): Promise<void> {
 			contributionPlan.id,
 		);
 		assert.equal(contributionCycle.status, contributionCycleStatuses.confirmed);
+		await assertReportExport(baseUrl, user, portfolio.id);
 
 		const secondUser = await signUpSmokeUser(baseUrl, "isolated", resources);
 		const crossUserPortfolioRead = await fetch(`${baseUrl}/portfolios/${portfolio.id}`, {
@@ -85,6 +86,7 @@ async function main(): Promise<void> {
 				"cash-account",
 				"contribution-plan",
 				"contribution-cycle-confirm",
+				"report-json-export",
 				"user-isolation",
 			],
 		});
@@ -289,6 +291,25 @@ async function createAndConfirmContributionCycle(
 	const status = readStringField(confirmPayload, "status");
 	assert.equal("userId" in confirmPayload, false);
 	return { status };
+}
+
+async function assertReportExport(
+	baseUrl: string,
+	user: TestUser,
+	portfolioId: string,
+): Promise<void> {
+	const response = await fetch(`${baseUrl}/portfolios/${portfolioId}/reports/current.json`, {
+		headers: jsonHeaders(user),
+	});
+	const payload = await readJson(response);
+	assert.equal(response.status, 200, JSON.stringify(payload));
+	assert.ok(isRecord(payload));
+	assert.equal(payload.schemaVersion, "1.0");
+	assert.ok(isRecord(payload.portfolio));
+	assert.equal(payload.portfolio.positionCount, 1);
+	assert.ok(Array.isArray(payload.positions));
+	assert.equal(payload.positions.length, 1);
+	assert.equal("userId" in payload, false);
 }
 
 async function cleanupSmokeData(
