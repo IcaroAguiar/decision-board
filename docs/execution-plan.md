@@ -1258,7 +1258,7 @@ proteger o adapter Better Auth contra pseudo-headers HTTP/2, sem iniciar UI.
 - [x] Rodar pnpm coverage e comparar auth-http/total
 - [x] Rodar lint/typecheck/test/build/smoke/ratchet antes do PR
 - [x] Rodar agentic-code-review com reviewer independente
-- [ ] Abrir PR com CI remoto verde
+- [x] Abrir PR com CI remoto verde
 ```
 
 **Fora do escopo:** alterar stack de auth, cookies, schema/migration, contratos
@@ -1267,6 +1267,46 @@ de sessão, UI/browser, dados reais e secrets.
 **Aceite:** `auth-http` melhora cobertura e a regressão de pseudo-header fica
 protegida sem enfraquecer auth, redaction, cookie handling, smoke real ou
 quality gate.
+
+---
+
+### PR-017Q — Cobertura e micro-cleanup de Auth logger
+
+**Objetivo:** reduzir lacuna produtiva do coverage pós-Fase 4 em redaction de
+auth logs e aplicar micro-cleanup já triado pelo `complexity-optimizer`, sem
+iniciar UI.
+
+**Escopo:**
+
+```txt
+- teste focado para redaction de URLs absolutas e relativas com query/hash
+- teste focado para URLs sem payload permanecerem estáveis
+- teste focado para assignments sensíveis fora de URLs
+- teste focado para coerção de Error, object, null e valores escalares
+- teste focado para authLogger escrever apenas warn/error
+- substituir sort de dois índices por seleção direta do primeiro índice de payload
+- atualizar status público seguro pós-PR #29
+```
+
+**Checklist de implementação:**
+
+```txt
+- [x] Identificar próximo corte produtivo: apps/api/src/auth/auth.logger.ts
+- [x] Adicionar teste focado sem Postgres, servidor HTTP ou porta fixa
+- [x] Aplicar micro-cleanup sem mudar contrato de redaction
+- [x] Rodar teste focado compilado
+- [x] Rodar pnpm coverage e comparar auth.logger/total
+- [x] Rodar lint/typecheck/test/build/smoke/ratchet antes do PR
+- [x] Rodar agentic-code-review com reviewer independente
+- [ ] Abrir PR com CI remoto verde
+```
+
+**Fora do escopo:** alterar Better Auth, cookies, schema/migration, rotas HTTP,
+providers externos, UI/browser, dados reais e secrets.
+
+**Aceite:** `auth.logger` melhora cobertura e mantém redaction de payloads
+sensíveis com fixtures sintéticos/placeholders, sem expor dados reais e sem
+enfraquecer logs de auth.
 
 ---
 

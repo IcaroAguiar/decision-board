@@ -20,6 +20,21 @@ function splitTrailingPunctuation(value: string): [string, string] {
 	return [value.slice(0, -match[0].length), match[0]];
 }
 
+function findFirstPayloadIndex(value: string): number | undefined {
+	const queryIndex = value.indexOf("?");
+	const hashIndex = value.indexOf("#");
+
+	if (queryIndex < 0) {
+		return hashIndex >= 0 ? hashIndex : undefined;
+	}
+
+	if (hashIndex < 0) {
+		return queryIndex;
+	}
+
+	return Math.min(queryIndex, hashIndex);
+}
+
 function redactUrlPayload(value: string): string {
 	const [urlText, trailingPunctuation] = splitTrailingPunctuation(value);
 
@@ -32,11 +47,7 @@ function redactUrlPayload(value: string): string {
 
 		return `${sanitizedUrl}${trailingPunctuation}`;
 	} catch {
-		const queryIndex = urlText.indexOf("?");
-		const hashIndex = urlText.indexOf("#");
-		const firstPayloadIndex = [queryIndex, hashIndex]
-			.filter((index) => index >= 0)
-			.sort((left, right) => left - right)[0];
+		const firstPayloadIndex = findFirstPayloadIndex(urlText);
 
 		if (firstPayloadIndex === undefined) {
 			return `${urlText}${trailingPunctuation}`;
