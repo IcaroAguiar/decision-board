@@ -882,6 +882,39 @@ mantém coverage, ratchet e quality gate verdes.
 
 ---
 
+### PR-017F — Cobertura dirigida de AssetRepository
+
+**Objetivo:** reduzir a próxima lacuna produtiva abaixo de 80% antes de UI em
+uma superfície de persistência multiusuário.
+
+**Escopo:**
+
+```txt
+- testes focados em apps/api/src/assets/asset.repository.ts
+- busca de assets ativos por q e ticker
+- isolamento de userAssetOverrides por userId
+- findByIdForUser sem override para usuário sem customização
+- reuso de asset canônico por ticker/exchange/currency
+- retorno null quando override aponta para asset inexistente
+```
+
+**Checklist de implementação:**
+
+```txt
+- [x] Identificar próximo menor coverage produtivo: apps/api/src/assets/asset.repository.ts
+- [x] Adicionar teste de repositório contra Postgres real sem abrir API/front
+- [x] Rodar teste focado compilado
+- [x] Rodar pnpm coverage e comparar asset.repository/total
+```
+
+**Fora do escopo:** alterar contrato HTTP de assets, refactor de Prisma,
+mudança de schema/migration e qualquer UI.
+
+**Aceite:** `asset.repository` melhora cobertura e o workspace mantém test,
+coverage, smoke, ratchet e quality gate verdes.
+
+---
+
 ### PR-017 — Dashboard web MVP
 
 **Objetivo:** criar tela principal útil.
