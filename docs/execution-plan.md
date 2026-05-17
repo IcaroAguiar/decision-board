@@ -1367,7 +1367,7 @@ user-owned de planos de aporte, sem iniciar UI.
 - [x] Rodar pnpm coverage e comparar contribution-plan.repository/total
 - [x] Rodar lint/typecheck/test/build/smoke/ratchet antes do PR
 - [x] Rodar agentic-code-review com reviewer independente
-- [ ] Abrir PR com CI remoto verde
+- [x] Abrir PR com CI remoto verde
 ```
 
 **Fora do escopo:** alterar schema/migration, rotas HTTP, service layer,
