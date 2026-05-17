@@ -711,6 +711,16 @@ compatibilidade do motor de alertas.
 
 ## 7.1. Gate pós-Fase 4 — Cobertura, testabilidade e smoke real antes de UI
 
+**Regra de parada:** depois do PR-016, nenhum PR de UI deve começar até que este
+gate esteja verde. A sequência válida é: smoke real backend, gate remoto,
+auditoria de complexidade/testabilidade, documentação pública segura e só então
+retomar o PR-017 de Dashboard.
+
+**Auditoria de complexidade:** rodar `complexity-optimizer` como triagem
+periódica. Achados em testes de integração podem ser ruído aceitável; refactors
+só entram quando preservarem comportamento com teste focado e reduzirem risco
+ou custo real do caminho produtivo.
+
 ### PR-017A — API smoke e documentação de testabilidade
 
 **Objetivo:** criar uma barreira reproduzível antes de iniciar qualquer UI.
@@ -741,6 +751,34 @@ de coverage.
 **Aceite:** antes de iniciar PRs de UI, o projeto tem um smoke real backend que
 exercita o contrato API atual contra Postgres e pode ser citado em PRs como
 evidência operacional.
+
+---
+
+### PR-017B — API smoke no quality gate remoto
+
+**Objetivo:** transformar o smoke backend em gate remoto antes de UI.
+
+**Escopo:**
+
+```txt
+- quality-gate do GitHub Actions roda pnpm smoke:api
+- smoke executa depois de migrations e testes
+- documentação explicita que o smoke também roda no CI
+```
+
+**Checklist de implementação:**
+
+```txt
+- [x] Adicionar etapa API smoke no workflow de quality-gate
+- [x] Preservar Postgres real do workflow existente
+- [x] Preservar porta efêmera do smoke
+- [x] Documentar gate remoto em docs/testing.md
+```
+
+**Fora do escopo:** browser smoke, UI, coverage threshold e novos serviços CI.
+
+**Aceite:** PRs passam a falhar no quality-gate remoto se a jornada API
+autenticada backend quebrar.
 
 ---
 
