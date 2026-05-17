@@ -18,10 +18,10 @@ post-Phase 4 hardening track focused on:
 - public-safe documentation;
 - no fixed common API or frontend ports in tests.
 
-The latest validated implementation baseline is commit `732cc73`, merged
+The latest validated implementation baseline is commit `09f13af`, merged
 through GitHub PR
-[#35](https://github.com/IcaroAguiar/decision-board/pull/35). Earlier
-docs-only status refreshes do not unblock UI. PR-017W is the current local
+[#36](https://github.com/IcaroAguiar/decision-board/pull/36). Earlier
+docs-only status refreshes do not unblock UI. PR-017X is the current local
 hardening cut and remains inside the post-Phase 4 track until merged and
 explicitly released.
 
@@ -29,14 +29,14 @@ explicitly released.
 
 | Evidence | Latest known result | Public-safe note |
 | --- | ---: | --- |
-| `pnpm coverage` | 99/99 tests, 94.38% lines, 77.90% branches, 98.02% functions | Local PR-017W evidence with synthetic env values and local Postgres. |
-| `pnpm test` | Workspace passed; API 72/72 | API tests run against local Postgres where required. |
-| `pnpm smoke:api` | Passed on ephemeral port `62690` | The exact port is runtime-assigned and not a contract. |
-| GitHub `quality-gate` | Passed for PR #35 in 2m17s | Runs migrations, tests, coverage ratchet, smoke, and build. |
-| GitGuardian | Passed for PR #35 | Remote secret scanning stayed green. |
+| `pnpm coverage` | 102/102 tests, 94.38% lines, 78.34% branches, 98.02% functions | Local PR-017X evidence with synthetic env values and local Postgres. |
+| `pnpm test` | Workspace passed; API 75/75 | API tests run against local Postgres where required. |
+| `pnpm smoke:api` | Passed on ephemeral port `52639` | The exact port is runtime-assigned and not a contract. |
+| GitHub `quality-gate` | Passed for PR #36 in 2m13s | Runs migrations, tests, coverage ratchet, smoke, and build. |
+| GitGuardian | Passed for PR #36 | Remote secret scanning stayed green. |
 | Local `gitleaks detect --redact` | No leaks found | Reports counts/status only, not secret values. |
-| Local ratchet | Passed for PR-017W | Ratchet has 0 blocking failures, warnings, or improvements; synthetic fixture literals were kept test-local. |
-| Independent review | PR-017W stability finding addressed | Reviewer found one medium test-ordering risk; timestamp-controlled fixture was added and revalidation approved. |
+| Local ratchet | Passed for PR-017X | Ratchet has 0 blocking failures, warnings, or improvements; synthetic fixture literals were kept test-local. |
+| Independent review | Approved for PR-017X | Independent reviewer found no confirmed findings; remote CI remains pending before merge. |
 
 ## Completed Post-Phase 4 Cuts
 
@@ -63,7 +63,8 @@ explicitly released.
 | PR-017S | #32 | Docs-only correction for post-PR #31 public status. |
 | PR-017T | #33 | Added focused `ContributionPlanRepository` update coverage. |
 | PR-017V | #35 | Added focused `JobsService` worker registration coverage. |
-| PR-017W | local branch | Adds focused `CashAccountRepository` user-isolation coverage; PR pending. |
+| PR-017W | #36 | Added focused `CashAccountRepository` user-isolation coverage. |
+| PR-017X | local branch | Adds focused `PositionRepository` and `PositionsService` coverage; PR pending. |
 
 ## Coverage Movement
 
@@ -84,15 +85,16 @@ thresholds that motivated the post-Phase 4 pivot:
 | `contribution-plans.service.js` | 93.18% lines, 83.93% branches |
 | `cash-account.dto.js` | 100.00% lines, 100.00% branches |
 | `position.dto.js` | 98.29% lines, 98.04% branches |
+| `positions.service.js` | 98.46% lines, 76.67% branches |
 | `auth-http.js` | 90.58% lines, 79.69% branches |
 | `auth.logger.js` | 96.25% lines, 94.12% branches |
 
 ## Complexity Optimizer Triage
 
-`complexity-optimizer` was rerun during the PR-017V local cut. The first-pass
+`complexity-optimizer` was rerun during the PR-017X local cut. The first-pass
 scanner still reports many loop/query-in-loop leads in HTTP tests; these are
 treated as test-harness leads, not product hot paths. The productive leads
-manually checked in this pass were:
+manually checked in the recent passes were:
 
 | Surface | Current read |
 | --- | --- |
@@ -102,7 +104,7 @@ manually checked in this pass were:
 | `asset.dto.ts` | Enum map creation is startup/static validation work, not a request-scale nested scan. |
 | `jobs.service.ts` | Worker registration is constant-size over two known queues; PR-017V tests the queue names and conservative worker options without changing runtime behavior. |
 
-No broad production optimization is bundled into PR-017V. The new code change is
+No broad production optimization is bundled into PR-017X. The new code change is
 test-only, and further optimization should remain separate, behavior-preserving,
 and backed by focused tests.
 
@@ -111,10 +113,11 @@ and backed by focused tests.
 PR-017Q intentionally uses synthetic placeholder strings to test whether auth
 log redaction removes token-like, e-mail-like, and callback-like payloads.
 PR-017W uses synthetic users, portfolios, and cash-account labels to exercise
-repository ownership. These fixtures are not real credentials, cookies, session
-IDs, raw auth payloads, real portfolio data, or real user data. Local
-`gitleaks detect --redact` and independent review must stay green before each
-PR is opened.
+repository ownership. PR-017X uses synthetic users, portfolios, assets, and
+positions to exercise repository ownership and service mapping. These fixtures
+are not real credentials, cookies, session IDs, raw auth payloads, real
+portfolio data, or real user data. Local `gitleaks detect --redact` and
+independent review must stay green before each PR is opened.
 
 ## Required Gate Before UI
 
