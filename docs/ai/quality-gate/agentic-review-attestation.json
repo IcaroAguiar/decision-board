@@ -1,24 +1,24 @@
 {
   "schemaVersion": 1,
-  "reviewer": "reviewer:019e3497-58b0-75b3-a28d-fd67a7b6d938",
-  "reviewedAt": "2026-05-17T06:23:00Z",
+  "reviewer": "security-reviewer:019e3569-630e-7171-a6ad-cad739c31336",
+  "reviewedAt": "2026-05-17T10:14:00Z",
   "verdict": "approved_with_risk",
   "deterministicSignalsReviewed": true,
   "allowedBases": [
     "main"
   ],
-  "reviewedFingerprint": "a8709fdf684fc3af2c1a2938ee295396672234394725f9f8c869ac4e04cbe687",
+  "reviewedFingerprint": "f2cb75154de2f0d617419ac4b374617c06d3d948116dc8b444b5c16651a1696d",
   "reviewedDeterministicSignals": {
-    "blocking": 6,
-    "high": 1,
-    "medium": 6
+    "blocking": 2,
+    "high": 0,
+    "medium": 2
   },
   "scope": [
-    "PR-017C coverage baseline before UI",
-    "pnpm coverage root script and scripts/run-coverage.mjs",
-    "Node native coverage artifacts coverage/coverage-summary.json and coverage/lcov.info",
-    "quality-gate coverage step and required coverage ratchet",
-    "docs/testing.md README and execution-plan updates for public-safe coverage guidance"
+    "PR-017P auth-http pseudo-header regression coverage",
+    "apps/api/src/auth/auth-http.ts pseudo-header filtering and URL host fallback",
+    "apps/api/src/auth/auth-http.test.ts mounted handler request capture",
+    "docs/execution-plan.md and docs/testability-status.md public-safe status updates",
+    "deterministic collector signals retry-without-backoff-or-timeout and shared-state-without-lock-signal"
   ],
-  "residualRisk": "Approved with risk: the independent reviewer found the initial untracked script and coverage-minimum bootstrap findings, both corrected. Deterministic command-injection is accepted because the runner uses spawnSync without shell and static commands. Debug logs are intentional command/progress output. Magic strings and numbers are lcov format tokens and coverage percentage defaults. no-test-file-changed is accepted because pnpm coverage exercised the new runner with 55 tests against real local Postgres. package-manifest-without-lockfile is accepted because package.json adds only a script and no dependency. Remaining risk: actionlint is not installed locally, so workflow syntax is ultimately verified by GitHub Actions."
+  "residualRisk": "Approved with risk: the independent security reviewer verified both deterministic collector signals as false positives. retry-without-backoff-or-timeout points at synchronous URL string construction, not retry or polling behavior. shared-state-without-lock-signal points at request-local Headers construction, not cross-request shared mutable state. The reviewer initially found one real coverage gap around :authority host fallback; the test was hardened to capture the Web Request sent to auth.handler and the targeted re-review returned no findings. Remaining protocol/test string literals are intentional HTTP boundary fixtures and are not blocking for this PR."
 }

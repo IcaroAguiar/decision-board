@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { IncomingMessage } from "node:http";
+import { IncomingMessage, ServerResponse } from "node:http";
 import { Socket } from "node:net";
 import test from "node:test";
 import {
@@ -11,7 +11,7 @@ import {
 	testWebOrigin,
 	toCookieHeader,
 } from "../test/http-test-app.js";
-import { SESSION_TOKEN_COOKIE_NAME_FRAGMENT } from "./auth.constants.js";
+import { AUTH_ROUTE_PATTERN, SESSION_TOKEN_COOKIE_NAME_FRAGMENT } from "./auth.constants.js";
 import { authLogger } from "./auth.logger.js";
 
 test("uses Express trusted protocol instead of raw forwarded protocol", async () => {
@@ -23,6 +23,142 @@ test("uses Express trusted protocol instead of raw forwarded protocol", async ()
 
 	assert.equal(resolveAuthRequestProtocol(request), "http");
 });
+
+test("falls back to socket encryption when Express protocol is unavailable", async () => {
+	configureTestEnvironment();
+	const { resolveAuthRequestProtocol } = await import("./auth-http.js");
+	const insecureRequest = new IncomingMessage(new Socket());
+	Object.defineProperty(insecureRequest, "protocol", { value: "ftp" });
+
+	assert.equal(resolveAuthRequestProtocol(insecureRequest), "http");
+
+	const secureRequest = new IncomingMessage(new Socket());
+	Object.defineProperty(secureRequest.socket, "encrypted", { value: true });
+
+	assert.equal(resolveAuthRequestProtocol(secureRequest), "https");
+});
+
+test("mounts auth handler with Express route context and sanitized response headers", async (context) => {
+	configureTestEnvironment();
+	const [{ mountAuthHandler }, { auth }] = await Promise.all([
+		import("./auth-http.js"),
+		import("./auth.js"),
+	]);
+	let forwardedRequest:
+		| {
+				hasAuthorityHeader: boolean;
+				hostHeader: string | null;
+				url: string;
+		  }
+		| undefined;
+	context.mock.method(auth, "handler", async (webRequest: Request) => {
+		forwardedRequest = {
+			hasAuthorityHeader: Array.from(webRequest.headers.keys()).includes(":authority"),
+			hostHeader: webRequest.headers.get("host"),
+			url: webRequest.url,
+		};
+		return new Response(JSON.stringify({ ok: true }), {
+			headers: { "content-type": "application/json" },
+			status: 200,
+		});
+	});
+	let mountedPath = "";
+	let mountedHandler:
+		| ((request: IncomingMessage, response: ServerResponse) => Promise<void>)
+		| undefined;
+	const app = {
+		getHttpAdapter() {
+			return {
+				getInstance() {
+					return {
+						all(path: string, handler: typeof mountedHandler) {
+							mountedPath = path;
+							mountedHandler = handler;
+						},
+					};
+				},
+			};
+		},
+	};
+
+	mountAuthHandler(app as never);
+	assert.equal(mountedPath, AUTH_ROUTE_PATTERN);
+	assert.ok(mountedHandler);
+
+	const request = new IncomingMessage(new Socket());
+	request.method = "GET";
+	request.url = "/ok";
+	request.headers.host = "fallback.example.test";
+	request.headers[":authority"] = ["auth.example.test"];
+	request.headers["x-forwarded-proto"] = "https";
+	request.headers["x-ignored"] = undefined;
+	Object.defineProperty(request, "baseUrl", { value: "/auth" });
+	Object.defineProperty(request, "originalUrl", { value: "/auth/ok" });
+	Object.defineProperty(request, "protocol", { value: "http" });
+	const response = new FakeServerResponse();
+
+	await mountedHandler(request, response);
+
+	assert.equal(response.statusCode, 200);
+	assert.deepEqual(forwardedRequest, {
+		hasAuthorityHeader: false,
+		hostHeader: "fallback.example.test",
+		url: "http://auth.example.test/auth/ok",
+	});
+	assert.deepEqual(JSON.parse(response.body), { ok: true });
+	assert.equal(response.headers.get("content-length"), String(response.body.length));
+	assert.equal(response.headers.has("set-cookie"), false);
+});
+
+class FakeServerResponse extends ServerResponse {
+	readonly headers = new Headers();
+	body = "";
+
+	constructor() {
+		super(new IncomingMessage(new Socket()));
+		this.statusCode = 0;
+	}
+
+	setHeader(name: string, value: number | string | readonly string[]): this {
+		if (Array.isArray(value)) {
+			this.headers.delete(name);
+			for (const item of value) {
+				this.headers.append(name, item);
+			}
+			return this;
+		}
+
+		this.headers.set(name, String(value));
+		return this;
+	}
+
+	end(callback?: () => void): this;
+	end(chunk: unknown, callback?: () => void): this;
+	end(chunk: unknown, encoding: BufferEncoding, callback?: () => void): this;
+	end(
+		chunkOrCallback?: unknown,
+		encodingOrCallback?: BufferEncoding | (() => void),
+		callback?: () => void,
+	): this {
+		const chunk = typeof chunkOrCallback === "function" ? undefined : chunkOrCallback;
+		this.body =
+			typeof chunk === "string"
+				? chunk
+				: chunk instanceof Uint8Array
+					? Buffer.from(chunk).toString("utf8")
+					: chunk === undefined
+						? ""
+						: String(chunk);
+		const onDone =
+			typeof chunkOrCallback === "function"
+				? chunkOrCallback
+				: typeof encodingOrCallback === "function"
+					? encodingOrCallback
+					: callback;
+		onDone?.();
+		return this;
+	}
+}
 
 function assertNoAuthTokenPayload(payload: unknown): void {
 	if (Array.isArray(payload)) {
