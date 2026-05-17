@@ -849,6 +849,39 @@ coverage, ratchet e quality gate verdes.
 
 ---
 
+### PR-017E — Cobertura dirigida de IP de cliente em auth
+
+**Objetivo:** reduzir a próxima lacuna produtiva do coverage baseline antes de
+UI em uma superfície auth-adjacent pequena.
+
+**Escopo:**
+
+```txt
+- testes focados em apps/api/src/auth/client-ip.ts
+- parsing de TRUST_PROXY_HOPS ausente, válido e inválido
+- configuração de trust proxy no host Express
+- normalização de x-forwarded-for a partir de request.ip
+- fallback para socket.remoteAddress
+- remoção do header quando não há IP de cliente
+```
+
+**Checklist de implementação:**
+
+```txt
+- [x] Identificar próximo menor coverage produtivo: apps/api/src/auth/client-ip.ts
+- [x] Adicionar teste unitário sem abrir portas fixas de API/front
+- [x] Rodar teste focado compilado
+- [x] Rodar pnpm coverage contra Postgres real/loopback permitido
+```
+
+**Fora do escopo:** alterar semântica de trust proxy, mexer em Better Auth,
+smoke de browser/UI e refactor de auth HTTP.
+
+**Aceite:** `client-ip` chega a 100% de linhas/branches/funções e o workspace
+mantém coverage, ratchet e quality gate verdes.
+
+---
+
 ### PR-017 — Dashboard web MVP
 
 **Objetivo:** criar tela principal útil.
