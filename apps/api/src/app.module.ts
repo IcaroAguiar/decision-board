@@ -9,6 +9,7 @@ import { JobsModule } from "./jobs/jobs.module.js";
 import { MarketDataModule } from "./market-data/market-data.module.js";
 import { PortfoliosModule } from "./portfolios/portfolios.module.js";
 import { PositionsModule } from "./positions/positions.module.js";
+import { ReportsModule } from "./reports/reports.module.js";
 
 @Module({
 	imports: [
@@ -20,6 +21,7 @@ import { PositionsModule } from "./positions/positions.module.js";
 		MarketDataModule,
 		PortfoliosModule,
 		PositionsModule,
+		ReportsModule,
 	],
 	controllers: [HealthController, MeController],
 })

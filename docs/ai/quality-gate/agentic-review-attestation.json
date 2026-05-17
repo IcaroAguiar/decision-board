@@ -1,24 +1,24 @@
 {
   "schemaVersion": 1,
-  "reviewer": "security-reviewer:019e3569-630e-7171-a6ad-cad739c31336",
-  "reviewedAt": "2026-05-17T10:14:00Z",
-  "verdict": "approved_with_risk",
+  "reviewer": "reviewer:019e35fe-869f-7a20-a608-43fdf74ac121",
+  "reviewedAt": "2026-05-17T12:52:00Z",
+  "verdict": "approved",
   "deterministicSignalsReviewed": true,
   "allowedBases": [
     "main"
   ],
-  "reviewedFingerprint": "f2cb75154de2f0d617419ac4b374617c06d3d948116dc8b444b5c16651a1696d",
+  "reviewedFingerprint": "fe807aad315f78569cbf2c4789e3e672522cc1a4311c69c400a2553ba9294461",
   "reviewedDeterministicSignals": {
-    "blocking": 2,
+    "blocking": 1,
     "high": 0,
-    "medium": 2
+    "medium": 3
   },
   "scope": [
-    "PR-017P auth-http pseudo-header regression coverage",
-    "apps/api/src/auth/auth-http.ts pseudo-header filtering and URL host fallback",
-    "apps/api/src/auth/auth-http.test.ts mounted handler request capture",
-    "docs/execution-plan.md and docs/testability-status.md public-safe status updates",
-    "deterministic collector signals retry-without-backoff-or-timeout and shared-state-without-lock-signal"
+    "PR-019B authenticated report export endpoint",
+    "apps/api/src/reports controller, service, repository, and HTTP test",
+    "apps/api/src/smoke/api-smoke.ts report-json-export assertion",
+    "README.md, docs/report-schema.md, docs/testing.md, docs/testability-status.md",
+    "deterministic collector signals content-type literal, event-worker false positive, OpenAPI residual, deep nesting, and backend e2e heuristic"
   ],
-  "residualRisk": "Approved with risk: the independent security reviewer verified both deterministic collector signals as false positives. retry-without-backoff-or-timeout points at synchronous URL string construction, not retry or polling behavior. shared-state-without-lock-signal points at request-local Headers construction, not cross-request shared mutable state. The reviewer initially found one real coverage gap around :authority host fallback; the test was hardened to capture the Web Request sent to auth.handler and the targeted re-review returned no findings. Remaining protocol/test string literals are intentional HTTP boundary fixtures and are not blocking for this PR."
+  "residualRisk": "Approved: reviewer found no blocking findings. content-type literal is centralized as a test constant; event-worker-without-backoff points at a smoke assertion, not a worker; backend e2e heuristic is satisfied by real HTTP test and smoke. Formal OpenAPI contract is still absent, but the current repo documents API contracts in README and docs/report-schema.md, and this route is covered by authenticated HTTP tests."
 }

@@ -18,25 +18,25 @@ post-Phase 4 hardening track focused on:
 - public-safe documentation;
 - no fixed common API or frontend ports in tests.
 
-The latest validated implementation baseline is commit `f329186`, merged
+The latest validated implementation baseline is commit `240411f`, merged
 through GitHub PR
-[#38](https://github.com/IcaroAguiar/decision-board/pull/38). Earlier
-docs-only status refreshes do not unblock UI. PR-019A is the current local
-report-engine JSON cut and remains inside the pre-UI track until merged and
-explicitly released.
+[#39](https://github.com/IcaroAguiar/decision-board/pull/39). Earlier
+docs-only status refreshes do not unblock UI. PR-019B is the current local
+authenticated report export cut and remains inside the pre-UI track until merged
+and explicitly released.
 
 ## Latest Evidence Snapshot
 
 | Evidence | Latest known result | Public-safe note |
 | --- | ---: | --- |
-| `pnpm coverage` | 108/108 tests, 94.39% lines, 78.89% branches, 98.11% functions | Local PR-019A evidence with synthetic env values and local Postgres. |
-| `pnpm test` | Workspace passed; API 75/75 | API tests run against local Postgres where required. |
-| `pnpm smoke:api` | Passed on ephemeral port `49378` | The exact port is runtime-assigned and not a contract; first parallel run hit auth rate limiting, isolated rerun passed. |
-| GitHub `quality-gate` | Passed for PR #38 in 2m16s | Runs migrations, tests, coverage ratchet, smoke, and build. |
-| GitGuardian | Passed for PR #38 | Remote secret scanning stayed green. |
+| `pnpm coverage` | 109/109 tests, 94.96% lines, 78.09% branches, 98.24% functions | Local PR-019B evidence with synthetic env values and local Postgres. |
+| `pnpm test` | Workspace passed; API 76/76 | API tests run against local Postgres where required. |
+| `pnpm smoke:api` | Passed on ephemeral port `59600` | The exact port is runtime-assigned and not a contract; smoke now includes `report-json-export`. |
+| GitHub `quality-gate` | Passed for PR #39 in 2m15s | Runs migrations, tests, coverage ratchet, smoke, and build. |
+| GitGuardian | Passed for PR #39 | Remote secret scanning stayed green. |
 | Local `gitleaks detect --redact` | No leaks found | Reports counts/status only, not secret values. |
-| Local ratchet | Passed for PR-019A | Ratchet has 0 blocking failures, warnings, or improvements after schema literal centralization. |
-| Independent review | Approved for PR-019A | Reviewer blocked on invalid `Date`; the fix was rechecked and approved. |
+| Local ratchet | Passed for PR-019B | Attestation updated after reviewer interpreted deterministic signals. |
+| Independent review | Approved for PR-019B | Reviewer found no blocking findings; OpenAPI formal contract remains residual. |
 
 ## Completed Post-Phase 4 Cuts
 
@@ -66,7 +66,8 @@ explicitly released.
 | PR-017W | #36 | Added focused `CashAccountRepository` user-isolation coverage. |
 | PR-017X | #37 | Added focused `PositionRepository` and `PositionsService` coverage. |
 | PR-018 | #38 | Added deterministic Markdown report generation from the MVP report envelope. |
-| PR-019A | local branch | Adds deterministic sanitized JSON report generation and schema guards; PR pending. |
+| PR-019A | #39 | Added deterministic sanitized JSON report generation and schema guards. |
+| PR-019B | local branch | Adds authenticated JSON/Markdown report export endpoints with user isolation; PR pending. |
 
 ## Coverage Movement
 
@@ -88,13 +89,15 @@ thresholds that motivated the post-Phase 4 pivot:
 | `cash-account.dto.js` | 100.00% lines, 100.00% branches |
 | `position.dto.js` | 98.29% lines, 98.04% branches |
 | `positions.service.js` | 98.46% lines, 76.67% branches |
-| `reports/index.js` | 95.05% lines, 91.94% branches |
+| `reports/index.js` | 99.02% lines, 98.59% branches |
+| `reports.service.js` | 99.54% lines, 55.77% branches |
+| `reports.controller.js` | 98.25% lines, 73.68% branches |
 | `auth-http.js` | 90.58% lines, 79.69% branches |
 | `auth.logger.js` | 96.25% lines, 94.12% branches |
 
 ## Complexity Optimizer Triage
 
-`complexity-optimizer` was rerun during the PR-017X local cut. The first-pass
+`complexity-optimizer` was rerun during the PR-019B local cut. The first-pass
 scanner still reports many loop/query-in-loop leads in HTTP tests; these are
 treated as test-harness leads, not product hot paths. The productive leads
 manually checked in the recent passes were:
@@ -107,9 +110,9 @@ manually checked in the recent passes were:
 | `asset.dto.ts` | Enum map creation is startup/static validation work, not a request-scale nested scan. |
 | `jobs.service.ts` | Worker registration is constant-size over two known queues; PR-017V tests the queue names and conservative worker options without changing runtime behavior. |
 
-No broad production optimization is bundled into PR-017X. The new code change is
-test-only, and further optimization should remain separate, behavior-preserving,
-and backed by focused tests.
+No broad production optimization is bundled into PR-019B. The productive
+auth/report surfaces are sensitive enough that future performance refactors
+should stay separate, behavior-preserving, and backed by focused tests.
 
 ## Public-Repo Fixture Safety
 
@@ -122,8 +125,11 @@ are not real credentials, cookies, session IDs, raw auth payloads, real
 portfolio data, or real user data. PR-018 uses synthetic report values to test
 Markdown formatting and sensitive-field omission. PR-019A extends the same
 synthetic report fixtures to JSON generation, schema guards, and sensitive-field
-omission. Local `gitleaks detect --redact` and independent review must stay
-green before each PR is opened.
+omission. PR-019B uses synthetic users, assets, cash accounts, contribution data,
+and report exports to prove auth, isolation, Markdown/JSON export, and omission
+of `userId`, account e-mail, session, and token-like terms. Local
+`gitleaks detect --redact` and independent review must stay green before each PR
+is opened.
 
 ## Required Gate Before UI
 

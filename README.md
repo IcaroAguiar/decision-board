@@ -256,6 +256,18 @@ from the versioned MVP report envelope. Report output includes portfolio,
 strategy, contribution, cash, positions, allocation, alerts, review policy, and
 user notes, while omitting known sensitive field names from nested records.
 
+The API exposes authenticated, non-persisted report exports for a portfolio:
+
+```txt
+GET /portfolios/:portfolioId/reports/current.json
+GET /portfolios/:portfolioId/reports/current.md
+```
+
+Both endpoints derive ownership from the Better Auth session cookie and return
+`404` when the portfolio does not belong to the authenticated user. Report
+exports avoid `userId`, account e-mail, cookies, session tokens, raw auth
+payloads, and unnecessary internal resource IDs.
+
 ## Jobs
 
 Set `JOBS_ENABLED=true` on exactly one API process to run pg-boss workers using

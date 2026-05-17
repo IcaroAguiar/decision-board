@@ -68,9 +68,9 @@ pnpm smoke:api
 
 The smoke starts the API on an ephemeral `127.0.0.1` port, signs up synthetic
 users, creates a portfolio, asset, manual price snapshot, position, cash account,
-contribution plan, and contribution cycle, confirms the cycle, checks a
-cross-user access denial, and then cleans up the synthetic users/assets it
-created.
+contribution plan, and contribution cycle, confirms the cycle, exports the JSON
+report endpoint, checks a cross-user access denial, and then cleans up the
+synthetic users/assets it created.
 
 The GitHub Actions quality gate runs this smoke after migrations and the test
 suite. A PR that changes backend/API behavior should still run it locally before
