@@ -832,6 +832,7 @@ Campos mínimos:
   "schemaVersion": "1.0",
   "generatedAt": "2026-05-11T00:00:00.000Z",
   "strategy": {},
+  "contribution": {},
   "cash": {},
   "portfolio": {},
   "positions": [],
