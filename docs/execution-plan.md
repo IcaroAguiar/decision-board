@@ -1332,7 +1332,7 @@ sem iniciar UI e sem alterar código executável.
 - [x] Atualizar docs/execution-plan.md
 - [x] Atualizar docs/testability-status.md
 - [x] Rodar lint/diff/secret scan proporcionais a docs-only
-- [ ] Abrir PR com CI remoto verde
+- [x] Abrir PR com CI remoto verde
 ```
 
 **Fora do escopo:** código produtivo, testes novos, schema/migration, API,
