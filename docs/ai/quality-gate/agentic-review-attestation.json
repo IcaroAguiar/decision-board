@@ -7,11 +7,11 @@
   "allowedBases": [
     "main"
   ],
-  "reviewedFingerprint": "1442c71a60129b019206d42c5a85dfb16affc8f61092e2d2e97952bf3771a34a",
+  "reviewedFingerprint": "3f1a1b308b1dae9ccee2e20f24da1fb1ff68aa6e9711a2eea4938ba3e85e58f0",
   "reviewedDeterministicSignals": {
-    "blocking": 7,
+    "blocking": 11,
     "high": 0,
-    "medium": 8
+    "medium": 14
   },
   "scope": [
     "PR-021 monthly contribution screen",

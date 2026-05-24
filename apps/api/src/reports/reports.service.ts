@@ -43,6 +43,7 @@ const CYCLE_MONTH_LENGTH = 7;
 export interface ReportExportResponse {
 	json: ReportEnvelope;
 	markdown: string;
+	selectedContributionCycleUpdatedAt?: Date;
 }
 
 export interface SavedReportMetadataResponse {
@@ -82,18 +83,30 @@ interface ReportPositionProjection {
 export class ReportsService {
 	constructor(@Inject(ReportsRepository) private readonly reports: ReportsRepository) {}
 
-	async exportPortfolioReport(userId: string, portfolioId: string): Promise<ReportExportResponse> {
-		const data = await this.reports.findPortfolioReportData(userId, portfolioId);
+	async exportPortfolioReport(
+		userId: string,
+		portfolioId: string,
+		contributionCycleId?: string,
+	): Promise<ReportExportResponse> {
+		const data = await this.reports.findPortfolioReportData(
+			userId,
+			portfolioId,
+			contributionCycleId,
+		);
 
 		if (!data) {
 			throw new NotFoundException("Portfolio not found");
 		}
 
 		const envelope = createReportEnvelope(data);
+		const selectedContributionCycle = contributionCycleId
+			? data.contributionCycles.find((cycle) => cycle.id === contributionCycleId)
+			: null;
 
 		return {
 			json: generateJsonReport(envelope),
 			markdown: generateMarkdownReport(envelope),
+			selectedContributionCycleUpdatedAt: selectedContributionCycle?.updatedAt,
 		};
 	}
 
@@ -102,19 +115,33 @@ export class ReportsService {
 		portfolioId: string,
 		data: CreateSavedReportDto = {},
 	): Promise<SavedReportMetadataResponse> {
-		const report = await this.exportPortfolioReport(userId, portfolioId);
-		const result = await this.reports.createSavedReport(userId, portfolioId, {
-			contributionCycleId: data.contributionCycleId,
+		const report = await this.exportPortfolioReport(userId, portfolioId, data.contributionCycleId);
+		if (data.contributionCycleId && !report.selectedContributionCycleUpdatedAt) {
+			throw new NotFoundException("Contribution cycle not found");
+		}
+		const reportData = {
 			schemaVersion: report.json.schemaVersion,
 			generatedAt: new Date(report.json.generatedAt),
 			strategyId: readReportStrategyIdFromEnvelope(report.json),
 			alertCount: report.json.alerts.length,
 			jsonReport: toPrismaJson(report.json),
 			markdownReport: report.markdown,
-		});
+		};
+		const result =
+			data.contributionCycleId && report.selectedContributionCycleUpdatedAt
+				? await this.reports.createSavedReport(userId, portfolioId, {
+						...reportData,
+						contributionCycleId: data.contributionCycleId,
+						contributionCycleUpdatedAt: report.selectedContributionCycleUpdatedAt,
+					})
+				: await this.reports.createSavedReport(userId, portfolioId, reportData);
 
 		if (result.status === createSavedReportResultStatuses.cycleNotFound) {
 			throw new NotFoundException("Contribution cycle not found");
+		}
+
+		if (result.status === createSavedReportResultStatuses.cycleChanged) {
+			throw new ConflictException("Contribution cycle changed before report generation completed");
 		}
 
 		if (result.status === createSavedReportResultStatuses.cycleNotConfirmed) {

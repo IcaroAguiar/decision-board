@@ -303,16 +303,41 @@ test("scopes contribution cycles by user and confirms a different amount", async
 		assert.equal(confirmedCycle.strategyId, strategyIds.opportunistic);
 		assert.equal(confirmedCycle.notes, "Aporte maior no mes");
 
-		const markReported = await fetch(`${baseUrl}/contribution-cycles/${createdCycle.id}`, {
+		const publicMarkReported = await fetch(`${baseUrl}/contribution-cycles/${createdCycle.id}`, {
 			method: "PATCH",
 			headers: jsonHeaders(userA),
 			body: JSON.stringify({
 				status: contributionCycleStatuses.reported,
 			}),
 		});
-		const reportedCycle = assertContributionCyclePayload(await readJson(markReported));
-		assert.equal(markReported.status, 200);
-		assert.equal(reportedCycle.status, contributionCycleStatuses.reported);
+		assert.equal(publicMarkReported.status, 409);
+
+		await prisma.contributionCycle.update({
+			where: {
+				id: createdCycle.id,
+			},
+			data: {
+				status: "REPORTED",
+			},
+		});
+
+		const mutateReportedNotes = await fetch(`${baseUrl}/contribution-cycles/${createdCycle.id}`, {
+			method: "PATCH",
+			headers: jsonHeaders(userA),
+			body: JSON.stringify({
+				notes: "trying to mutate a reported cycle",
+			}),
+		});
+		assert.equal(mutateReportedNotes.status, 409);
+
+		const mutateReportedAmount = await fetch(`${baseUrl}/contribution-cycles/${createdCycle.id}`, {
+			method: "PATCH",
+			headers: jsonHeaders(userA),
+			body: JSON.stringify({
+				confirmedAmount: "1300",
+			}),
+		});
+		assert.equal(mutateReportedAmount.status, 409);
 
 		const reopenReported = await fetch(`${baseUrl}/contribution-cycles/${createdCycle.id}`, {
 			method: "PATCH",

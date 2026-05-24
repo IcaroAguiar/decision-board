@@ -322,12 +322,16 @@ async function createAndConfirmContributionCycle(
 	baseUrl: string,
 	user: TestUser,
 	contributionPlanId: string,
+	options: {
+		cycleMonth?: string;
+		strategyId?: string;
+	} = {},
 ): Promise<IdPayload> {
 	const createResponse = await fetch(`${baseUrl}/contribution-plans/${contributionPlanId}/cycles`, {
 		method: httpMethods.post,
 		headers: jsonHeaders(user),
 		body: JSON.stringify({
-			cycleMonth: "2099-05",
+			cycleMonth: options.cycleMonth ?? "2099-05",
 		}),
 	});
 	const createPayload = await readJson(createResponse);
@@ -340,7 +344,7 @@ async function createAndConfirmContributionCycle(
 		body: JSON.stringify({
 			status: contributionCycleStatuses.confirmed,
 			confirmedAmount: "1200",
-			strategyId: strategyIds.opportunistic,
+			strategyId: options.strategyId ?? strategyIds.opportunistic,
 			notes: "synthetic report confirmation",
 		}),
 	});

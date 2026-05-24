@@ -23,6 +23,7 @@ export type CreateContributionCycleResult =
 
 export type UpdateContributionCycleResult =
 	| { status: "updated"; contributionCycle: ContributionCycle }
+	| { status: "conflict" }
 	| { status: "not-found" };
 
 @Injectable()
@@ -138,16 +139,25 @@ export class ContributionCycleRepository {
 		userId: string,
 		contributionCycleId: string,
 		data: UpdateContributionCycleDto,
+		expectedStatus?: ContributionCycle["status"],
 	): Promise<UpdateContributionCycleResult> {
 		const result = await prisma.contributionCycle.updateMany({
 			where: {
 				id: contributionCycleId,
 				userId,
+				status: expectedStatus,
 			},
 			data: toUpdateData(data),
 		});
 
 		if (result.count === 0) {
+			const contributionCycle = await this.findByUser(userId, contributionCycleId);
+			if (contributionCycle) {
+				return {
+					status: "conflict",
+				};
+			}
+
 			return {
 				status: "not-found",
 			};
