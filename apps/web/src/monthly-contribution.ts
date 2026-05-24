@@ -59,6 +59,11 @@ export interface SavedReport {
 	alertCount: number;
 }
 
+export interface ConfirmedAmountValidation {
+	error: string | null;
+	value: string;
+}
+
 export const loadStates = {
 	error: "error",
 	idle: "idle",
@@ -101,6 +106,7 @@ const isoDateTextLength = 10;
 const monthTextLength = 2;
 const currencyLocale = "pt-BR";
 const fallbackCurrencyText = "R$ 0,00";
+const moneyDecimalPattern = /^(0|[1-9]\d{0,11})(\.\d{1,8})?$/;
 
 export function getCurrentCycleMonth(now = new Date()): string {
 	const month = String(now.getMonth() + 1).padStart(monthTextLength, "0");
@@ -135,6 +141,53 @@ export function formatCurrency(value: number | string | null | undefined): strin
 
 export function getStrategy(strategyId: StrategyId): StrategyOption {
 	return strategyOptions.find((strategy) => strategy.id === strategyId) ?? defaultStrategyOption;
+}
+
+export function normalizeConfirmedAmount(value: string): ConfirmedAmountValidation {
+	const trimmed = value.trim();
+
+	if (!trimmed) {
+		return { error: "Informe o valor confirmado do aporte.", value: "" };
+	}
+
+	const normalized = trimmed.replace(",", ".");
+
+	if (!moneyDecimalPattern.test(normalized) || Number(normalized) <= 0) {
+		return {
+			error: "Informe um decimal positivo, sem símbolo de moeda ou separador de milhar.",
+			value: "",
+		};
+	}
+
+	return { error: null, value: normalized };
+}
+
+export function isConfirmableCycle(cycle: ContributionCycle | null): boolean {
+	return cycle?.status === cycleStatuses.pending || cycle?.status === cycleStatuses.confirmed;
+}
+
+export function canConfirmContributionCycle(
+	cycle: ContributionCycle | null,
+	amount: ConfirmedAmountValidation,
+): boolean {
+	return Boolean(cycle) && isConfirmableCycle(cycle) && amount.error === null;
+}
+
+export function canGenerateContributionReport(
+	cycle: ContributionCycle | null,
+	lastReportCycleId: string | null,
+): boolean {
+	return (
+		Boolean(cycle) && cycle?.status === cycleStatuses.confirmed && cycle.id !== lastReportCycleId
+	);
+}
+
+export function markCycleReported(cycle: ContributionCycle): ContributionCycle {
+	return {
+		...cycle,
+		status: cycleStatuses.reported,
+		updatedAt: new Date().toISOString(),
+	};
 }
 
 export function normalizeApiBase(value: string): string {

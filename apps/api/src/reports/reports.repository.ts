@@ -14,6 +14,12 @@ const REPORT_CONTRIBUTION_PLAN_LIMIT = 50;
 const REPORT_CONTRIBUTION_CYCLE_LIMIT = 5;
 const SAVED_REPORT_LIST_LIMIT = 100;
 
+export const createSavedReportResultStatuses = {
+	created: "created",
+	cycleNotConfirmed: "cycle-not-confirmed",
+	cycleNotFound: "cycle-not-found",
+} as const;
+
 export interface DecimalValue {
 	toString(): string;
 }
@@ -83,6 +89,7 @@ export interface ReportContributionCycleData {
 }
 
 export interface CreateSavedReportData {
+	contributionCycleId?: string;
 	schemaVersion: string;
 	generatedAt: Date;
 	strategyId: string | null;
@@ -90,6 +97,14 @@ export interface CreateSavedReportData {
 	jsonReport: Prisma.InputJsonValue;
 	markdownReport: string;
 }
+
+export type CreateSavedReportResult =
+	| {
+			status: typeof createSavedReportResultStatuses.created;
+			report: SavedReportMetadataData;
+	  }
+	| { status: typeof createSavedReportResultStatuses.cycleNotConfirmed }
+	| { status: typeof createSavedReportResultStatuses.cycleNotFound };
 
 export interface SavedReportMetadataData {
 	id: string;
@@ -243,19 +258,57 @@ export class ReportsRepository {
 		userId: string,
 		portfolioId: string,
 		data: CreateSavedReportData,
-	): Promise<SavedReportMetadataData> {
-		return prisma.report.create({
-			data: {
-				userId,
-				portfolioId,
-				schemaVersion: data.schemaVersion,
-				generatedAt: data.generatedAt,
-				strategyId: data.strategyId,
-				alertCount: data.alertCount,
-				jsonReport: data.jsonReport,
-				markdownReport: data.markdownReport,
-			},
-			select: savedReportMetadataSelect,
+	): Promise<CreateSavedReportResult> {
+		return prisma.$transaction(async (tx) => {
+			if (data.contributionCycleId) {
+				const update = await tx.contributionCycle.updateMany({
+					where: {
+						id: data.contributionCycleId,
+						userId,
+						portfolioId,
+						status: "CONFIRMED",
+					},
+					data: {
+						status: "REPORTED" satisfies ContributionCycleStatus,
+					},
+				});
+
+				if (update.count === 0) {
+					const cycle = await tx.contributionCycle.findFirst({
+						where: {
+							id: data.contributionCycleId,
+							userId,
+							portfolioId,
+						},
+						select: {
+							id: true,
+						},
+					});
+
+					return cycle
+						? { status: createSavedReportResultStatuses.cycleNotConfirmed }
+						: { status: createSavedReportResultStatuses.cycleNotFound };
+				}
+			}
+
+			const report = await tx.report.create({
+				data: {
+					userId,
+					portfolioId,
+					schemaVersion: data.schemaVersion,
+					generatedAt: data.generatedAt,
+					strategyId: data.strategyId,
+					alertCount: data.alertCount,
+					jsonReport: data.jsonReport,
+					markdownReport: data.markdownReport,
+				},
+				select: savedReportMetadataSelect,
+			});
+
+			return {
+				report,
+				status: createSavedReportResultStatuses.created,
+			};
 		});
 	}
 

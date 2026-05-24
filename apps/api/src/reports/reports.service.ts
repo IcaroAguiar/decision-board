@@ -15,12 +15,14 @@ import type {
 } from "@decision-board/types";
 import { strategyIds } from "@decision-board/types";
 import {
+	ConflictException,
 	Inject,
 	Injectable,
 	InternalServerErrorException,
 	NotFoundException,
 } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
+import type { CreateSavedReportDto } from "./report.dto.js";
 import type {
 	DecimalValue,
 	ReportCashAccountData,
@@ -31,7 +33,7 @@ import type {
 	SavedReportContentData,
 	SavedReportMetadataData,
 } from "./reports.repository.js";
-import { ReportsRepository } from "./reports.repository.js";
+import { createSavedReportResultStatuses, ReportsRepository } from "./reports.repository.js";
 
 const REPORT_SCHEMA_VERSION = "1.0";
 const MONEY_SCALE = 100;
@@ -98,9 +100,11 @@ export class ReportsService {
 	async createSavedReport(
 		userId: string,
 		portfolioId: string,
+		data: CreateSavedReportDto = {},
 	): Promise<SavedReportMetadataResponse> {
 		const report = await this.exportPortfolioReport(userId, portfolioId);
-		const metadata = await this.reports.createSavedReport(userId, portfolioId, {
+		const result = await this.reports.createSavedReport(userId, portfolioId, {
+			contributionCycleId: data.contributionCycleId,
 			schemaVersion: report.json.schemaVersion,
 			generatedAt: new Date(report.json.generatedAt),
 			strategyId: readReportStrategyIdFromEnvelope(report.json),
@@ -109,7 +113,15 @@ export class ReportsService {
 			markdownReport: report.markdown,
 		});
 
-		return toSavedReportMetadataResponse(metadata);
+		if (result.status === createSavedReportResultStatuses.cycleNotFound) {
+			throw new NotFoundException("Contribution cycle not found");
+		}
+
+		if (result.status === createSavedReportResultStatuses.cycleNotConfirmed) {
+			throw new ConflictException("Contribution cycle must be confirmed before report generation");
+		}
+
+		return toSavedReportMetadataResponse(result.report);
 	}
 
 	async listSavedReports(

@@ -83,6 +83,7 @@ export class ContributionCyclesService {
 			throw new NotFoundException("Contribution cycle not found");
 		}
 
+		assertStatusTransition(existing, data);
 		assertConfirmedAmount(existing, data);
 
 		const result = await this.contributionCycles.updateByUser(userId, contributionCycleId, data);
@@ -92,6 +93,26 @@ export class ContributionCyclesService {
 		}
 
 		return toContributionCycleResponse(result.contributionCycle);
+	}
+}
+
+function assertStatusTransition(
+	existing: ContributionCycle,
+	data: UpdateContributionCycleDto,
+): void {
+	if (data.status === undefined) {
+		return;
+	}
+
+	const currentStatus = toApiStatus(existing.status);
+	const terminalStatuses = new Set<ContributionCycleStatus>([
+		contributionCycleStatuses.closed,
+		contributionCycleStatuses.reported,
+		contributionCycleStatuses.skipped,
+	]);
+
+	if (terminalStatuses.has(currentStatus) && data.status !== currentStatus) {
+		throw new ConflictException("Terminal contribution cycle status cannot be changed");
 	}
 }
 

@@ -1,18 +1,23 @@
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useId, useMemo, useState } from "react";
 import {
 	type CashAccount,
 	type ContributionCycle,
 	type ContributionPlan,
+	canConfirmContributionCycle,
+	canGenerateContributionReport,
 	cycleStatuses,
 	defaultApiBase,
 	formatCurrency,
 	getCurrentCycleMonth,
 	getNextReviewDate,
 	getStrategy,
+	isConfirmableCycle,
 	jsonContentTypeHeader,
 	type LoadState,
 	loadStates,
+	markCycleReported,
 	normalizeApiBase,
+	normalizeConfirmedAmount,
 	type SavedReport,
 	type StrategyId,
 	statusLabels,
@@ -25,6 +30,7 @@ import {
 } from "./monthly-contribution.js";
 
 export function App() {
+	const confirmedAmountErrorId = useId();
 	const [apiBase, setApiBase] = useState(() => readStoredValue(storedApiBaseKey, defaultApiBase));
 	const [portfolioId, setPortfolioId] = useState(() => readStoredValue(storedPortfolioIdKey, ""));
 	const [contributionPlanId, setContributionPlanId] = useState(() =>
@@ -38,6 +44,7 @@ export function App() {
 	const [strategyId, setStrategyId] = useState<StrategyId>(strategyIds.balancedGrowth);
 	const [notes, setNotes] = useState("");
 	const [lastReport, setLastReport] = useState<SavedReport | null>(null);
+	const [lastReportCycleId, setLastReportCycleId] = useState<string | null>(null);
 	const [loadState, setLoadState] = useState<LoadState>(loadStates.idle);
 	const [message, setMessage] = useState("");
 
@@ -65,10 +72,18 @@ export function App() {
 	const plannedAmount = selectedCycle?.plannedAmount ?? activePlan?.amount ?? "0";
 	const cashAvailable = cashAccounts.reduce((total, account) => total + Number(account.balance), 0);
 	const nextReviewDate = getNextReviewDate(cycleMonth, strategyId);
+	const confirmedAmountValidation = normalizeConfirmedAmount(confirmedAmount);
+	const confirmedAmountError =
+		confirmedAmount.trim().length > 0 ? confirmedAmountValidation.error : null;
+	const confirmedAmountDisplay =
+		confirmedAmount.trim().length > 0 && confirmedAmountValidation.error
+			? "Valor inválido"
+			: formatCurrency(selectedCycle?.confirmedAmount ?? confirmedAmount);
+	const visibleReport = selectedCycle?.id === lastReportCycleId ? lastReport : null;
 	const canLoad = portfolioId.trim().length > 0;
 	const canCreateCycle = Boolean(activePlan) && !selectedCycle;
-	const canConfirmCycle = Boolean(selectedCycle) && confirmedAmount.trim().length > 0;
-	const canGenerateReport = selectedCycle?.status === cycleStatuses.confirmed;
+	const canConfirmCycle = canConfirmContributionCycle(selectedCycle, confirmedAmountValidation);
+	const canGenerateReport = canGenerateContributionReport(selectedCycle, lastReportCycleId);
 
 	useEffect(() => {
 		if (selectedCycle) {
@@ -96,6 +111,7 @@ export function App() {
 		setLoadState(loadStates.loading);
 		setMessage("");
 		setLastReport(null);
+		setLastReportCycleId(null);
 
 		try {
 			const normalizedApiBase = normalizeApiBase(apiBase);
@@ -171,6 +187,16 @@ export function App() {
 			setLoadState(loadStates.error);
 			return;
 		}
+		if (!isConfirmableCycle(selectedCycle)) {
+			setMessage("Este ciclo já foi encerrado para confirmação.");
+			setLoadState(loadStates.error);
+			return;
+		}
+		if (confirmedAmountValidation.error) {
+			setMessage(confirmedAmountValidation.error);
+			setLoadState(loadStates.error);
+			return;
+		}
 
 		setLoadState(loadStates.loading);
 		setMessage("");
@@ -181,7 +207,7 @@ export function App() {
 				`/contribution-cycles/${selectedCycle.id}`,
 				{
 					body: JSON.stringify({
-						confirmedAmount: confirmedAmount.trim(),
+						confirmedAmount: confirmedAmountValidation.value,
 						notes: notes.trim() || null,
 						status: cycleStatuses.confirmed,
 						strategyId,
@@ -204,6 +230,11 @@ export function App() {
 			setLoadState(loadStates.error);
 			return;
 		}
+		if (!canGenerateReport) {
+			setMessage("O relatório deste ciclo só pode ser gerado uma vez após confirmação.");
+			setLoadState(loadStates.error);
+			return;
+		}
 
 		setLoadState(loadStates.loading);
 		setMessage("");
@@ -212,9 +243,16 @@ export function App() {
 			const report = await apiRequest<SavedReport>(
 				normalizeApiBase(apiBase),
 				`/portfolios/${portfolioId}/reports`,
-				{ method: "POST" },
+				{
+					body: JSON.stringify({
+						contributionCycleId: selectedCycle.id,
+					}),
+					method: "POST",
+				},
 			);
 			setLastReport(report);
+			setLastReportCycleId(selectedCycle.id);
+			setCycles((current) => upsertCycle(current, markCycleReported(selectedCycle)));
 			setLoadState(loadStates.ready);
 			setMessage("Relatório salvo para revisão externa.");
 		} catch (error) {
@@ -297,7 +335,7 @@ export function App() {
 				</article>
 				<article className="metric-card">
 					<span>Aporte confirmado</span>
-					<strong>{formatCurrency(selectedCycle?.confirmedAmount ?? confirmedAmount)}</strong>
+					<strong>{confirmedAmountDisplay}</strong>
 					<small>
 						{selectedCycle ? statusLabels[selectedCycle.status] : "Ciclo ainda não criado"}
 					</small>
@@ -330,11 +368,18 @@ export function App() {
 						<label>
 							<span>Valor confirmado</span>
 							<input
+								aria-describedby={confirmedAmountError ? confirmedAmountErrorId : undefined}
+								aria-invalid={Boolean(confirmedAmountError)}
 								inputMode="decimal"
 								onChange={(event) => setConfirmedAmount(event.target.value)}
 								placeholder="1200.00"
 								value={confirmedAmount}
 							/>
+							{confirmedAmountError ? (
+								<small className="field-error" id={confirmedAmountErrorId}>
+									{confirmedAmountError}
+								</small>
+							) : null}
 						</label>
 						<label>
 							<span>Estratégia do ciclo</span>
@@ -362,7 +407,9 @@ export function App() {
 							disabled={!canConfirmCycle || loadState === loadStates.loading}
 							type="submit"
 						>
-							Salvar confirmação
+							{selectedCycle && !isConfirmableCycle(selectedCycle)
+								? "Ciclo encerrado"
+								: "Salvar confirmação"}
 						</button>
 					</form>
 				</div>
@@ -382,8 +429,8 @@ export function App() {
 						<div>
 							<dt>Relatório</dt>
 							<dd>
-								{lastReport
-									? `#${lastReport.id.slice(0, 8)} · ${lastReport.alertCount} alerta(s)`
+								{visibleReport
+									? `#${visibleReport.id.slice(0, 8)} · ${visibleReport.alertCount} alerta(s)`
 									: "Ainda não gerado"}
 							</dd>
 						</div>
@@ -408,7 +455,6 @@ async function apiRequest<T>(apiBase: string, path: string, init: RequestInit = 
 	if (init.body && !headers.has(jsonContentTypeHeader)) {
 		headers.set(jsonContentTypeHeader, "application/json");
 	}
-
 	const response = await fetch(`${apiBase}${path}`, {
 		...init,
 		credentials: "include",
@@ -449,6 +495,5 @@ function persistWorkspace(apiBase: string, portfolioId: string, contributionPlan
 	window.localStorage.setItem(storedPlanIdKey, contributionPlanId);
 }
 
-function getErrorMessage(error: unknown): string {
-	return error instanceof Error ? error.message : "Falha inesperada no fluxo mensal.";
-}
+const getErrorMessage = (error: unknown): string =>
+	error instanceof Error ? error.message : "Falha inesperada no fluxo mensal.";

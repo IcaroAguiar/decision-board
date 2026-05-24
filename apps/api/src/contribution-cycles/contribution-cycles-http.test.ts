@@ -302,6 +302,27 @@ test("scopes contribution cycles by user and confirms a different amount", async
 		assert.equal(confirmedCycle.confirmedAmount, "1200");
 		assert.equal(confirmedCycle.strategyId, strategyIds.opportunistic);
 		assert.equal(confirmedCycle.notes, "Aporte maior no mes");
+
+		const markReported = await fetch(`${baseUrl}/contribution-cycles/${createdCycle.id}`, {
+			method: "PATCH",
+			headers: jsonHeaders(userA),
+			body: JSON.stringify({
+				status: contributionCycleStatuses.reported,
+			}),
+		});
+		const reportedCycle = assertContributionCyclePayload(await readJson(markReported));
+		assert.equal(markReported.status, 200);
+		assert.equal(reportedCycle.status, contributionCycleStatuses.reported);
+
+		const reopenReported = await fetch(`${baseUrl}/contribution-cycles/${createdCycle.id}`, {
+			method: "PATCH",
+			headers: jsonHeaders(userA),
+			body: JSON.stringify({
+				status: contributionCycleStatuses.confirmed,
+				confirmedAmount: "1300",
+			}),
+		});
+		assert.equal(reopenReported.status, 409);
 	} finally {
 		await prisma.user.deleteMany({ where: { email: { in: [userA.email, userB.email] } } });
 		await clearAuthRateLimits(prisma);

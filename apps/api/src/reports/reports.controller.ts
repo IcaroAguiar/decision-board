@@ -1,11 +1,11 @@
-import { Controller, Get, Header, Inject, Param, Post, Req, Res } from "@nestjs/common";
+import { Body, Controller, Get, Header, Inject, Param, Post, Req, Res } from "@nestjs/common";
 import {
 	type RequestWithHeaders,
 	type ResponseWithCookieHeaders,
 	requireAuthenticatedUser,
 } from "../auth/authenticated-request.js";
 import { parsePortfolioId } from "../portfolios/portfolio.dto.js";
-import { parseReportId } from "./report.dto.js";
+import { parseCreateSavedReportDto, parseReportId } from "./report.dto.js";
 import { ReportsService } from "./reports.service.js";
 
 const CURRENT_JSON_REPORT_ROUTE = "current.json";
@@ -21,9 +21,14 @@ export class ReportsController {
 		@Req() request: RequestWithHeaders,
 		@Res({ passthrough: true }) response: ResponseWithCookieHeaders,
 		@Param("portfolioId") portfolioId: string,
+		@Body() body: unknown,
 	) {
 		const user = await requireAuthenticatedUser(request, response);
-		return this.reports.createSavedReport(user.userId, parsePortfolioId(portfolioId));
+		return this.reports.createSavedReport(
+			user.userId,
+			parsePortfolioId(portfolioId),
+			parseCreateSavedReportDto(body),
+		);
 	}
 
 	@Get()
