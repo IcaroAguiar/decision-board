@@ -303,6 +303,59 @@ test("scopes contribution cycles by user and confirms a different amount", async
 		assert.equal(confirmedCycle.strategyId, strategyIds.opportunistic);
 		assert.equal(confirmedCycle.notes, "Aporte maior no mes");
 
+		const rollbackCycleResponse = await fetch(`${baseUrl}/contribution-plans/${planA.id}/cycles`, {
+			method: "POST",
+			headers: jsonHeaders(userA),
+			body: JSON.stringify({
+				cycleMonth: "2099-06",
+			}),
+		});
+		const rollbackCycle = assertContributionCyclePayload(await readJson(rollbackCycleResponse));
+		assert.equal(rollbackCycleResponse.status, 201);
+
+		const confirmRollbackCycleResponse = await fetch(
+			`${baseUrl}/contribution-cycles/${rollbackCycle.id}`,
+			{
+				method: "PATCH",
+				headers: jsonHeaders(userA),
+				body: JSON.stringify({
+					status: contributionCycleStatuses.confirmed,
+					confirmedAmount: "900",
+				}),
+			},
+		);
+		assert.equal(confirmRollbackCycleResponse.status, 200);
+
+		const rollbackWithoutClearingAmount = await fetch(
+			`${baseUrl}/contribution-cycles/${rollbackCycle.id}`,
+			{
+				method: "PATCH",
+				headers: jsonHeaders(userA),
+				body: JSON.stringify({
+					status: contributionCycleStatuses.skipped,
+				}),
+			},
+		);
+		assert.equal(rollbackWithoutClearingAmount.status, 400);
+
+		const rollbackWithClearedAmount = await fetch(
+			`${baseUrl}/contribution-cycles/${rollbackCycle.id}`,
+			{
+				method: "PATCH",
+				headers: jsonHeaders(userA),
+				body: JSON.stringify({
+					status: contributionCycleStatuses.skipped,
+					confirmedAmount: null,
+				}),
+			},
+		);
+		const skippedRollbackCycle = assertContributionCyclePayload(
+			await readJson(rollbackWithClearedAmount),
+		);
+		assert.equal(rollbackWithClearedAmount.status, 200);
+		assert.equal(skippedRollbackCycle.status, contributionCycleStatuses.skipped);
+		assert.equal(skippedRollbackCycle.confirmedAmount, null);
+
 		const publicMarkReported = await fetch(`${baseUrl}/contribution-cycles/${createdCycle.id}`, {
 			method: "PATCH",
 			headers: jsonHeaders(userA),

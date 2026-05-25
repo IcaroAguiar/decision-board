@@ -124,6 +124,17 @@ function assertStatusTransition(
 		throw new ConflictException("Reported status is set by report generation");
 	}
 
+	if (
+		currentStatus === contributionCycleStatuses.confirmed &&
+		data.status !== undefined &&
+		data.status !== contributionCycleStatuses.confirmed &&
+		data.confirmedAmount !== null
+	) {
+		throw new BadRequestException(
+			"confirmedAmount must be null when leaving confirmed status",
+		);
+	}
+
 	if (terminalStatuses.has(currentStatus) && !isNoOpUpdate(existing, data)) {
 		throw new ConflictException("Terminal contribution cycle status cannot be changed");
 	}
