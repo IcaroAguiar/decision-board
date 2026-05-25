@@ -1,25 +1,29 @@
 {
   "schemaVersion": 1,
-  "reviewer": "codex-independent-reviewer:agentic-code-review-pr020-2026-05-17",
-  "reviewedAt": "2026-05-17T16:08:27Z",
-  "verdict": "approved",
+  "reviewer": "codex-independent-reviewer:agentic-code-review-pr021-2026-05-23-huygens",
+  "reviewedAt": "2026-05-23T08:16:02Z",
+  "verdict": "approved_with_risk",
   "deterministicSignalsReviewed": true,
   "allowedBases": [
     "main"
   ],
-  "reviewedFingerprint": "c2f96366e1fc2c81a11892a9cccfcadbfc8f70ecd642f8de03b131020dbfb9fd",
+  "reviewedFingerprint": "1068f41d298eb8ba99b8a2b00b521eb3612756314ad6ffb41ba152c5bc894ee3",
   "reviewedDeterministicSignals": {
-    "blocking": 2,
+    "blocking": 10,
     "high": 0,
-    "medium": 4
+    "medium": 14
   },
   "scope": [
-    "PR-020 authenticated saved report history API",
-    "reports table migration and Prisma relations",
-    "apps/api/src/reports controller, service, repository, report id validation, and HTTP test",
-    "apps/api/src/smoke/api-smoke.ts report-history-create-list assertion",
-    "README.md, docs/report-schema.md, docs/testing.md, docs/testability-status.md",
-    "deterministic collector signals for backend integration coverage, auth visibility, DTO validation, OpenAPI/versioning, smoke false positive, and duplicated route literals"
+    "PR-021 monthly contribution screen",
+    "apps/web/src/App.tsx monthly contribution UI and authenticated API calls",
+    "apps/web/src/monthly-contribution.ts helper contracts for cycle month, strategy, status, amount validation, report gating, API base normalization, and currency formatting",
+    "apps/web/src/App.test.tsx executable helper assertions, including local timezone cycle month, invalid amount rejection, terminal cycle gating, report gating, invalid currency, and API base normalization",
+    "apps/web/src/styles.css responsive layout, validation state, and visible focus states",
+    "apps/web/src/vite-env.d.ts Vite env typing",
+    "apps/api/src/reports POST body contract, selected contribution cycle report binding, and duplicate selected-cycle report rejection",
+    "apps/api/src/contribution-cycles terminal status transition guard",
+    "apps/api/src/reports and apps/api/src/contribution-cycles HTTP regression tests for selected-cycle report generation and terminal cycle reopening",
+    "deterministic collector signals for frontend behavior, backend boundary changes, portfolio-scoped list loading, local Headers construction, DTO validation, i18n, magic result strings, and large component size"
   ],
-  "residualRisk": "Approved with residual risk: reviewer found no blocking findings. event-worker-without-backoff-or-concurrency-limit points at a smoke fetch, not a worker. duplicated portfolioId does not introduce contract drift in this cut. Auth is explicit through requireAuthenticatedUser, user isolation is enforced by userId plus portfolioId queries and a composite FK, reportId has manual UUID validation, saved JSON is validated before return, and real HTTP tests plus smoke exercise the production route path. Residual risk: saved report listing has a fixed internal limit of 100 and no cursor/filter contract yet; formal OpenAPI/versioning is still absent and should be addressed before richer UI or external consumers depend on the API."
+  "residualRisk": "Approved with notes after fix loop: external review found three actionable issues around terminal cycle confirmation, stale or duplicate report state, and invalid confirmed amounts. The fixes add frontend amount normalization, UI report gating by selected cycle, API report binding to contributionCycleId, transactional CONFIRMED -> REPORTED transition before saved report creation, duplicate selected-cycle report rejection, server-side terminal-cycle reopening protection, and canonical repository-service result statuses for the new report contract. Independent reviewer initially requested backend enforcement for duplicate reports and terminal status transitions; the second review found no blockers. Remaining accepted risks: POST /reports without contributionCycleId intentionally remains a backward-compatible generic saved-report path, strategy/status contracts are mirrored in the web helper instead of shared package imports, portfolio-scoped lists are still loaded without a new pagination contract, App.tsx remains a large component, and formal OpenAPI/i18n extraction is still absent. No financial advice, order flow, or broker automation was introduced."
 }

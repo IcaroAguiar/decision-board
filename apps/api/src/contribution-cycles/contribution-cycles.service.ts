@@ -83,15 +83,58 @@ export class ContributionCyclesService {
 			throw new NotFoundException("Contribution cycle not found");
 		}
 
+		assertStatusTransition(existing, data);
 		assertConfirmedAmount(existing, data);
 
-		const result = await this.contributionCycles.updateByUser(userId, contributionCycleId, data);
+		if (isNoOpUpdate(existing, data)) {
+			return toContributionCycleResponse(existing);
+		}
+
+		const result = await this.contributionCycles.updateByUser(
+			userId,
+			contributionCycleId,
+			data,
+			existing.status,
+		);
 
 		if (result.status === "not-found") {
 			throw new NotFoundException("Contribution cycle not found");
 		}
 
+		if (result.status === "conflict") {
+			throw new ConflictException("Contribution cycle changed while updating");
+		}
+
 		return toContributionCycleResponse(result.contributionCycle);
+	}
+}
+
+function assertStatusTransition(
+	existing: ContributionCycle,
+	data: UpdateContributionCycleDto,
+): void {
+	const currentStatus = toApiStatus(existing.status);
+	const terminalStatuses = new Set<ContributionCycleStatus>([
+		contributionCycleStatuses.closed,
+		contributionCycleStatuses.reported,
+		contributionCycleStatuses.skipped,
+	]);
+
+	if (data.status === contributionCycleStatuses.reported && currentStatus !== data.status) {
+		throw new ConflictException("Reported status is set by report generation");
+	}
+
+	if (
+		currentStatus === contributionCycleStatuses.confirmed &&
+		data.status !== undefined &&
+		data.status !== contributionCycleStatuses.confirmed &&
+		data.confirmedAmount !== null
+	) {
+		throw new BadRequestException("confirmedAmount must be null when leaving confirmed status");
+	}
+
+	if (terminalStatuses.has(currentStatus) && !isNoOpUpdate(existing, data)) {
+		throw new ConflictException("Terminal contribution cycle status cannot be changed");
 	}
 }
 
@@ -111,6 +154,17 @@ function assertConfirmedAmount(
 	) {
 		throw new BadRequestException("confirmedAmount is required when status is confirmed");
 	}
+}
+
+function isNoOpUpdate(existing: ContributionCycle, data: UpdateContributionCycleDto): boolean {
+	const currentStatus = toApiStatus(existing.status);
+	return (
+		(data.status === undefined || data.status === currentStatus) &&
+		(data.confirmedAmount === undefined ||
+			data.confirmedAmount === (existing.confirmedAmount?.toString() ?? null)) &&
+		(data.strategyId === undefined || data.strategyId === existing.strategyId) &&
+		(data.notes === undefined || data.notes === existing.notes)
+	);
 }
 
 function toContributionCycleResponse(

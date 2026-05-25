@@ -302,6 +302,105 @@ test("scopes contribution cycles by user and confirms a different amount", async
 		assert.equal(confirmedCycle.confirmedAmount, "1200");
 		assert.equal(confirmedCycle.strategyId, strategyIds.opportunistic);
 		assert.equal(confirmedCycle.notes, "Aporte maior no mes");
+
+		const rollbackCycleResponse = await fetch(`${baseUrl}/contribution-plans/${planA.id}/cycles`, {
+			method: "POST",
+			headers: jsonHeaders(userA),
+			body: JSON.stringify({
+				cycleMonth: "2099-06",
+			}),
+		});
+		const rollbackCycle = assertContributionCyclePayload(await readJson(rollbackCycleResponse));
+		assert.equal(rollbackCycleResponse.status, 201);
+
+		const confirmRollbackCycleResponse = await fetch(
+			`${baseUrl}/contribution-cycles/${rollbackCycle.id}`,
+			{
+				method: "PATCH",
+				headers: jsonHeaders(userA),
+				body: JSON.stringify({
+					status: contributionCycleStatuses.confirmed,
+					confirmedAmount: "900",
+				}),
+			},
+		);
+		assert.equal(confirmRollbackCycleResponse.status, 200);
+
+		const rollbackWithoutClearingAmount = await fetch(
+			`${baseUrl}/contribution-cycles/${rollbackCycle.id}`,
+			{
+				method: "PATCH",
+				headers: jsonHeaders(userA),
+				body: JSON.stringify({
+					status: contributionCycleStatuses.skipped,
+				}),
+			},
+		);
+		assert.equal(rollbackWithoutClearingAmount.status, 400);
+
+		const rollbackWithClearedAmount = await fetch(
+			`${baseUrl}/contribution-cycles/${rollbackCycle.id}`,
+			{
+				method: "PATCH",
+				headers: jsonHeaders(userA),
+				body: JSON.stringify({
+					status: contributionCycleStatuses.skipped,
+					confirmedAmount: null,
+				}),
+			},
+		);
+		const skippedRollbackCycle = assertContributionCyclePayload(
+			await readJson(rollbackWithClearedAmount),
+		);
+		assert.equal(rollbackWithClearedAmount.status, 200);
+		assert.equal(skippedRollbackCycle.status, contributionCycleStatuses.skipped);
+		assert.equal(skippedRollbackCycle.confirmedAmount, null);
+
+		const publicMarkReported = await fetch(`${baseUrl}/contribution-cycles/${createdCycle.id}`, {
+			method: "PATCH",
+			headers: jsonHeaders(userA),
+			body: JSON.stringify({
+				status: contributionCycleStatuses.reported,
+			}),
+		});
+		assert.equal(publicMarkReported.status, 409);
+
+		await prisma.contributionCycle.update({
+			where: {
+				id: createdCycle.id,
+			},
+			data: {
+				status: "REPORTED",
+			},
+		});
+
+		const mutateReportedNotes = await fetch(`${baseUrl}/contribution-cycles/${createdCycle.id}`, {
+			method: "PATCH",
+			headers: jsonHeaders(userA),
+			body: JSON.stringify({
+				notes: "trying to mutate a reported cycle",
+			}),
+		});
+		assert.equal(mutateReportedNotes.status, 409);
+
+		const mutateReportedAmount = await fetch(`${baseUrl}/contribution-cycles/${createdCycle.id}`, {
+			method: "PATCH",
+			headers: jsonHeaders(userA),
+			body: JSON.stringify({
+				confirmedAmount: "1300",
+			}),
+		});
+		assert.equal(mutateReportedAmount.status, 409);
+
+		const reopenReported = await fetch(`${baseUrl}/contribution-cycles/${createdCycle.id}`, {
+			method: "PATCH",
+			headers: jsonHeaders(userA),
+			body: JSON.stringify({
+				status: contributionCycleStatuses.confirmed,
+				confirmedAmount: "1300",
+			}),
+		});
+		assert.equal(reopenReported.status, 409);
 	} finally {
 		await prisma.user.deleteMany({ where: { email: { in: [userA.email, userB.email] } } });
 		await clearAuthRateLimits(prisma);

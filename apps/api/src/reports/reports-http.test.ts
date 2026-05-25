@@ -60,7 +60,11 @@ test("exports sanitized JSON and Markdown reports for the authenticated portfoli
 			portfolio.id,
 			cashAccount.id,
 		);
-		await createAndConfirmContributionCycle(baseUrl, owner, contributionPlan.id);
+		const contributionCycle = await createAndConfirmContributionCycle(
+			baseUrl,
+			owner,
+			contributionPlan.id,
+		);
 
 		const anonymous = await fetch(
 			`${baseUrl}/portfolios/${portfolio.id}/reports/${REPORT_JSON_PATH}`,
@@ -116,12 +120,36 @@ test("exports sanitized JSON and Markdown reports for the authenticated portfoli
 		const saveResponse = await fetch(`${baseUrl}/portfolios/${portfolio.id}/reports`, {
 			method: httpMethods.post,
 			headers: jsonHeaders(owner),
+			body: JSON.stringify({
+				contributionCycleId: contributionCycle.id,
+			}),
 		});
 		const savedReport = assertSavedReportMetadata(await readJson(saveResponse));
 		assert.equal(saveResponse.status, 201);
 		assert.equal(savedReport.schemaVersion, "1.0");
 		assert.equal(savedReport.strategyId, strategyIds.opportunistic);
 		assert.ok(savedReport.alertCount > 0);
+
+		const duplicateCycleReport = await fetch(`${baseUrl}/portfolios/${portfolio.id}/reports`, {
+			method: httpMethods.post,
+			headers: jsonHeaders(owner),
+			body: JSON.stringify({
+				contributionCycleId: contributionCycle.id,
+			}),
+		});
+		assert.equal(duplicateCycleReport.status, 409);
+
+		const cyclesAfterReport = await fetch(
+			`${baseUrl}/portfolios/${portfolio.id}/contribution-cycles`,
+			{
+				headers: jsonHeaders(owner),
+			},
+		);
+		const cyclesAfterReportPayload = await readJson(cyclesAfterReport);
+		assert.equal(cyclesAfterReport.status, 200, JSON.stringify(cyclesAfterReportPayload));
+		assert.ok(Array.isArray(cyclesAfterReportPayload));
+		assert.equal(cyclesAfterReportPayload[0].id, contributionCycle.id);
+		assert.equal(cyclesAfterReportPayload[0].status, contributionCycleStatuses.reported);
 
 		const listResponse = await fetch(`${baseUrl}/portfolios/${portfolio.id}/reports`, {
 			headers: jsonHeaders(owner),
@@ -294,12 +322,16 @@ async function createAndConfirmContributionCycle(
 	baseUrl: string,
 	user: TestUser,
 	contributionPlanId: string,
-): Promise<void> {
+	options: {
+		cycleMonth?: string;
+		strategyId?: string;
+	} = {},
+): Promise<IdPayload> {
 	const createResponse = await fetch(`${baseUrl}/contribution-plans/${contributionPlanId}/cycles`, {
 		method: httpMethods.post,
 		headers: jsonHeaders(user),
 		body: JSON.stringify({
-			cycleMonth: "2099-05",
+			cycleMonth: options.cycleMonth ?? "2099-05",
 		}),
 	});
 	const createPayload = await readJson(createResponse);
@@ -312,12 +344,13 @@ async function createAndConfirmContributionCycle(
 		body: JSON.stringify({
 			status: contributionCycleStatuses.confirmed,
 			confirmedAmount: "1200",
-			strategyId: strategyIds.opportunistic,
+			strategyId: options.strategyId ?? strategyIds.opportunistic,
 			notes: "synthetic report confirmation",
 		}),
 	});
 	const confirmPayload = await readJson(confirmResponse);
 	assert.equal(confirmResponse.status, 200, JSON.stringify(confirmPayload));
+	return cycle;
 }
 
 function assertReportJson(payload: unknown, owner: TestUser, ticker: string | undefined): void {
