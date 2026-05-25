@@ -3733,17 +3733,20 @@ function buildRepos() {
 
   return uniqueRoots.map((root) => {
     const repoConfig = configForRoot(root);
-    const entries = changedFileEntries(root, args.base);
+    const rawEntries = changedFileEntries(root, args.base);
+    const entries = (args.includeClean ? rawEntries : rawEntries.filter(Boolean)).filter((entry) => !shouldIgnoreByConfig(entry.path, repoConfig));
     const changedLines = changedLineMap(root, args.base, entries);
     return {
       root,
       name: basename(root),
       config: repoConfig,
       configPath: findConfigPath(root, args.configPath) || startConfigPath || "",
-      entries: (args.includeClean ? entries : entries.filter(Boolean)).filter((entry) => !shouldIgnoreByConfig(entry.path, repoConfig)),
+      rawChangedFiles: rawEntries.length,
+      ignoredChangedFiles: Math.max(0, rawEntries.length - entries.length),
+      entries,
       changedLines,
     };
-  }).filter((repo) => args.includeClean || repo.entries.length > 0);
+  }).filter((repo) => args.includeClean || repo.rawChangedFiles > 0);
 }
 
 const repos = buildRepos();
@@ -3825,6 +3828,8 @@ for (const repo of repos) {
     path: repo.root,
     configPath: repo.configPath || null,
     changedFiles: files.length,
+    rawChangedFiles: repo.rawChangedFiles,
+    ignoredChangedFiles: repo.ignoredChangedFiles,
     codeFiles: files.filter((file) => isCode(file) && !isTest(file)).length,
     testFiles: files.filter(isTest).length,
     riskSignals: risks,

@@ -94,12 +94,12 @@ jobs:
 
       - name: Agentic review packet
         env:
-          AGENTIC_REVIEW_BASE: origin/${{ github.base_ref || 'main' }}
+          AGENTIC_REVIEW_BASE: ${{ github.event_name == 'push' && github.event.before || format('origin/{0}', github.base_ref || 'main') }}
         run: node docs/ai/quality-gate/vendor/collect-review-context.mjs --base "$AGENTIC_REVIEW_BASE" --json > docs/ai/quality-gate/agentic-review-packet.json
 
       - name: Ratchet quality gate
         env:
-          AGENTIC_REVIEW_BASE: origin/${{ github.base_ref || 'main' }}
+          AGENTIC_REVIEW_BASE: ${{ github.event_name == 'push' && github.event.before || format('origin/{0}', github.base_ref || 'main') }}
         run: node docs/ai/quality-gate/check-ratchet.mjs
 
       - name: Refresh baseline artifact
