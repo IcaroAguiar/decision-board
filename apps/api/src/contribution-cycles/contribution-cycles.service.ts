@@ -130,9 +130,7 @@ function assertStatusTransition(
 		data.status !== contributionCycleStatuses.confirmed &&
 		data.confirmedAmount !== null
 	) {
-		throw new BadRequestException(
-			"confirmedAmount must be null when leaving confirmed status",
-		);
+		throw new BadRequestException("confirmedAmount must be null when leaving confirmed status");
 	}
 
 	if (terminalStatuses.has(currentStatus) && !isNoOpUpdate(existing, data)) {
