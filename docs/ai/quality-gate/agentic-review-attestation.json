@@ -7,7 +7,7 @@
   "allowedBases": [
     "main"
   ],
-  "reviewedFingerprint": "17f98c51879da2e9ac4b936f1a21d6b5cc946c5ef1d47f2797d5eacad70ade79",
+  "reviewedFingerprint": "1068f41d298eb8ba99b8a2b00b521eb3612756314ad6ffb41ba152c5bc894ee3",
   "reviewedDeterministicSignals": {
     "blocking": 10,
     "high": 0,
