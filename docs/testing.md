@@ -76,6 +76,10 @@ The GitHub Actions quality gate runs this smoke after migrations and the test
 suite. A PR that changes backend/API behavior should still run it locally before
 opening the PR so failures are diagnosed with local logs and database access.
 
+Open-source security automation (Dependabot + CodeQL) lives under `.github/` and
+is documented in [SECURITY.md](../SECURITY.md). Browser E2E for the temporary
+web proof harness is manual; see [proof-harness.md](proof-harness.md).
+
 Expected output is a small JSON object:
 
 ```json

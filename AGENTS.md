@@ -28,9 +28,16 @@ Jobs (`JOBS_ENABLED`) and brapi market data are optional; default manual market 
 
 Root scripts in `package.json` / README: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`, `pnpm smoke:api`. API integration tests and smoke need Postgres + auth env vars (see `docs/testing.md`); they bind Nest to an ephemeral loopback port, not 3001.
 
-### Web UI auth caveat
+### Web UI (prova de fluxo)
 
-The MVP web app (`apps/web`) is the monthly contribution workspace and has **no login UI**. API calls use `credentials: "include"` against `WEB_ORIGIN`. For browser E2E, sign in first via `POST /auth/sign-in/email` (or sign-up) so the `better-auth.session_token` cookie is set for the API host, then open the UI on **`http://localhost:5173`** (prefer `localhost` over `127.0.0.1` so the cookie host matches). Set the API field to `http://localhost:3001` and paste a portfolio UUID owned by that session.
+A app em `apps/web` é um **harness temporário** de prova de fluxo (não UX de
+produto). Ver [docs/proof-harness.md](docs/proof-harness.md).
+
+API calls usam `credentials: "include"` contra `WEB_ORIGIN`. Abra a UI em
+`http://localhost:5173` (preferir `localhost` sobre `127.0.0.1` para o cookie
+bater), defina a API como `http://localhost:3001`, faça sign-up/sign-in na
+própria tela e selecione/crie um portfolio — sem colar UUID no caminho
+principal.
 
 ### Docker in this environment
 

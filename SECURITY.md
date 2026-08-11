@@ -26,3 +26,20 @@ Decision Board must never:
 - scrape authenticated financial accounts;
 - expose user-owned resources without session-derived `userId` scoping;
 - log auth payloads, tokens, cookies, session IDs, reset tokens, or sensitive personal data.
+
+## Production baseline
+
+See [docs/production-hardening.md](docs/production-hardening.md) for HTTPS and
+Postgres backup expectations. The API enables Helmet security headers, CORS
+restricted to trusted web origins, auth and provider refresh rate limits, and
+auth log redaction.
+
+Dependency and static-analysis hygiene for this public repository:
+
+- Dependabot updates for npm and GitHub Actions (`.github/dependabot.yml`)
+- CodeQL analysis for TypeScript (`.github/workflows/codeql.yml`)
+- Quality gate CI for lint, typecheck, tests, coverage, smoke, and build
+  (`.github/workflows/quality-gate.yml`)
+
+OpenSSF Scorecard is not enabled yet (optional for this cut; revisit if the
+project needs public scorecard badges or fork-safe scorecard tokens).

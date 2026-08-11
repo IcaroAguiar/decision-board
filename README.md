@@ -37,6 +37,17 @@ pnpm dev
 Before starting the API, set `BETTER_AUTH_SECRET` in `.env` to a locally generated
 value.
 
+## Web proof harness (temporary)
+
+`apps/web` is an operational **proof-of-flow** UI (auth, portfolio selector, thin
+CRUD forms, monthly contribution, `current.json`). It is **not** product UX.
+Happy-path steps: [docs/proof-harness.md](docs/proof-harness.md).
+
+Open `http://localhost:5173`, set API base to `http://localhost:3001`, sign up
+or sign in on the page, then create/select a portfolio — no UUID paste required
+on the main path. Keep `WEB_ORIGIN=http://localhost:5173` so the session cookie
+works with `credentials: "include"`.
+
 ## Validation
 
 ```bash
@@ -328,3 +339,5 @@ are allowlisted before persistence.
 - User-owned resources must always be scoped by authenticated `userId`.
 - Manual market data must remain available even when optional providers fail.
 - Reports must not include secrets or unnecessary personal identifiers.
+- Production HTTPS and Postgres backup expectations:
+  [docs/production-hardening.md](docs/production-hardening.md).

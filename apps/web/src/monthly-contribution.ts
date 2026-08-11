@@ -59,6 +59,47 @@ export interface SavedReport {
 	alertCount: number;
 }
 
+export interface SessionUser {
+	userId: string;
+	email: string;
+}
+
+export interface PortfolioSummary {
+	id: string;
+	name: string;
+	baseCurrency: string;
+}
+
+export interface AssetSummary {
+	id: string;
+	ticker: string;
+	name: string;
+}
+
+export interface PositionSummary {
+	id: string;
+	assetId: string;
+	quantity: string;
+	totalValue: string | null;
+}
+
+export interface ReportHistoryItem {
+	id: string;
+	generatedAt: string;
+	strategyId: string | null;
+	alertCount: number;
+}
+
+export interface CurrentReportEnvelope {
+	schemaVersion?: string;
+	alerts?: unknown[];
+	portfolio?: {
+		positionCount?: number;
+		totalValue?: string | number;
+	};
+	[key: string]: unknown;
+}
+
 export interface ConfirmedAmountValidation {
 	error: string | null;
 	value: string;
