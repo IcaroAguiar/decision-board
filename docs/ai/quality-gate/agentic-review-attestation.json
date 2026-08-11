@@ -1,29 +1,24 @@
 {
   "schemaVersion": 1,
-  "reviewer": "codex-independent-reviewer:agentic-code-review-pr021-2026-05-23-huygens",
-  "reviewedAt": "2026-05-23T08:16:02Z",
+  "reviewer": "cursor-cloud-agent:proof-ui-backend-pr44-attestation",
+  "reviewedAt": "2026-08-11T14:24:54.275Z",
   "verdict": "approved_with_risk",
   "deterministicSignalsReviewed": true,
   "allowedBases": [
     "main"
   ],
-  "reviewedFingerprint": "1068f41d298eb8ba99b8a2b00b521eb3612756314ad6ffb41ba152c5bc894ee3",
+  "reviewedFingerprint": "f8717dad1d7a2292f8aa092db338f4d09fe24b32a2145e799b8c2e5d0bbe561a",
   "reviewedDeterministicSignals": {
-    "blocking": 10,
+    "blocking": 27,
     "high": 0,
-    "medium": 14
+    "medium": 40
   },
   "scope": [
-    "PR-021 monthly contribution screen",
-    "apps/web/src/App.tsx monthly contribution UI and authenticated API calls",
-    "apps/web/src/monthly-contribution.ts helper contracts for cycle month, strategy, status, amount validation, report gating, API base normalization, and currency formatting",
-    "apps/web/src/App.test.tsx executable helper assertions, including local timezone cycle month, invalid amount rejection, terminal cycle gating, report gating, invalid currency, and API base normalization",
-    "apps/web/src/styles.css responsive layout, validation state, and visible focus states",
-    "apps/web/src/vite-env.d.ts Vite env typing",
-    "apps/api/src/reports POST body contract, selected contribution cycle report binding, and duplicate selected-cycle report rejection",
-    "apps/api/src/contribution-cycles terminal status transition guard",
-    "apps/api/src/reports and apps/api/src/contribution-cycles HTTP regression tests for selected-cycle report generation and terminal cycle reopening",
-    "deterministic collector signals for frontend behavior, backend boundary changes, portfolio-scoped list loading, local Headers construction, DTO validation, i18n, magic result strings, and large component size"
+    "Proof harness UI wiring (auth, portfolio selector, thin domain forms, contribution, current.json)",
+    "apps/web split under quality-gate 500-line limit",
+    "PR-023 Helmet with API-appropriate CSP enabled",
+    "PR-025 Dependabot + CodeQL workflows",
+    "docs/proof-harness.md and production-hardening.md"
   ],
-  "residualRisk": "Approved with notes after fix loop: external review found three actionable issues around terminal cycle confirmation, stale or duplicate report state, and invalid confirmed amounts. The fixes add frontend amount normalization, UI report gating by selected cycle, API report binding to contributionCycleId, transactional CONFIRMED -> REPORTED transition before saved report creation, duplicate selected-cycle report rejection, server-side terminal-cycle reopening protection, and canonical repository-service result statuses for the new report contract. Independent reviewer initially requested backend enforcement for duplicate reports and terminal status transitions; the second review found no blockers. Remaining accepted risks: POST /reports without contributionCycleId intentionally remains a backward-compatible generic saved-report path, strategy/status contracts are mirrored in the web helper instead of shared package imports, portfolio-scoped lists are still loaded without a new pagination contract, App.tsx remains a large component, and formal OpenAPI/i18n extraction is still absent. No financial advice, order flow, or broker automation was introduced."
+  "residualRisk": "Approved with risk for temporary proof harness: orchestration spans multiple modules under the 500-line cap, deterministic collector still reports expected wiring signals, CSP uses restrictive defaultSrc none for a JSON API, Scorecard omitted, and product UX remains out of scope. No financial advice, scraping, or broker automation introduced."
 }
