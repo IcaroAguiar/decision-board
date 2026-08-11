@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
   "reviewer": "cursor-cloud-agent:proof-ui-backend-pr44-attestation",
-  "reviewedAt": "2026-08-11T14:24:54.275Z",
+  "reviewedAt": "2026-08-11T14:27:07.442Z",
   "verdict": "approved_with_risk",
   "deterministicSignalsReviewed": true,
   "allowedBases": [
     "main"
   ],
-  "reviewedFingerprint": "f8717dad1d7a2292f8aa092db338f4d09fe24b32a2145e799b8c2e5d0bbe561a",
+  "reviewedFingerprint": "ceeca605b6f57c1fa76ca93d4007a17743a9eef522288c71ae93b5612f4ff398",
   "reviewedDeterministicSignals": {
     "blocking": 27,
     "high": 0,
