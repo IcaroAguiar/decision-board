@@ -1732,7 +1732,8 @@ corte visual posterior.
 ## 9. Fase 6 — Hardening open source
 
 **Janela operacional (prova de fluxo):** fechar PR-023 (contrato/ops), alinhar
-PR-024 ao quality-gate existente, e entregar PR-025 (Dependabot/CodeQL). A UI
+PR-024 ao CI (lint/test/build; ratchet agentic depreciado), e entregar PR-025
+(Dependabot/CodeQL). A UI
 em `apps/web` nesta janela é harness de prova (auth + seletor + forms finos),
 não polish de produto. **Fora desta janela:** PR-026 ledger, PR-027 CSV,
 PR-028 proposal; dashboard/cards polidos (PR-017/022 como UX) ficam para fase
@@ -1796,8 +1797,10 @@ posterior explícita. Sem `GET /strategies` nem summary REST novos — reutiliza
 - [x] Rodar build
 ```
 
-**Nota:** o quality-gate remoto também cobre migrations, coverage, `smoke:api`,
-gitleaks e ratchet agentic; deploy automático permanece fora do escopo.
+**Nota:** o workflow CI (`.github/workflows/quality-gate.yml`) cobre
+migrations, coverage, `smoke:api` e gitleaks. O ratchet agentic em
+`docs/ai/quality-gate/` está **depreciado** e não é mais gate de merge.
+Deploy automático permanece fora do escopo.
 
 **Fora do escopo:** deploy automático.
 

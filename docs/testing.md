@@ -37,7 +37,7 @@ them to a fixed common port such as `3000`, `3001`, or `5173`.
 ## Coverage
 
 Run coverage before UI work and before PRs that touch API, domain packages,
-reports, strategies, providers, jobs, or quality-gate behavior:
+reports, strategies, providers, jobs, or CI coverage reporting:
 
 ```bash
 DATABASE_URL="postgresql://decision_board:<local-password>@localhost:55432/decision_board?schema=public" \
@@ -49,9 +49,10 @@ pnpm coverage
 
 The coverage command uses Node's native test coverage against compiled
 JavaScript tests for `packages/*` and `apps/api`. It generates
-`coverage/coverage-summary.json` for the quality ratchet and `coverage/lcov.info`
-for detailed inspection. The current command intentionally excludes browser/UI
-coverage because the pre-UI gate is backend/domain focused.
+`coverage/coverage-summary.json` and `coverage/lcov.info` for inspection. The
+current command intentionally excludes browser/UI coverage because the pre-UI
+gate is backend/domain focused. The generated agentic ratchet under
+`docs/ai/quality-gate/` is deprecated and is not required for PRs.
 
 ## API Smoke
 
@@ -72,9 +73,9 @@ contribution plan, and contribution cycle, confirms the cycle, exports the JSON
 report endpoint, creates/lists a saved report history entry, checks a cross-user
 access denial, and then cleans up the synthetic users/assets it created.
 
-The GitHub Actions quality gate runs this smoke after migrations and the test
-suite. A PR that changes backend/API behavior should still run it locally before
-opening the PR so failures are diagnosed with local logs and database access.
+GitHub Actions CI runs this smoke after migrations and the test suite. A PR
+that changes backend/API behavior should still run it locally before opening
+the PR so failures are diagnosed with local logs and database access.
 
 Open-source security automation (Dependabot + CodeQL) lives under `.github/` and
 is documented in [SECURITY.md](../SECURITY.md). Browser E2E for the temporary

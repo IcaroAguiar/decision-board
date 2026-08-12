@@ -38,8 +38,9 @@ Dependency and static-analysis hygiene for this public repository:
 
 - Dependabot updates for npm and GitHub Actions (`.github/dependabot.yml`)
 - CodeQL analysis for TypeScript (`.github/workflows/codeql.yml`)
-- Quality gate CI for lint, typecheck, tests, coverage, smoke, and build
-  (`.github/workflows/quality-gate.yml`)
+- CI for lint, typecheck, tests, coverage, smoke, and build
+  (`.github/workflows/quality-gate.yml`). The generated agentic ratchet under
+  `docs/ai/quality-gate/` is deprecated and is not a merge gate.
 
 OpenSSF Scorecard is not enabled yet (optional for this cut; revisit if the
 project needs public scorecard badges or fork-safe scorecard tokens).

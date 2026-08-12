@@ -23,5 +23,6 @@ bater no mesmo site lógico).
 8. **Criar ciclo** do mês → confirmar valor/estratégia → **gerar relatório**.
 9. **Carregar `current.json`** e conferir histórico.
 
-Gates automatizados continuam sendo `pnpm smoke:api` + quality-gate; browser E2E
-completo não faz parte desta janela.
+Gates automatizados: `pnpm lint`, `typecheck`, `test`, `build`, `smoke:api` no
+workflow CI. O ratchet agentic em `docs/ai/quality-gate/` está depreciado.
+Browser E2E completo não faz parte desta janela.
