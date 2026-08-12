@@ -40,6 +40,77 @@ button:disabled {
 	padding: 40px 24px 56px;
 }
 
+.proof-banner {
+	margin: 0 0 20px;
+	padding: 12px 14px;
+	border: 1px dashed #8a6d2f;
+	background: #fff8e8;
+	color: #5c4818;
+	font-size: 0.92rem;
+	font-weight: 700;
+	line-height: 1.45;
+}
+
+.proof-section {
+	margin-top: 28px;
+	padding-top: 20px;
+	border-top: 1px solid #d6ddd4;
+}
+
+.proof-section h3 {
+	margin: 0 0 8px;
+	grid-column: 1 / -1;
+	font-size: 1rem;
+}
+
+.proof-form-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 20px;
+}
+
+.proof-form {
+	padding: 12px 0;
+	border-top: 1px solid #e4ebe3;
+}
+
+.hint {
+	margin: 10px 0 0;
+	color: #617067;
+	font-size: 0.9rem;
+	font-weight: 600;
+}
+
+.fallback-details {
+	margin-top: 14px;
+	color: #617067;
+}
+
+.fallback-details summary {
+	cursor: pointer;
+	font-weight: 700;
+}
+
+.json-dump {
+	margin: 0;
+	max-height: 360px;
+	overflow: auto;
+	padding: 12px;
+	border: 1px solid #d6ddd4;
+	background: #f3f5f1;
+	font-size: 0.78rem;
+	line-height: 1.4;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+
+.report-history-list {
+	margin: 12px 0 0;
+	padding-left: 18px;
+	color: #405249;
+	font-weight: 600;
+}
+
 .workspace-header {
 	display: flex;
 	align-items: flex-start;
@@ -121,7 +192,7 @@ h2 {
 
 .setup-band {
 	display: grid;
-	grid-template-columns: 1.1fr 1fr 1fr auto;
+	grid-template-columns: 1.2fr 1fr auto;
 	gap: 14px;
 	align-items: end;
 	padding: 18px 0 22px;
@@ -343,7 +414,8 @@ dd {
 	.setup-band,
 	.overview-grid,
 	.flow-grid,
-	.cycle-form {
+	.cycle-form,
+	.proof-form-grid {
 		grid-template-columns: 1fr;
 	}
 

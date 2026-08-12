@@ -1,10 +1,12 @@
 import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
 import type { NestExpressApplication } from "@nestjs/platform-express";
+import helmet from "helmet";
 import { AppModule } from "./app.module.js";
 import { mountAuthHandler } from "./auth/auth-http.js";
 import { normalizeClientIpForAuth } from "./auth/client-ip.js";
 import { getTrustedOrigins } from "./auth/env.js";
+import { apiHelmetOptions } from "./http-security.js";
 
 const defaultPort = 3001;
 
@@ -14,6 +16,7 @@ async function bootstrap(): Promise<void> {
 	});
 	const port = Number.parseInt(process.env.PORT ?? String(defaultPort), 10);
 
+	app.use(helmet(apiHelmetOptions));
 	app.enableCors({
 		credentials: true,
 		origin: getTrustedOrigins(),

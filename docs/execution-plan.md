@@ -1731,6 +1731,15 @@ corte visual posterior.
 
 ## 9. Fase 6 — Hardening open source
 
+**Janela operacional (prova de fluxo):** fechar PR-023 (contrato/ops), alinhar
+PR-024 ao CI (lint/test/build; ratchet agentic depreciado), e entregar PR-025
+(Dependabot/CodeQL). A UI
+em `apps/web` nesta janela é harness de prova (auth + seletor + forms finos),
+não polish de produto. **Fora desta janela:** PR-026 ledger, PR-027 CSV,
+PR-028 proposal; dashboard/cards polidos (PR-017/022 como UX) ficam para fase
+posterior explícita. Sem `GET /strategies` nem summary REST novos — reutilizar
+`reports/current.json` e o catálogo local de estratégias na web.
+
 ### PR-023 — Segurança básica de produção
 
 **Objetivo:** preparar para uso externo controlado.
@@ -1748,13 +1757,13 @@ corte visual posterior.
 **Checklist de implementação:**
 
 ```txt
-- [ ] Rate limit em auth
-- [ ] Rate limit em endpoints de provider externo
-- [ ] CORS baseado em WEB_ORIGIN
-- [ ] Helmet ou headers equivalentes
-- [ ] Logs sem tokens, cookies ou payload sensível
-- [ ] Documentar HTTPS obrigatório
-- [ ] Documentar backup do Postgres
+- [x] Rate limit em auth
+- [x] Rate limit em endpoints de provider externo
+- [x] CORS baseado em WEB_ORIGIN
+- [x] Helmet ou headers equivalentes
+- [x] Logs sem tokens, cookies ou payload sensível
+- [x] Documentar HTTPS obrigatório
+- [x] Documentar backup do Postgres
 ```
 
 **Fora do escopo:** RLS.
@@ -1780,13 +1789,18 @@ corte visual posterior.
 **Checklist de implementação:**
 
 ```txt
-- [ ] Criar workflow CI
-- [ ] Rodar pnpm install com cache
-- [ ] Rodar lint
-- [ ] Rodar typecheck
-- [ ] Rodar tests
-- [ ] Rodar build
+- [x] Criar workflow CI
+- [x] Rodar pnpm install com cache
+- [x] Rodar lint
+- [x] Rodar typecheck
+- [x] Rodar tests
+- [x] Rodar build
 ```
+
+**Nota:** o workflow CI (`.github/workflows/quality-gate.yml`) cobre
+migrations, coverage, `smoke:api` e gitleaks. O ratchet agentic em
+`docs/ai/quality-gate/` está **depreciado** e não é mais gate de merge.
+Deploy automático permanece fora do escopo.
 
 **Fora do escopo:** deploy automático.
 
@@ -1810,12 +1824,15 @@ corte visual posterior.
 **Checklist de implementação:**
 
 ```txt
-- [ ] Configurar Dependabot ou Renovate
-- [ ] Configurar CodeQL para TS
+- [x] Configurar Dependabot ou Renovate
+- [x] Configurar CodeQL para TS
 - [ ] Adicionar OpenSSF Scorecard se adequado
-- [ ] Revisar SECURITY.md
-- [ ] Garantir que secrets não rodam em PRs não confiáveis
+- [x] Revisar SECURITY.md
+- [x] Garantir que secrets não rodam em PRs não confiáveis
 ```
+
+**Nota:** OpenSSF Scorecard ficou de fora neste corte (opcional; evita atrito
+em forks sem tokens). Dependabot + CodeQL + SECURITY.md cobrem a rotina mínima.
 
 **Fora do escopo:** auditoria externa.
 

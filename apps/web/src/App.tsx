@@ -1,8 +1,11 @@
 import { type FormEvent, useEffect, useId, useMemo, useState } from "react";
+import { apiRequest, apiRequestAllowUnauthorized, getErrorMessage } from "./api-client.js";
 import {
+	type AssetSummary,
 	type CashAccount,
 	type ContributionCycle,
 	type ContributionPlan,
+	type CurrentReportEnvelope,
 	canConfirmContributionCycle,
 	canGenerateContributionReport,
 	cycleStatuses,
@@ -10,29 +13,42 @@ import {
 	formatCurrency,
 	getCurrentCycleMonth,
 	getNextReviewDate,
-	getStrategy,
 	isConfirmableCycle,
-	jsonContentTypeHeader,
 	type LoadState,
 	loadStates,
 	markCycleReported,
 	normalizeApiBase,
 	normalizeConfirmedAmount,
+	type PortfolioSummary,
+	type PositionSummary,
+	type ReportHistoryItem,
 	type SavedReport,
+	type SessionUser,
 	type StrategyId,
-	statusLabels,
 	storedApiBaseKey,
 	storedPlanIdKey,
 	storedPortfolioIdKey,
 	strategyIds,
-	strategyOptions,
 	upsertCycle,
 } from "./monthly-contribution.js";
-
+import { ProofContributionSection } from "./proof-contribution-section.js";
+import { nextBusyLoadState, resolveListedPortfolioId } from "./proof-load-state.js";
+import { ProofReportsSection } from "./proof-reports-section.js";
+import { ProofSeedSection } from "./proof-seed-section.js";
+import { ProofSetupSection } from "./proof-setup-section.js";
+import { persistWorkspace, readStoredValue } from "./proof-storage.js";
+import { loadProofWorkspaceData } from "./proof-workspace-load.js";
 export function App() {
 	const confirmedAmountErrorId = useId();
 	const [apiBase, setApiBase] = useState(() => readStoredValue(storedApiBaseKey, defaultApiBase));
+	const [session, setSession] = useState<SessionUser | null>(null);
+	const [sessionKnown, setSessionKnown] = useState(false);
+	const [authName, setAuthName] = useState("");
+	const [authEmail, setAuthEmail] = useState("");
+	const [authPassword, setAuthPassword] = useState("");
+	const [portfolios, setPortfolios] = useState<PortfolioSummary[]>([]);
 	const [portfolioId, setPortfolioId] = useState(() => readStoredValue(storedPortfolioIdKey, ""));
+	const [newPortfolioName, setNewPortfolioName] = useState("");
 	const [contributionPlanId, setContributionPlanId] = useState(() =>
 		readStoredValue(storedPlanIdKey, ""),
 	);
@@ -40,11 +56,15 @@ export function App() {
 	const [plans, setPlans] = useState<ContributionPlan[]>([]);
 	const [cycles, setCycles] = useState<ContributionCycle[]>([]);
 	const [cashAccounts, setCashAccounts] = useState<CashAccount[]>([]);
+	const [positions, setPositions] = useState<PositionSummary[]>([]);
+	const [assets, setAssets] = useState<AssetSummary[]>([]);
 	const [confirmedAmount, setConfirmedAmount] = useState("");
 	const [strategyId, setStrategyId] = useState<StrategyId>(strategyIds.balancedGrowth);
 	const [notes, setNotes] = useState("");
 	const [lastReport, setLastReport] = useState<SavedReport | null>(null);
 	const [lastReportCycleId, setLastReportCycleId] = useState<string | null>(null);
+	const [reportHistory, setReportHistory] = useState<ReportHistoryItem[]>([]);
+	const [currentReport, setCurrentReport] = useState<CurrentReportEnvelope | null>(null);
 	const [loadState, setLoadState] = useState<LoadState>(loadStates.idle);
 	const [message, setMessage] = useState("");
 
@@ -68,7 +88,6 @@ export function App() {
 			) ?? null,
 		[activePlan, cycleMonth, cycles],
 	);
-	const selectedStrategy = getStrategy(strategyId);
 	const plannedAmount = selectedCycle?.plannedAmount ?? activePlan?.amount ?? "0";
 	const cashAvailable = cashAccounts.reduce((total, account) => total + Number(account.balance), 0);
 	const nextReviewDate = getNextReviewDate(cycleMonth, strategyId);
@@ -80,10 +99,16 @@ export function App() {
 			? "Valor inválido"
 			: formatCurrency(selectedCycle?.confirmedAmount ?? confirmedAmount);
 	const visibleReport = selectedCycle?.id === lastReportCycleId ? lastReport : null;
-	const canLoad = portfolioId.trim().length > 0;
+	const canLoad = Boolean(session) && portfolioId.trim().length > 0;
 	const canCreateCycle = Boolean(activePlan) && !selectedCycle;
 	const canConfirmCycle = canConfirmContributionCycle(selectedCycle, confirmedAmountValidation);
 	const canGenerateReport = canGenerateContributionReport(selectedCycle, lastReportCycleId);
+	const busy = loadState === loadStates.loading;
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: one-shot cookie session hydrate on mount
+	useEffect(() => {
+		void refreshSession(normalizeApiBase(apiBase));
+	}, []);
 
 	useEffect(() => {
 		if (selectedCycle) {
@@ -92,7 +117,6 @@ export function App() {
 			setNotes(selectedCycle.notes ?? "");
 			return;
 		}
-
 		if (activePlan) {
 			setConfirmedAmount(activePlan.amount);
 			setStrategyId(activePlan.defaultStrategyId);
@@ -100,107 +124,212 @@ export function App() {
 		}
 	}, [activePlan, selectedCycle]);
 
+	function reportMessage(next: string, error = false) {
+		setMessage(next);
+		if (!next) {
+			return;
+		}
+		setLoadState(error ? loadStates.error : loadStates.ready);
+	}
+
+	async function refreshSession(base = normalizeApiBase(apiBase)): Promise<SessionUser | null> {
+		if (!base) {
+			setSession(null);
+			setSessionKnown(true);
+			return null;
+		}
+		try {
+			const user = await apiRequestAllowUnauthorized<SessionUser>(base, "/me");
+			setSession(user);
+			setSessionKnown(true);
+			persistWorkspace(base, portfolioId, contributionPlanId);
+			if (user) await loadPortfolios(base);
+			else setPortfolios([]);
+			return user;
+		} catch (error) {
+			setSession(null);
+			setSessionKnown(true);
+			reportMessage(getErrorMessage(error, "Falha ao verificar sessão."), true);
+			return null;
+		}
+	}
+
+	async function loadPortfolios(
+		base = normalizeApiBase(apiBase),
+		preferredId = portfolioId,
+	): Promise<PortfolioSummary[]> {
+		const listed = await apiRequest<PortfolioSummary[]>(base, "/portfolios");
+		setPortfolios(listed);
+		const selectedId = resolveListedPortfolioId(listed, preferredId);
+		if (selectedId && selectedId !== preferredId) {
+			setPortfolioId(selectedId);
+			persistWorkspace(base, selectedId, contributionPlanId);
+		}
+		return listed;
+	}
+
+	async function signUp(event: FormEvent<HTMLFormElement>) {
+		event.preventDefault();
+		setLoadState(loadStates.loading);
+		setMessage("");
+		try {
+			const base = normalizeApiBase(apiBase);
+			setApiBase(base);
+			await apiRequest(base, "/auth/sign-up/email", {
+				method: "POST",
+				body: JSON.stringify({
+					name: authName.trim(),
+					email: authEmail.trim(),
+					password: authPassword,
+				}),
+			});
+			await refreshSession(base);
+			setAuthPassword("");
+			reportMessage("Conta criada e sessão ativa.");
+		} catch (error) {
+			reportMessage(getErrorMessage(error, "Falha no sign-up."), true);
+		}
+	}
+
+	async function signIn(event: FormEvent<HTMLFormElement>) {
+		event.preventDefault();
+		setLoadState(loadStates.loading);
+		setMessage("");
+		try {
+			const base = normalizeApiBase(apiBase);
+			setApiBase(base);
+			await apiRequest(base, "/auth/sign-in/email", {
+				method: "POST",
+				body: JSON.stringify({ email: authEmail.trim(), password: authPassword }),
+			});
+			await refreshSession(base);
+			setAuthPassword("");
+			reportMessage("Sessão iniciada.");
+		} catch (error) {
+			reportMessage(getErrorMessage(error, "Falha no sign-in."), true);
+		}
+	}
+
+	async function signOut() {
+		setLoadState(loadStates.loading);
+		setMessage("");
+		try {
+			await apiRequest(normalizeApiBase(apiBase), "/auth/sign-out", { method: "POST" });
+			setSession(null);
+			setPortfolios([]);
+			setPlans([]);
+			setCycles([]);
+			setCashAccounts([]);
+			setPositions([]);
+			setAssets([]);
+			setCurrentReport(null);
+			setReportHistory([]);
+			reportMessage("Sessão encerrada.");
+		} catch (error) {
+			reportMessage(getErrorMessage(error, "Falha no sign-out."), true);
+		}
+	}
+
+	async function createPortfolio(event: FormEvent<HTMLFormElement>) {
+		event.preventDefault();
+		if (!session) {
+			reportMessage("Faça login antes de criar um portfolio.", true);
+			return;
+		}
+		setLoadState(loadStates.loading);
+		setMessage("");
+		try {
+			const base = normalizeApiBase(apiBase);
+			const portfolio = await apiRequest<PortfolioSummary>(base, "/portfolios", {
+				method: "POST",
+				body: JSON.stringify({
+					name: newPortfolioName.trim() || "Carteira de prova",
+					baseCurrency: "BRL",
+				}),
+			});
+			setNewPortfolioName("");
+			setPortfolioId(portfolio.id);
+			persistWorkspace(base, portfolio.id, contributionPlanId);
+			await loadPortfolios(base, portfolio.id);
+			reportMessage(`Portfolio criado: ${portfolio.name}`);
+		} catch (error) {
+			reportMessage(getErrorMessage(error, "Falha ao criar portfolio."), true);
+		}
+	}
+
 	async function loadContributionWorkspace(event?: FormEvent<HTMLFormElement>) {
 		event?.preventDefault();
 		if (!canLoad) {
-			setMessage("Informe um portfolioId para carregar o ciclo do mês.");
-			setLoadState(loadStates.error);
+			reportMessage("Selecione um portfolio (após login) para carregar o ciclo do mês.", true);
 			return;
 		}
-
 		setLoadState(loadStates.loading);
 		setMessage("");
 		setLastReport(null);
 		setLastReportCycleId(null);
-
 		try {
-			const normalizedApiBase = normalizeApiBase(apiBase);
-			const [loadedPlans, loadedCycles, loadedCashAccounts] = await Promise.all([
-				apiRequest<ContributionPlan[]>(
-					normalizedApiBase,
-					`/portfolios/${portfolioId}/contribution-plans`,
-				),
-				apiRequest<ContributionCycle[]>(
-					normalizedApiBase,
-					`/portfolios/${portfolioId}/contribution-cycles`,
-				),
-				apiRequest<CashAccount[]>(normalizedApiBase, `/portfolios/${portfolioId}/cash-accounts`),
-			]);
+			const base = normalizeApiBase(apiBase);
+			const [loadedPlans, loadedCycles, loadedCash, loadedPositions, loadedAssets, history] =
+				await loadProofWorkspaceData(base, portfolioId);
 			const nextPlan =
 				loadedPlans.find((plan) => plan.id === contributionPlanId) ?? loadedPlans[0] ?? null;
-
-			setApiBase(normalizedApiBase);
+			setApiBase(base);
 			setPlans(loadedPlans);
 			setCycles(loadedCycles);
-			setCashAccounts(loadedCashAccounts);
+			setCashAccounts(loadedCash);
+			setPositions(loadedPositions);
+			setAssets(loadedAssets);
+			setReportHistory(history);
 			setContributionPlanId(nextPlan?.id ?? contributionPlanId);
-			persistWorkspace(normalizedApiBase, portfolioId, nextPlan?.id ?? contributionPlanId);
-			setLoadState(loadStates.ready);
-			setMessage(
+			persistWorkspace(base, portfolioId, nextPlan?.id ?? contributionPlanId);
+			reportMessage(
 				nextPlan
 					? "Dados carregados. Revise o ciclo do mês antes de confirmar."
 					: "Dados carregados, mas nenhuma recorrência ativa foi encontrada.",
 			);
 		} catch (error) {
-			setLoadState(loadStates.error);
-			setMessage(getErrorMessage(error));
+			reportMessage(getErrorMessage(error, "Falha ao carregar workspace."), true);
 		}
 	}
 
 	async function createMonthlyCycle() {
 		if (!activePlan) {
-			setMessage("Nenhum plano ativo foi carregado para criar o ciclo.");
-			setLoadState(loadStates.error);
+			reportMessage("Nenhum plano ativo foi carregado para criar o ciclo.", true);
 			return;
 		}
-
 		setLoadState(loadStates.loading);
 		setMessage("");
-
 		try {
 			const cycle = await apiRequest<ContributionCycle>(
 				normalizeApiBase(apiBase),
 				`/contribution-plans/${activePlan.id}/cycles`,
-				{
-					body: JSON.stringify({
-						cycleMonth,
-						strategyId,
-					}),
-					method: "POST",
-				},
+				{ body: JSON.stringify({ cycleMonth, strategyId }), method: "POST" },
 			);
 			setCycles((current) => upsertCycle(current, cycle));
 			setContributionPlanId(activePlan.id);
-			persistWorkspace(apiBase, portfolioId, activePlan.id);
-			setLoadState(loadStates.ready);
-			setMessage("Ciclo mensal criado. Confirme valor e estratégia antes do relatório.");
+			persistWorkspace(normalizeApiBase(apiBase), portfolioId, activePlan.id);
+			reportMessage("Ciclo mensal criado. Confirme valor e estratégia antes do relatório.");
 		} catch (error) {
-			setLoadState(loadStates.error);
-			setMessage(getErrorMessage(error));
+			reportMessage(getErrorMessage(error, "Falha ao criar ciclo."), true);
 		}
 	}
 
 	async function confirmMonthlyCycle(event: FormEvent<HTMLFormElement>) {
 		event.preventDefault();
 		if (!selectedCycle) {
-			setMessage("Crie ou carregue o ciclo do mês antes de confirmar.");
-			setLoadState(loadStates.error);
+			reportMessage("Crie ou carregue o ciclo do mês antes de confirmar.", true);
 			return;
 		}
 		if (!isConfirmableCycle(selectedCycle)) {
-			setMessage("Este ciclo já foi encerrado para confirmação.");
-			setLoadState(loadStates.error);
+			reportMessage("Este ciclo já foi encerrado para confirmação.", true);
 			return;
 		}
 		if (confirmedAmountValidation.error) {
-			setMessage(confirmedAmountValidation.error);
-			setLoadState(loadStates.error);
+			reportMessage(confirmedAmountValidation.error, true);
 			return;
 		}
-
 		setLoadState(loadStates.loading);
 		setMessage("");
-
 		try {
 			const cycle = await apiRequest<ContributionCycle>(
 				normalizeApiBase(apiBase),
@@ -216,284 +345,152 @@ export function App() {
 				},
 			);
 			setCycles((current) => upsertCycle(current, cycle));
-			setLoadState(loadStates.ready);
-			setMessage("Ciclo confirmado. O relatório já pode ser gerado nesta tela.");
+			reportMessage("Ciclo confirmado. O relatório já pode ser gerado nesta tela.");
 		} catch (error) {
-			setLoadState(loadStates.error);
-			setMessage(getErrorMessage(error));
+			reportMessage(getErrorMessage(error, "Falha ao confirmar ciclo."), true);
 		}
 	}
 
 	async function generateReport() {
 		if (!selectedCycle) {
-			setMessage("Confirme ou selecione um ciclo antes de gerar relatório.");
-			setLoadState(loadStates.error);
+			reportMessage("Confirme ou selecione um ciclo antes de gerar relatório.", true);
 			return;
 		}
 		if (!canGenerateReport) {
-			setMessage("O relatório deste ciclo só pode ser gerado uma vez após confirmação.");
-			setLoadState(loadStates.error);
+			reportMessage("O relatório deste ciclo só pode ser gerado uma vez após confirmação.", true);
 			return;
 		}
-
 		setLoadState(loadStates.loading);
 		setMessage("");
-
 		try {
-			const report = await apiRequest<SavedReport>(
-				normalizeApiBase(apiBase),
-				`/portfolios/${portfolioId}/reports`,
-				{
-					body: JSON.stringify({
-						contributionCycleId: selectedCycle.id,
-					}),
-					method: "POST",
-				},
-			);
+			const base = normalizeApiBase(apiBase);
+			const report = await apiRequest<SavedReport>(base, `/portfolios/${portfolioId}/reports`, {
+				body: JSON.stringify({ contributionCycleId: selectedCycle.id }),
+				method: "POST",
+			});
 			setLastReport(report);
 			setLastReportCycleId(selectedCycle.id);
 			setCycles((current) => upsertCycle(current, markCycleReported(selectedCycle)));
-			setLoadState(loadStates.ready);
-			setMessage("Relatório salvo para revisão externa.");
+			setReportHistory(
+				await apiRequest<ReportHistoryItem[]>(base, `/portfolios/${portfolioId}/reports`),
+			);
+			reportMessage("Relatório salvo para revisão externa.");
 		} catch (error) {
-			setLoadState(loadStates.error);
-			setMessage(getErrorMessage(error));
+			reportMessage(getErrorMessage(error, "Falha ao gerar relatório."), true);
 		}
 	}
 
 	return (
 		<main className="app-shell">
+			<p className="proof-banner">
+				Prova de fluxo / temporária — não é UX de produto. Wiring operacional para exercitar a API.
+			</p>
 			<section className="workspace-header">
 				<div>
 					<p className="eyebrow">Decision Board</p>
-					<h1>Aporte do mês</h1>
+					<h1>Harness de prova</h1>
 					<p className="summary">
-						Acompanhe o ciclo mensal, confirme o aporte e gere o relatório estruturado com dados
-						informativos da carteira.
+						Auth → portfolio → posição/caixa → aporte → preço → relatório, sem colar UUID no caminho
+						principal.
 					</p>
 				</div>
 				<div className="status-strip" aria-live="polite">
 					<span className={`status-dot ${loadState}`} />
-					<span>{loadState === loadStates.loading ? "Sincronizando" : "Fluxo mensal"}</span>
+					<span>{busy ? "Sincronizando" : "Fluxo de prova"}</span>
 				</div>
 			</section>
 
-			<form className="setup-band" onSubmit={loadContributionWorkspace}>
-				<label>
-					<span>API</span>
-					<input
-						onChange={(event) => setApiBase(event.target.value)}
-						placeholder="origem atual ou URL da API"
-						value={apiBase}
-					/>
-				</label>
-				<label>
-					<span>Portfolio ID</span>
-					<input
-						onChange={(event) => setPortfolioId(event.target.value)}
-						placeholder="uuid da carteira"
-						value={portfolioId}
-					/>
-				</label>
-				<label>
-					<span>Plano de aporte</span>
-					<input
-						onChange={(event) => setContributionPlanId(event.target.value)}
-						placeholder="opcional; usa o primeiro ativo"
-						value={contributionPlanId}
-					/>
-				</label>
-				<button
-					className="primary-action"
-					disabled={loadState === loadStates.loading}
-					type="submit"
-				>
-					Carregar
-				</button>
-			</form>
+			<ProofSetupSection
+				apiBase={apiBase}
+				authEmail={authEmail}
+				authName={authName}
+				authPassword={authPassword}
+				busy={busy}
+				canLoad={canLoad}
+				contributionPlanId={contributionPlanId}
+				createPortfolio={createPortfolio}
+				loadContributionWorkspace={loadContributionWorkspace}
+				loadPortfolios={() => void loadPortfolios()}
+				newPortfolioName={newPortfolioName}
+				plans={plans}
+				portfolioId={portfolioId}
+				portfolios={portfolios}
+				session={session}
+				sessionKnown={sessionKnown}
+				setApiBase={setApiBase}
+				setAuthEmail={setAuthEmail}
+				setAuthName={setAuthName}
+				setAuthPassword={setAuthPassword}
+				setContributionPlanId={setContributionPlanId}
+				setNewPortfolioName={setNewPortfolioName}
+				setPortfolioId={setPortfolioId}
+				signIn={signIn}
+				signOut={signOut}
+				signUp={signUp}
+			/>
 
 			{message ? (
 				<p className={`message ${loadState === loadStates.error ? "error" : ""}`}>{message}</p>
 			) : null}
 
-			<section className="overview-grid" aria-label="Resumo do ciclo mensal">
-				<article className="metric-card">
-					<span>Ciclo atual</span>
-					<strong>{cycleMonth}</strong>
-					<input
-						aria-label="Mês do ciclo"
-						className="compact-input"
-						onChange={(event) => setCycleMonth(event.target.value)}
-						type="month"
-						value={cycleMonth}
-					/>
-				</article>
-				<article className="metric-card">
-					<span>Aporte planejado</span>
-					<strong>{formatCurrency(plannedAmount)}</strong>
-					<small>{activePlan ? "Recorrência ativa" : "Carregue um plano ativo"}</small>
-				</article>
-				<article className="metric-card">
-					<span>Aporte confirmado</span>
-					<strong>{confirmedAmountDisplay}</strong>
-					<small>
-						{selectedCycle ? statusLabels[selectedCycle.status] : "Ciclo ainda não criado"}
-					</small>
-				</article>
-				<article className="metric-card">
-					<span>Caixa disponível</span>
-					<strong>{formatCurrency(cashAvailable)}</strong>
-					<small>{cashAccounts.length} conta(s) de caixa</small>
-				</article>
-			</section>
+			<ProofSeedSection
+				apiBase={apiBase}
+				assets={assets}
+				busy={busy}
+				cashAccounts={cashAccounts}
+				onAssetsChange={setAssets}
+				onBusy={(next) => setLoadState((current) => nextBusyLoadState(current, next))}
+				onCashAccountsChange={setCashAccounts}
+				onMessage={(next, error) => reportMessage(next, error)}
+				onPlanCreated={(plan) => {
+					setPlans((current) => [plan, ...current]);
+					setContributionPlanId(plan.id);
+					persistWorkspace(normalizeApiBase(apiBase), portfolioId, plan.id);
+				}}
+				onPositionsChange={setPositions}
+				portfolioId={portfolioId}
+				positions={positions}
+				sessionActive={Boolean(session)}
+			/>
 
-			<section className="flow-grid">
-				<div className="work-surface">
-					<div className="section-heading">
-						<div>
-							<p className="eyebrow">Operação mensal</p>
-							<h2>Ciclo de aporte</h2>
-						</div>
-						<button
-							className="secondary-action"
-							disabled={!canCreateCycle || loadState === loadStates.loading}
-							onClick={createMonthlyCycle}
-							type="button"
-						>
-							Criar ciclo
-						</button>
-					</div>
+			<ProofContributionSection
+				activePlanPresent={Boolean(activePlan)}
+				busy={busy}
+				canConfirmCycle={canConfirmCycle}
+				canCreateCycle={canCreateCycle}
+				canGenerateReport={canGenerateReport}
+				cashAccountCount={cashAccounts.length}
+				cashAvailable={cashAvailable}
+				confirmMonthlyCycle={confirmMonthlyCycle}
+				confirmedAmount={confirmedAmount}
+				confirmedAmountDisplay={confirmedAmountDisplay}
+				confirmedAmountError={confirmedAmountError}
+				confirmedAmountErrorId={confirmedAmountErrorId}
+				createMonthlyCycle={createMonthlyCycle}
+				cycleMonth={cycleMonth}
+				generateReport={generateReport}
+				nextReviewDate={nextReviewDate}
+				notes={notes}
+				plannedAmount={plannedAmount}
+				selectedCycle={selectedCycle}
+				setConfirmedAmount={setConfirmedAmount}
+				setCycleMonth={setCycleMonth}
+				setNotes={setNotes}
+				setStrategyId={setStrategyId}
+				strategyId={strategyId}
+				visibleReport={visibleReport}
+			/>
 
-					<form className="cycle-form" onSubmit={confirmMonthlyCycle}>
-						<label>
-							<span>Valor confirmado</span>
-							<input
-								aria-describedby={confirmedAmountError ? confirmedAmountErrorId : undefined}
-								aria-invalid={Boolean(confirmedAmountError)}
-								inputMode="decimal"
-								onChange={(event) => setConfirmedAmount(event.target.value)}
-								placeholder="1200.00"
-								value={confirmedAmount}
-							/>
-							{confirmedAmountError ? (
-								<small className="field-error" id={confirmedAmountErrorId}>
-									{confirmedAmountError}
-								</small>
-							) : null}
-						</label>
-						<label>
-							<span>Estratégia do ciclo</span>
-							<select
-								onChange={(event) => setStrategyId(event.target.value as StrategyId)}
-								value={strategyId}
-							>
-								{strategyOptions.map((strategy) => (
-									<option key={strategy.id} value={strategy.id}>
-										{strategy.name}
-									</option>
-								))}
-							</select>
-						</label>
-						<label className="full-row">
-							<span>Notas operacionais</span>
-							<textarea
-								onChange={(event) => setNotes(event.target.value)}
-								placeholder="Registro opcional para o relatório e revisão humana"
-								value={notes}
-							/>
-						</label>
-						<button
-							className="primary-action"
-							disabled={!canConfirmCycle || loadState === loadStates.loading}
-							type="submit"
-						>
-							{selectedCycle && !isConfirmableCycle(selectedCycle)
-								? "Ciclo encerrado"
-								: "Salvar confirmação"}
-						</button>
-					</form>
-				</div>
-
-				<aside className="review-surface">
-					<p className="eyebrow">Revisão</p>
-					<h2>{selectedStrategy.name}</h2>
-					<dl>
-						<div>
-							<dt>Próxima revisão</dt>
-							<dd>{nextReviewDate}</dd>
-						</div>
-						<div>
-							<dt>Cadência</dt>
-							<dd>{selectedStrategy.reportIntervalDays} dias</dd>
-						</div>
-						<div>
-							<dt>Relatório</dt>
-							<dd>
-								{visibleReport
-									? `#${visibleReport.id.slice(0, 8)} · ${visibleReport.alertCount} alerta(s)`
-									: "Ainda não gerado"}
-							</dd>
-						</div>
-					</dl>
-					<button
-						className="secondary-action wide"
-						disabled={!canGenerateReport || loadState === loadStates.loading}
-						onClick={generateReport}
-						type="button"
-					>
-						Gerar relatório
-					</button>
-				</aside>
-			</section>
+			<ProofReportsSection
+				apiBase={apiBase}
+				busy={busy}
+				currentReport={currentReport}
+				onBusy={(next) => setLoadState((current) => nextBusyLoadState(current, next))}
+				onCurrentReportChange={setCurrentReport}
+				onMessage={(next, error) => reportMessage(next, error)}
+				portfolioId={portfolioId}
+				reportHistory={reportHistory}
+			/>
 		</main>
 	);
 }
-
-async function apiRequest<T>(apiBase: string, path: string, init: RequestInit = {}): Promise<T> {
-	const headers = new Headers(init.headers);
-
-	if (init.body && !headers.has(jsonContentTypeHeader)) {
-		headers.set(jsonContentTypeHeader, "application/json");
-	}
-	const response = await fetch(`${apiBase}${path}`, {
-		...init,
-		credentials: "include",
-		headers,
-	});
-
-	if (!response.ok) {
-		const body = await readResponseText(response);
-		throw new Error(body || `Request failed with status ${response.status}`);
-	}
-
-	return response.json() as Promise<T>;
-}
-
-async function readResponseText(response: Response): Promise<string> {
-	try {
-		const payload = await response.json();
-		if (payload && typeof payload === "object" && "message" in payload) {
-			return String(payload.message);
-		}
-		return JSON.stringify(payload);
-	} catch {
-		return response.statusText;
-	}
-}
-
-function readStoredValue(key: string, fallback: string): string {
-	if (typeof window === "undefined") {
-		return fallback;
-	}
-
-	return window.localStorage.getItem(key) ?? fallback;
-}
-
-function persistWorkspace(apiBase: string, portfolioId: string, contributionPlanId: string): void {
-	window.localStorage.setItem(storedApiBaseKey, apiBase);
-	window.localStorage.setItem(storedPortfolioIdKey, portfolioId);
-	window.localStorage.setItem(storedPlanIdKey, contributionPlanId);
-}
-
-const getErrorMessage = (error: unknown): string =>
-	error instanceof Error ? error.message : "Falha inesperada no fluxo mensal.";

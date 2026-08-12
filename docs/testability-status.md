@@ -13,7 +13,7 @@ post-Phase 4 hardening track focused on:
 
 - stronger coverage;
 - real API smoke checks;
-- quality-gate ratchets;
+- CI (lint, tests, coverage, smoke, build); the generated agentic ratchet is deprecated;
 - independent review for material code changes;
 - public-safe documentation;
 - no fixed common API or frontend ports in tests.
@@ -32,10 +32,10 @@ explicitly released.
 | `pnpm coverage` | 109/109 tests, 95.05% lines, 78.22% branches, 98.30% functions | Local PR-020 evidence with synthetic env values and local Postgres. |
 | `pnpm test` | Workspace passed; API 76/76 | API tests run against local Postgres where required. |
 | `pnpm smoke:api` | Passed on ephemeral port `58874` | The exact port is runtime-assigned and not a contract; smoke now includes `report-history-create-list`. |
-| GitHub `quality-gate` | Passed for PR #40 | Runs migrations, tests, coverage ratchet, smoke, and build. |
+| GitHub `quality-gate` | CI job (lint/test/coverage/smoke/build) | Agentic ratchet/attestation under `docs/ai/quality-gate/` is deprecated. |
 | GitGuardian | Passed for PR #40 | Remote secret scanning stayed green. |
 | Local `gitleaks detect --redact` | No leaks found | Reports counts/status only, not secret values. |
-| Local ratchet | Passed for PR-020 | Attestation updated after reviewer interpreted deterministic signals. |
+| Local ratchet | Deprecated | Do not refresh attestations; CI no longer runs `check-ratchet.mjs`. |
 | Independent review | Approved for PR-020 | Reviewer found no blocking findings; pagination contract and OpenAPI remain residual. |
 
 ## Completed Post-Phase 4 Cuts

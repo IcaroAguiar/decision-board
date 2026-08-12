@@ -1,16 +1,10 @@
-name: Agentic Quality Gate
+name: CI
 
 on:
   pull_request: {}
   push:
     branches: [main]
-  workflow_dispatch:
-    inputs:
-      refresh_baseline:
-        description: Refresh baseline after a passing main/default-branch run
-        required: false
-        default: false
-        type: boolean
+  workflow_dispatch: {}
 
 permissions:
   contents: read
@@ -41,8 +35,6 @@ jobs:
       WEB_ORIGIN: http://localhost:5173
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -77,12 +69,6 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: Gate script syntax check
-        run: |
-          node --check docs/ai/quality-gate/check-ratchet.mjs
-          node --check docs/ai/quality-gate/refresh-baseline.mjs
-          node --check docs/ai/quality-gate/vendor/collect-review-context.mjs
-
       - name: Secret scan
         uses: gitleaks/gitleaks-action@v2
         env:
@@ -92,32 +78,12 @@ jobs:
       - name: Clean transient secret scan artifacts
         run: rm -f results.sarif
 
-      - name: Agentic review packet
-        env:
-          AGENTIC_REVIEW_BASE: ${{ github.event_name == 'push' && github.event.before || format('origin/{0}', github.base_ref || 'main') }}
-        run: node docs/ai/quality-gate/vendor/collect-review-context.mjs --base "$AGENTIC_REVIEW_BASE" --json > docs/ai/quality-gate/agentic-review-packet.json
-
-      - name: Ratchet quality gate
-        env:
-          AGENTIC_REVIEW_BASE: ${{ github.event_name == 'push' && github.event.before || format('origin/{0}', github.base_ref || 'main') }}
-        run: node docs/ai/quality-gate/check-ratchet.mjs
-
-      - name: Refresh baseline artifact
-        if: github.event_name == 'workflow_dispatch' && inputs.refresh_baseline == true && github.ref == 'refs/heads/main'
-        run: node docs/ai/quality-gate/refresh-baseline.mjs
-
-      - name: Upload quality artifacts
+      - name: Upload coverage artifacts
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: agentic-quality-gate
+          name: coverage
           path: |
-            docs/ai/quality-gate/baseline.json
-            docs/ai/quality-gate/*report*.json
-            docs/ai/quality-gate/*report*.md
-            docs/ai/quality-gate/quality-trend-entry.json
-            docs/ai/quality-gate/quality-trend.jsonl
-            docs/ai/quality-gate/auto-improvement-queue.json
-            docs/ai/quality-gate/agentic-review-packet.json
             coverage/coverage-summary.json
             coverage/lcov.info
+          if-no-files-found: warn

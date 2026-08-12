@@ -59,6 +59,47 @@ export interface SavedReport {
 	alertCount: number;
 }
 
+export interface SessionUser {
+	userId: string;
+	email: string;
+}
+
+export interface PortfolioSummary {
+	id: string;
+	name: string;
+	baseCurrency: string;
+}
+
+export interface AssetSummary {
+	id: string;
+	ticker: string;
+	name: string;
+}
+
+export interface PositionSummary {
+	id: string;
+	assetId: string;
+	quantity: string;
+	totalValue: string | null;
+}
+
+export interface ReportHistoryItem {
+	id: string;
+	generatedAt: string;
+	strategyId: string | null;
+	alertCount: number;
+}
+
+export interface CurrentReportEnvelope {
+	schemaVersion?: string;
+	alerts?: unknown[];
+	portfolio?: {
+		positionCount?: number;
+		totalValue?: string | number;
+	};
+	[key: string]: unknown;
+}
+
 export interface ConfirmedAmountValidation {
 	error: string | null;
 	value: string;
@@ -73,7 +114,8 @@ export const loadStates = {
 
 export type LoadState = (typeof loadStates)[keyof typeof loadStates];
 
-export const defaultApiBase = import.meta.env?.VITE_API_BASE_URL ?? "";
+export const fallbackApiBase = "http://localhost:3001";
+export const defaultApiBase = import.meta.env?.VITE_API_BASE_URL || fallbackApiBase;
 export const jsonContentTypeHeader = "content-type";
 export const storedApiBaseKey = "decision-board.apiBase";
 export const storedPortfolioIdKey = "decision-board.portfolioId";

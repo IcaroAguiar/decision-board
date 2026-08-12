@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import type { AddressInfo } from "node:net";
 import type { NestExpressApplication } from "@nestjs/platform-express";
+import helmet from "helmet";
+import { apiHelmetOptions } from "../http-security.js";
 
 export const testWebOrigin = "http://localhost:5173";
 
@@ -34,6 +36,7 @@ export async function createTestApp(): Promise<{
 		bodyParser: false,
 		logger: false,
 	});
+	app.use(helmet(apiHelmetOptions));
 
 	app.enableCors({
 		credentials: true,
