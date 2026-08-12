@@ -126,8 +126,9 @@ function stableJson(value) {
 function fingerprintReviewSignals(repos, files) {
   const payload = {
     changedFiles: [...files].sort(),
-    repositories: repos.map((repo) => ({
-      name: repo.name,
+    repositories: [...repos]
+      .sort((left, right) => String(left.name).localeCompare(String(right.name)))
+      .map((repo) => ({
       normalizedGateSummary: repo.normalizedGateSummary || {},
       findingsSummary: repo.findingsSummary || {},
       findings: (Array.isArray(repo.findings) ? repo.findings : []).map((finding) => ({
@@ -141,7 +142,7 @@ function fingerprintReviewSignals(repos, files) {
         count: finding.count,
         lines: finding.lines || [],
       })).sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right))),
-    })).sort((left, right) => String(left.name).localeCompare(String(right.name))),
+    })),
   };
   return createHash("sha256").update(JSON.stringify(stableJson(payload))).digest("hex");
 }

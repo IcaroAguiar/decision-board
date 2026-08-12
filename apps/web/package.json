@@ -6,7 +6,7 @@
 	"scripts": {
 		"build": "tsc -p tsconfig.json --noEmit && vite build",
 		"dev": "vite",
-		"test": "tsc -p tsconfig.json --noEmit",
+		"test": "tsc -p tsconfig.json --noEmit && tsx --test src/api-client.test.ts src/proof-load-state.test.ts",
 		"typecheck": "tsc -p tsconfig.json --noEmit"
 	},
 	"dependencies": {
@@ -17,6 +17,7 @@
 		"@vitejs/plugin-react": "5.1.1",
 		"@types/react": "19.2.7",
 		"@types/react-dom": "19.2.3",
+		"tsx": "4.20.6",
 		"typescript": "5.9.3",
 		"vite": "7.2.7"
 	}

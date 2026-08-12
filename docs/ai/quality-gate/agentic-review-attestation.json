@@ -1,15 +1,15 @@
 {
   "schemaVersion": 1,
   "reviewer": "cursor-cloud-agent:proof-ui-backend-pr44-attestation",
-  "reviewedAt": "2026-08-11T16:20:21.597Z",
+  "reviewedAt": "2026-08-12T18:45:00.000Z",
   "verdict": "approved_with_risk",
   "deterministicSignalsReviewed": true,
   "allowedBases": [
     "main"
   ],
-  "reviewedFingerprint": "54620417bd509e88a4ee478a606004145cc61d0d164684c1b32c94a9e2cc0e25",
+  "reviewedFingerprint": "f71f6d9d5cd34bee005a1094103003c439450dc951e49048435706a49018ebe5",
   "reviewedDeterministicSignals": {
-    "blocking": 27,
+    "blocking": 28,
     "high": 0,
     "medium": 40
   },
@@ -18,7 +18,7 @@
     "apps/web split under quality-gate 500-line limit",
     "PR-023 Helmet with API-appropriate CSP enabled",
     "PR-025 Dependabot + CodeQL workflows",
-    "docs/proof-harness.md and production-hardening.md"
+    "Harness busy/error state, default API base, portfolio selection, Helmet shared in tests, cwd-stable review fingerprint"
   ],
   "residualRisk": "Approved with risk for temporary proof harness: orchestration spans multiple modules under the 500-line cap, deterministic collector still reports expected wiring signals, CSP uses restrictive defaultSrc none for a JSON API, Scorecard omitted, and product UX remains out of scope. No financial advice, scraping, or broker automation introduced."
 }

@@ -32,6 +32,7 @@ import {
 	upsertCycle,
 } from "./monthly-contribution.js";
 import { ProofContributionSection } from "./proof-contribution-section.js";
+import { nextBusyLoadState, resolveListedPortfolioId } from "./proof-load-state.js";
 import { ProofReportsSection } from "./proof-reports-section.js";
 import { ProofSeedSection } from "./proof-seed-section.js";
 import { ProofSetupSection } from "./proof-setup-section.js";
@@ -125,14 +126,23 @@ export function App() {
 
 	function reportMessage(next: string, error = false) {
 		setMessage(next);
+		if (!next) {
+			return;
+		}
 		setLoadState(error ? loadStates.error : loadStates.ready);
 	}
 
 	async function refreshSession(base = normalizeApiBase(apiBase)): Promise<SessionUser | null> {
+		if (!base) {
+			setSession(null);
+			setSessionKnown(true);
+			return null;
+		}
 		try {
 			const user = await apiRequestAllowUnauthorized<SessionUser>(base, "/me");
 			setSession(user);
 			setSessionKnown(true);
+			persistWorkspace(base, portfolioId, contributionPlanId);
 			if (user) await loadPortfolios(base);
 			else setPortfolios([]);
 			return user;
@@ -144,13 +154,16 @@ export function App() {
 		}
 	}
 
-	async function loadPortfolios(base = normalizeApiBase(apiBase)): Promise<PortfolioSummary[]> {
+	async function loadPortfolios(
+		base = normalizeApiBase(apiBase),
+		preferredId = portfolioId,
+	): Promise<PortfolioSummary[]> {
 		const listed = await apiRequest<PortfolioSummary[]>(base, "/portfolios");
 		setPortfolios(listed);
-		const firstPortfolio = listed[0];
-		if (listed.length > 0 && firstPortfolio && !listed.some((p) => p.id === portfolioId)) {
-			setPortfolioId(firstPortfolio.id);
-			persistWorkspace(base, firstPortfolio.id, contributionPlanId);
+		const selectedId = resolveListedPortfolioId(listed, preferredId);
+		if (selectedId && selectedId !== preferredId) {
+			setPortfolioId(selectedId);
+			persistWorkspace(base, selectedId, contributionPlanId);
 		}
 		return listed;
 	}
@@ -237,7 +250,7 @@ export function App() {
 			setNewPortfolioName("");
 			setPortfolioId(portfolio.id);
 			persistWorkspace(base, portfolio.id, contributionPlanId);
-			await loadPortfolios(base);
+			await loadPortfolios(base, portfolio.id);
 			reportMessage(`Portfolio criado: ${portfolio.name}`);
 		} catch (error) {
 			reportMessage(getErrorMessage(error, "Falha ao criar portfolio."), true);
@@ -294,7 +307,7 @@ export function App() {
 			);
 			setCycles((current) => upsertCycle(current, cycle));
 			setContributionPlanId(activePlan.id);
-			persistWorkspace(apiBase, portfolioId, activePlan.id);
+			persistWorkspace(normalizeApiBase(apiBase), portfolioId, activePlan.id);
 			reportMessage("Ciclo mensal criado. Confirme valor e estratégia antes do relatório.");
 		} catch (error) {
 			reportMessage(getErrorMessage(error, "Falha ao criar ciclo."), true);
@@ -367,25 +380,6 @@ export function App() {
 		}
 	}
 
-	async function loadCurrentReport() {
-		if (!portfolioId) {
-			reportMessage("Selecione um portfolio para carregar current.json.", true);
-			return;
-		}
-		setLoadState(loadStates.loading);
-		setMessage("");
-		try {
-			const envelope = await apiRequest<CurrentReportEnvelope>(
-				normalizeApiBase(apiBase),
-				`/portfolios/${portfolioId}/reports/current.json`,
-			);
-			setCurrentReport(envelope);
-			reportMessage("current.json carregado.");
-		} catch (error) {
-			reportMessage(getErrorMessage(error, "Falha ao carregar current.json."), true);
-		}
-	}
-
 	return (
 		<main className="app-shell">
 			<p className="proof-banner">
@@ -445,7 +439,7 @@ export function App() {
 				busy={busy}
 				cashAccounts={cashAccounts}
 				onAssetsChange={setAssets}
-				onBusy={(next) => setLoadState(next ? loadStates.loading : loadStates.ready)}
+				onBusy={(next) => setLoadState((current) => nextBusyLoadState(current, next))}
 				onCashAccountsChange={setCashAccounts}
 				onMessage={(next, error) => reportMessage(next, error)}
 				onPlanCreated={(plan) => {
@@ -488,9 +482,12 @@ export function App() {
 			/>
 
 			<ProofReportsSection
+				apiBase={apiBase}
 				busy={busy}
 				currentReport={currentReport}
-				onLoadCurrentReport={() => void loadCurrentReport()}
+				onBusy={(next) => setLoadState((current) => nextBusyLoadState(current, next))}
+				onCurrentReportChange={setCurrentReport}
+				onMessage={(next, error) => reportMessage(next, error)}
 				portfolioId={portfolioId}
 				reportHistory={reportHistory}
 			/>

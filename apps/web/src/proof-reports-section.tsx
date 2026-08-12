@@ -1,14 +1,43 @@
-import type { CurrentReportEnvelope, ReportHistoryItem } from "./monthly-contribution.js";
+import { apiRequest, getErrorMessage } from "./api-client.js";
+import {
+	type CurrentReportEnvelope,
+	normalizeApiBase,
+	type ReportHistoryItem,
+} from "./monthly-contribution.js";
 
 export interface ProofReportsSectionProps {
+	apiBase: string;
 	busy: boolean;
 	portfolioId: string;
 	currentReport: CurrentReportEnvelope | null;
 	reportHistory: ReportHistoryItem[];
-	onLoadCurrentReport: () => void;
+	onBusy: (busy: boolean) => void;
+	onCurrentReportChange: (report: CurrentReportEnvelope) => void;
+	onMessage: (message: string, error?: boolean) => void;
 }
 
 export function ProofReportsSection(props: ProofReportsSectionProps) {
+	async function loadCurrentReport() {
+		if (!props.portfolioId) {
+			props.onMessage("Selecione um portfolio para carregar current.json.", true);
+			return;
+		}
+		props.onBusy(true);
+		props.onMessage("");
+		try {
+			const envelope = await apiRequest<CurrentReportEnvelope>(
+				normalizeApiBase(props.apiBase),
+				`/portfolios/${props.portfolioId}/reports/current.json`,
+			);
+			props.onCurrentReportChange(envelope);
+			props.onMessage("current.json carregado.");
+		} catch (error) {
+			props.onMessage(getErrorMessage(error, "Falha ao carregar current.json."), true);
+		} finally {
+			props.onBusy(false);
+		}
+	}
+
 	return (
 		<section className="proof-section" aria-label="Relatórios">
 			<div className="section-heading">
@@ -19,7 +48,7 @@ export function ProofReportsSection(props: ProofReportsSectionProps) {
 				<button
 					className="secondary-action"
 					disabled={!props.portfolioId || props.busy}
-					onClick={props.onLoadCurrentReport}
+					onClick={() => void loadCurrentReport()}
 					type="button"
 				>
 					Carregar current.json

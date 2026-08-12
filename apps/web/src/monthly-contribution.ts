@@ -114,7 +114,8 @@ export const loadStates = {
 
 export type LoadState = (typeof loadStates)[keyof typeof loadStates];
 
-export const defaultApiBase = import.meta.env?.VITE_API_BASE_URL ?? "";
+export const fallbackApiBase = "http://localhost:3001";
+export const defaultApiBase = import.meta.env?.VITE_API_BASE_URL || fallbackApiBase;
 export const jsonContentTypeHeader = "content-type";
 export const storedApiBaseKey = "decision-board.apiBase";
 export const storedPortfolioIdKey = "decision-board.portfolioId";

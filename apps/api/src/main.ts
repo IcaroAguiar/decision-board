@@ -6,6 +6,7 @@ import { AppModule } from "./app.module.js";
 import { mountAuthHandler } from "./auth/auth-http.js";
 import { normalizeClientIpForAuth } from "./auth/client-ip.js";
 import { getTrustedOrigins } from "./auth/env.js";
+import { apiHelmetOptions } from "./http-security.js";
 
 const defaultPort = 3001;
 
@@ -15,22 +16,7 @@ async function bootstrap(): Promise<void> {
 	});
 	const port = Number.parseInt(process.env.PORT ?? String(defaultPort), 10);
 
-	app.use(
-		helmet({
-			contentSecurityPolicy: {
-				useDefaults: false,
-				directives: {
-					defaultSrc: ["'none'"],
-					baseUri: ["'none'"],
-					formAction: ["'none'"],
-					frameAncestors: ["'none'"],
-					objectSrc: ["'none'"],
-				},
-			},
-			crossOriginEmbedderPolicy: false,
-			crossOriginResourcePolicy: { policy: "cross-origin" },
-		}),
-	);
+	app.use(helmet(apiHelmetOptions));
 	app.enableCors({
 		credentials: true,
 		origin: getTrustedOrigins(),

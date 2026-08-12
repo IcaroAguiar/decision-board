@@ -5,6 +5,7 @@ import {
 	canConfirmContributionCycle,
 	canGenerateContributionReport,
 	cycleStatuses,
+	fallbackApiBase,
 	formatCurrency,
 	getCurrentCycleMonth,
 	getNextReviewDate,
@@ -24,6 +25,7 @@ assert.equal(getNextReviewDate("not-a-month", strategyIds.balancedGrowth), "Mês
 assert.equal(formatCurrency("1200").replace(/\s/u, " "), "R$ 1.200,00");
 assert.equal(formatCurrency("not-a-number"), "R$ 0,00");
 assert.equal(normalizeApiBase("https://api.example.test/"), "https://api.example.test");
+assert.equal(normalizeApiBase("   "), fallbackApiBase);
 assert.deepEqual(normalizeConfirmedAmount("1200,50"), { error: null, value: "1200.50" });
 assert.deepEqual(normalizeConfirmedAmount("1200.12345678"), {
 	error: null,
