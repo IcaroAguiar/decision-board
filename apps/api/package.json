@@ -20,7 +20,7 @@
 		"@nestjs/core": "11.1.21",
 		"@nestjs/platform-express": "11.1.21",
 		"@prisma/client": "6.19.3",
-		"better-auth": "^1.6.9",
+		"better-auth": "^1.7.12",
 		"pg-boss": "12.18.2",
 		"reflect-metadata": "0.2.2",
 		"rxjs": "7.8.2"
