@@ -39,4 +39,5 @@ allowBuilds:
   esbuild: true
   prisma: true
 overrides:
+  body-parser@2.2.2: 2.4.0
   multer@2.1.1: 2.5.0
