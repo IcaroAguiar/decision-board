@@ -73,6 +73,18 @@ export function covarianceMatrix(series: readonly (readonly number[])[]): number
 	return matrix;
 }
 
+/** Variância abaixo desta fração da escala da diagonal é cancelamento numérico, não risco. */
+const cancellationTolerance = 1e-12;
+/** Ruído negativo absoluto aceito quando a escala da diagonal é minúscula; nunca relaxa o limite relativo. */
+const negativeNoiseFloor = 1e-12;
+
+function varianceZeroTolerance(
+	weights: readonly number[],
+	matrix: readonly (readonly number[])[],
+): number {
+	return weightedDiagonalScale(weights, matrix) * cancellationTolerance;
+}
+
 function weightedDiagonalScale(
 	weights: readonly number[],
 	matrix: readonly (readonly number[])[],
@@ -103,9 +115,10 @@ export function portfolioVolatility(
 	if (!Number.isFinite(variance)) {
 		throw new Error("A variância da carteira excede o intervalo numérico finito.");
 	}
-	const zeroTolerance = weightedDiagonalScale(weights, matrix) * 1e-12;
+	const zeroTolerance = varianceZeroTolerance(weights, matrix);
 	if (variance < 0) {
-		if (approxEqual(variance, 0, { absolute: Math.max(1e-12, zeroTolerance) })) return 0;
+		if (approxEqual(variance, 0, { absolute: Math.max(negativeNoiseFloor, zeroTolerance) }))
+			return 0;
 		throw new Error("Matriz de covariância inválida: variância da carteira negativa.");
 	}
 	if (variance <= zeroTolerance) return 0;
@@ -132,7 +145,7 @@ export function tryRiskContributions(
 		weightedMarginal.push(contribution);
 		portfolioVariance += contribution;
 	}
-	const zeroTolerance = weightedDiagonalScale(weights, matrix) * 1e-12;
+	const zeroTolerance = varianceZeroTolerance(weights, matrix);
 	if (!Number.isFinite(portfolioVariance) || portfolioVariance <= zeroTolerance) {
 		return null;
 	}
