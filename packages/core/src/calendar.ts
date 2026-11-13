@@ -53,8 +53,10 @@ export function createBusinessCalendar({
 	}
 
 	return {
-		coverage: { from: coveredFrom, until: coveredUntil },
-		holidays: [...holidaySet].sort(),
+		coverage: Object.freeze({ from: coveredFrom, until: coveredUntil }),
+		holidays: Object.freeze(
+			[...holidaySet].filter((date) => date >= coveredFrom && date <= coveredUntil).sort(),
+		),
 		isBusinessDay,
 		adjustToBusinessDay(date, direction) {
 			let result = date;

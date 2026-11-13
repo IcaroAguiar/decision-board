@@ -76,7 +76,11 @@ export function createAnalysisResult<TInput, TOutput, TAssumptions = Record<stri
 	) {
 		throw new Error("Uma análise com bloqueio não pode ser completa.");
 	}
-	return { ...result, sources: deduplicateSources(result.sources) };
+	return {
+		...result,
+		sources: deduplicateSources(result.sources),
+		natures: canonicalNatures(result.natures),
+	};
 }
 
 export interface AnalysisRef {
@@ -99,4 +103,15 @@ export function toAnalysisRef<TInput, TOutput, TAssumptions>(
 		status: result.status,
 		strategyVersion: result.strategyVersion,
 	};
+}
+
+const natureOrder: readonly DataNature[] = ["informed", "observed", "estimated"];
+
+function canonicalNatures(natures: readonly DataNature[]): DataNature[] {
+	for (const nature of natures) {
+		if (!natureOrder.includes(nature)) {
+			throw new Error(`Natureza de dado desconhecida: ${String(nature)}.`);
+		}
+	}
+	return natureOrder.filter((nature) => natures.includes(nature));
 }

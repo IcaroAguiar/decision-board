@@ -226,3 +226,20 @@ test("maps complete, partial and empty coverage to analysis status", () => {
 	assert.equal(statusFromCoverage("partial"), "partial");
 	assert.equal(statusFromCoverage("empty"), "inconclusive");
 });
+
+test("canonicalizes natures and rejects unknown ones", () => {
+	const result = createAnalysisResult({
+		...complete,
+		natures: ["estimated", "informed", "estimated"],
+	});
+	assert.deepEqual(result.natures, ["informed", "estimated"]);
+	assert.throws(
+		() =>
+			createAnalysisResult({
+				...complete,
+				// @ts-expect-error Natures belong to the closed DataNature set.
+				natures: ["guessed"],
+			}),
+		/Natureza de dado desconhecida/,
+	);
+});

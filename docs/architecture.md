@@ -138,6 +138,7 @@ Todo método devolve o mesmo envelope:
 - data de referência;
 - entradas e premissas usadas;
 - fontes, cada uma com data;
+- naturezas dos valores usados (informado, observado ou estimado);
 - o que não foi verificado;
 - achados (informativo, alerta ou bloqueio), com mensagem em português;
 - a saída, que é nula quando o resultado é inconclusivo.

@@ -135,3 +135,14 @@ test("exposes its coverage and sorted holidays for reproducibility", () => {
 	assert.deepEqual(covered.coverage, { from: "2026-01-01", until: "2026-12-31" });
 	assert.deepEqual(covered.holidays, ["2026-01-01", "2026-03-04"]);
 });
+
+test("freezes exposed coverage and keeps only covered holidays", () => {
+	const covered = createBusinessCalendar({
+		holidays: ["2025-12-25", "2026-03-04"],
+		coveredFrom: "2026-01-01",
+		coveredUntil: "2026-12-31",
+	});
+	assert.deepEqual(covered.holidays, ["2026-03-04"]);
+	assert.equal(Object.isFrozen(covered.coverage), true);
+	assert.equal(Object.isFrozen(covered.holidays), true);
+});
