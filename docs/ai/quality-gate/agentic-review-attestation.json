@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
   "reviewer": "claude-sonnet-5-5 (revisão independente, calls 793a98cc05cf/e0ffdf3d2642/97b4f931e223; sinais: b7ed4365c751)",
-  "reviewedAt": "2026-11-13T21:20:17Z",
+  "reviewedAt": "2026-11-13T21:34:00Z",
   "verdict": "approved_with_risk",
   "deterministicSignalsReviewed": true,
-  "reviewedFingerprint": "b6f44040254c4f69eb6f9d11a588a8e0054993804e269209da9ffede65d9eb35",
+  "reviewedFingerprint": "f4e0f0db40ba999d9c6d210626d35ffd80fc4d3c472c90e30faf7485cdfca486",
   "reviewedDeterministicSignals": {
     "blocking": 21,
     "high": 0,
