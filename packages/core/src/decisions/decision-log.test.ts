@@ -218,8 +218,12 @@ test("guarda de linguagem: nenhuma mensagem usa termos prescritivos ou 'venda' f
 			}),
 		],
 		claims: [
-			{ text: "Afirmação sem cálculo.", analysisId: null },
-			{ text: "Afirmação apoiada em análise inconclusiva.", analysisId: "ana-old" },
+			{ text: "Afirmação sem cálculo.", methodId: methodIds.goalTracking, analysisId: null },
+			{
+				text: "Afirmação apoiada em análise inconclusiva.",
+				methodId: methodIds.allocationVsTarget,
+				analysisId: "ana-old",
+			},
 		],
 	});
 	const evaluation = evaluateProposal(proposal, v2);

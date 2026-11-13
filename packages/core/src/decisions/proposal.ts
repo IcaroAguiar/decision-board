@@ -2,6 +2,7 @@ import {
 	type AnalysisFinding,
 	type AnalysisRef,
 	type AnalysisResult,
+	type MethodId,
 	methodIds,
 } from "../analysis.js";
 import { parseIsoDate } from "../calendar.js";
@@ -31,6 +32,8 @@ export interface ProposalJustification {
 
 export interface ProposalClaim {
 	text: string;
+	/** Método cujo resultado sustenta a afirmação; a análise citada precisa ser desse método. */
+	methodId: MethodId;
 	analysisId: string | null;
 }
 
@@ -167,10 +170,11 @@ export function evaluateProposal(proposal: Proposal, current: StrategyVersion): 
 		}
 		const referencedAnalysis =
 			claim.analysisId === null ? undefined : analysesById.get(claim.analysisId);
-		if (
+		const supportsClaim =
 			referencedAnalysis !== undefined &&
-			(referencedAnalysis.status === "complete" || referencedAnalysis.status === "partial")
-		) {
+			referencedAnalysis.method.id === claim.methodId &&
+			(referencedAnalysis.status === "complete" || referencedAnalysis.status === "partial");
+		if (supportsClaim) {
 			claims.push({ text: claim.text, verification: "verified" });
 		} else {
 			claims.push({ text: claim.text, verification: "unverified-opinion" });
@@ -178,9 +182,11 @@ export function evaluateProposal(proposal: Proposal, current: StrategyVersion): 
 				code: "unverified_claim",
 				severity: "warning",
 				message:
-					referencedAnalysis?.status === "inconclusive"
-						? `Opinião não verificada: análise ${referencedAnalysis.id} inconclusiva (${claim.text}).`
-						: `Opinião não verificada: afirmação sem referência a análise calculada (${claim.text}).`,
+					referencedAnalysis === undefined
+						? `Opinião não verificada: afirmação sem referência a análise calculada (${claim.text}).`
+						: referencedAnalysis.method.id !== claim.methodId
+							? `Opinião não verificada: análise ${referencedAnalysis.id} não é do método ${claim.methodId} (${claim.text}).`
+							: `Opinião não verificada: análise ${referencedAnalysis.id} inconclusiva (${claim.text}).`,
 			});
 		}
 	}

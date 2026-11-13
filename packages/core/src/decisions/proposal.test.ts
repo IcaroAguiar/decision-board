@@ -364,11 +364,36 @@ test("R11: verifica afirmações apenas contra análises completas/parciais e si
 			}),
 		],
 		claims: [
-			{ text: "Desvio da Meta calculado no R7.", analysisId: "ana-v1" },
-			{ text: "Cobertura parcial calculada no R8.", analysisId: "ana-partial" },
-			{ text: "Correlação favorável segundo análise inconclusiva.", analysisId: "ana-inc" },
-			{ text: "Retorno esperado de 14% ao ano.", analysisId: null },
-			{ text: "Correlação reduzida segundo simulação externa.", analysisId: "ana-inexistente" },
+			{
+				text: "Desvio da Meta calculado no R7.",
+				methodId: methodIds.allocationVsTarget,
+				analysisId: "ana-v1",
+			},
+			{
+				text: "Cobertura parcial calculada no R7.",
+				methodId: methodIds.allocationVsTarget,
+				analysisId: "ana-partial",
+			},
+			{
+				text: "Ganho da Meta calculado no R8.",
+				methodId: methodIds.goalTracking,
+				analysisId: "ana-partial",
+			},
+			{
+				text: "Correlação favorável segundo análise inconclusiva.",
+				methodId: methodIds.allocationVsTarget,
+				analysisId: "ana-inc",
+			},
+			{
+				text: "Retorno esperado de 14% ao ano.",
+				methodId: methodIds.goalTracking,
+				analysisId: null,
+			},
+			{
+				text: "Correlação reduzida segundo simulação externa.",
+				methodId: methodIds.correlationTest,
+				analysisId: "ana-inexistente",
+			},
 		],
 	});
 
@@ -376,7 +401,8 @@ test("R11: verifica afirmações apenas contra análises completas/parciais e si
 	assert.equal(evaluation.approvable, true);
 	assert.deepEqual(evaluation.claims, [
 		{ text: "Desvio da Meta calculado no R7.", verification: "verified" },
-		{ text: "Cobertura parcial calculada no R8.", verification: "verified" },
+		{ text: "Cobertura parcial calculada no R7.", verification: "verified" },
+		{ text: "Ganho da Meta calculado no R8.", verification: "unverified-opinion" },
 		{
 			text: "Correlação favorável segundo análise inconclusiva.",
 			verification: "unverified-opinion",
@@ -401,6 +427,6 @@ test("R11: verifica afirmações apenas contra análises completas/parciais e si
 	);
 	assert.equal(
 		evaluation.findings.filter((finding) => finding.code === "unverified_claim").length,
-		3,
+		4,
 	);
 });
