@@ -60,7 +60,7 @@ Candidato que vence antes do resgate é omitido com aviso. Referências a candid
 desconhecidos e falhas de solver geram aviso com `subject`, uma entrada em
 `notVerified` e status parcial. Na linha afetada, `breakEvens` fica vazio e
 `turningPoint` fica nulo; outras linhas continuam disponíveis. Sem linhas
-calculáveis por essas condições, R1 retorna uma lista vazia parcial. IDs duplicados
+calculáveis, R1 é inconclusivo, com saída nula e os avisos preservados. IDs duplicados
 de candidato, cenário ou pedido de ponto de virada são erros de programação.
 
 Em R2, título vencido gera resultado inconclusivo; objetivo passado gera resultado

@@ -112,14 +112,20 @@ export function prepareRedemption(input: Omit<RedemptionInput, "rate">) {
 	const dates = businessDates(input.calendar, input.from, input.to);
 	nonNegative(input.principal);
 	const path = createRatePath(input.scenario.steps);
-	const cdiFactors = dates.map((date) => path.dailyFactor(date));
+	let cdiFactors: number[] | undefined;
+	const cdiFactorAt = (index: number): number => {
+		cdiFactors ??= dates.map((date) => path.dailyFactor(date));
+		const factor = cdiFactors[index];
+		if (factor === undefined) throw new Error("Fator do CDI ausente para a data de capitalização.");
+		return factor;
+	};
 	return (rate: AccrualRate): RedemptionValue => {
 		let custody = 0;
 		const evolution: AccrualPoint[] = [];
 		const balance = compound(
 			input.principal,
 			dates,
-			(index) => dailyGrowthFactor(rate, cdiFactors[index] ?? 1),
+			(index) => dailyGrowthFactor(rate, rate.kind === "prefixed" ? 1 : cdiFactorAt(index)),
 			(date, opening, closing) => {
 				custody = finite(
 					custody +

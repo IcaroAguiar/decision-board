@@ -110,7 +110,7 @@ export function analyzeRateRisk(input: RateRiskInput, calendar: BusinessCalendar
 			findings.push({ code: "PAST_GOAL", severity: "warning", subject: bond.id, message });
 			common.notVerified.push(message);
 		}
-		if (bond.maturity > input.goalDate.value)
+		if (!pastGoal && bond.maturity > input.goalDate.value)
 			findings.push({
 				code: "MATURITY_AFTER_GOAL",
 				severity: "warning",

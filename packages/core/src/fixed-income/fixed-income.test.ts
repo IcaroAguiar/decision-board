@@ -476,8 +476,8 @@ test("R1 isolates maturity and solver data conditions while preserving other row
 		},
 		calendar,
 	);
-	assert.equal(empty.status, "partial");
-	assert.deepEqual(empty.output, []);
+	assert.equal(empty.status, "inconclusive");
+	assert.equal(empty.output, null);
 
 	const mixed = simulateFixedIncome(
 		{
@@ -591,6 +591,10 @@ test("R2 reports matured bonds and past goals as data conditions", () => {
 	assert.equal(pastGoal.status, "partial");
 	assert.ok(pastGoal.output);
 	assert.ok(pastGoal.findings.some((f) => f.code === "PAST_GOAL"));
+	assert.equal(
+		pastGoal.findings.some((f) => f.code === "MATURITY_AFTER_GOAL"),
+		false,
+	);
 	assert.ok(pastGoal.notVerified.includes("Objetivo anterior à data da análise."));
 });
 

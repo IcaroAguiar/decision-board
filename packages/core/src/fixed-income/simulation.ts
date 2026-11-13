@@ -184,13 +184,6 @@ export function simulateFixedIncome(input: FixedIncomeInput, calendar: BusinessC
 			}
 		}
 	}
-	if (rows.length === 0 && partial) {
-		return createAnalysisResult<FixedIncomeInput, SimulationRow[], typeof common.assumptions>({
-			...common,
-			status: "partial",
-			output: [],
-		});
-	}
 	if (rows.length === 0) {
 		return createAnalysisResult<FixedIncomeInput, SimulationRow[], typeof common.assumptions>({
 			...common,
