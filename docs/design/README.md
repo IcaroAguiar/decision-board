@@ -1,5 +1,23 @@
 # Design References
 
+O [briefing do novo produto](product-brief.md) orienta o próximo design, que será
+produzido pelo usuário. As imagens abaixo são referências da visão anterior;
+não representam aprovação visual para a nova implementação.
+
+## Pacote para o novo design
+
+- [Nome escolhido e arquitetura de marca](naming.md).
+- [Briefing das telas e subfluxos](product-brief.md).
+- [Sistema de design proposto](design-system.md).
+- [Prompt autocontido para o Claude Design](claude-design-prompt.md).
+
+O nome escolhido é **Ascend Compass**. O produto terá identidade própria, com
+logo específico e poucos sinais de parentesco com
+[Ascend](https://ascendteam.cloud/). Cores e fontes não são uma herança obrigatória.
+Este pacote não renomeia o repositório.
+
+## Referências anteriores
+
 Source board:
 
 ![Decision Board reference board](source/decision-board-reference-board.png)
