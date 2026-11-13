@@ -120,6 +120,18 @@ test("rejects empty method identity, invalid analysis dates and invalid source d
 		/método/,
 	);
 	assert.throws(
+		() =>
+			createAnalysisResult({
+				...complete,
+				method: {
+					// @ts-expect-error Method ids belong to the shared catalog.
+					id: "r99.unknown",
+					version: "1",
+				},
+			}),
+		/catálogo/,
+	);
+	assert.throws(
 		() => createAnalysisResult({ ...complete, method: { id: methodIds.rateRisk, version: "" } }),
 		/método/,
 	);

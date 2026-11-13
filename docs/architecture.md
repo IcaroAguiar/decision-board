@@ -90,7 +90,7 @@ argumento, inclusive a data de referência.
 
 | Pacote | Responsabilidade | Não pode |
 | --- | --- | --- |
-| `packages/core` | Contratos de proveniência, calendário de dias úteis, envelope de análise e os métodos R1 a R12 | Depender de React, NestJS, Prisma, Better Auth, HTTP, variáveis de ambiente ou relógio |
+| `packages/core` | Contratos de proveniência, calendário de dias úteis, envelope de análise e os métodos das fichas de análise, à medida que forem implementados | Depender de React, NestJS, Prisma, Better Auth, HTTP, variáveis de ambiente ou relógio |
 | `packages/types` | Tipos e enums compartilhados entre API, web e pacotes | Conter lógica |
 | `packages/market-data` | Adaptadores das fontes públicas (BCB, Tesouro Transparente, ANBIMA, CVM) e dos provedores opcionais | Ser chamado pelo core ou pelos relatórios |
 | `packages/reports` | Exportação em Markdown e JSON a partir do mesmo resultado gravado, com `schemaVersion` | Buscar dados de mercado ou recalcular |

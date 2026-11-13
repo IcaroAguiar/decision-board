@@ -9,6 +9,7 @@ export const methodIds = {
 	goalTracking: "r8.goal-tracking",
 } as const;
 export type MethodId = (typeof methodIds)[keyof typeof methodIds];
+const knownMethodIds: ReadonlySet<string> = new Set(Object.values(methodIds));
 
 export interface MethodRef {
 	id: MethodId;
@@ -46,8 +47,8 @@ export type AnalysisResult<
 export function createAnalysisResult<TInput, TOutput, TAssumptions = Record<string, unknown>>(
 	result: AnalysisResult<TInput, TOutput, TAssumptions>,
 ): AnalysisResult<TInput, TOutput, TAssumptions> {
-	if (!result.method.id.trim() || !result.method.version.trim()) {
-		throw new Error("Informe o identificador e a versão do método.");
+	if (!knownMethodIds.has(result.method.id) || !result.method.version.trim()) {
+		throw new Error("Informe um identificador de método do catálogo e a versão do método.");
 	}
 	parseIsoDate(result.asOf);
 	if ((result.status === "inconclusive") !== (result.output === null)) {
