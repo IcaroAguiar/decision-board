@@ -426,7 +426,7 @@ export function simulateContributionAllocation(
 			byPart: {
 				reserve: weight("part:reserve"),
 				goal: weight("part:goal"),
-				equities: weight("part:equities"),
+				variableIncome: weight("part:variableIncome"),
 			},
 		},
 	} satisfies AuditableContributionSimulation;

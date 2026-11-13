@@ -55,7 +55,7 @@ export function analyzeAllocationVsTarget(input: AllocationVsTargetInput) {
 	);
 	const knownValues = (predicate: (position: AllocationHolding) => boolean) =>
 		holdings.filter(predicate).reduce((sum, position) => sum + position.value, 0);
-	const weight = (value: number) => (total > 0 ? value / total : null);
+	const weight = (value: number) => (total !== null && total > 0 ? value / total : null);
 	const findings: AnalysisFinding[] = [];
 	const deviation = (
 		key: string,
@@ -159,7 +159,9 @@ export function analyzeAllocationVsTarget(input: AllocationVsTargetInput) {
 	if (coverage.coverage === "empty")
 		notVerified.push("Pesos indefinidos: patrimônio conhecido nulo ou ausente.");
 	const maxDeviationBefore =
-		total > 0 ? Math.max(...byPart.map((row) => Math.abs(row.deviation ?? 0))) : null;
+		total !== null && total > 0
+			? Math.max(...byPart.map((row) => Math.abs(row.deviation ?? 0)))
+			: null;
 	const maxDeviationAfter =
 		proposal && proposal.postAllocation.totalValue > 0
 			? Math.max(

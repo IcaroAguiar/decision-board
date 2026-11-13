@@ -43,7 +43,7 @@ function fixture(overrides: Partial<PartContributionInput> = {}): PartContributi
 		partTargets: {
 			reserve: { target: 0, band: { min: 0, max: 0 } },
 			goal: { target: 1, band: { min: 0, max: 1 } },
-			equities: { target: 0, band: { min: 0, max: 1 } },
+			variableIncome: { target: 0, band: { min: 0, max: 1 } },
 		},
 		...overrides,
 	};
@@ -76,7 +76,7 @@ test("chooses the candidate reducing the part target gap", () => {
 			},
 			{
 				assetId: "synthetic-equities",
-				part: "equities",
+				part: "variableIncome",
 				value: 100,
 				assetClass: "synthetic",
 				institution: "synthetic",
@@ -84,11 +84,11 @@ test("chooses the candidate reducing the part target gap", () => {
 		],
 		candidates: [
 			candidate(),
-			candidate({ assetId: "synthetic-equities", ticker: "SYN2", part: "equities" }),
+			candidate({ assetId: "synthetic-equities", ticker: "SYN2", part: "variableIncome" }),
 		],
 	});
 	input.partTargets.goal.target = 0.5;
-	input.partTargets.equities.target = 0.5;
+	input.partTargets.variableIncome.target = 0.5;
 	const result = simulateContributionAllocation(input);
 	assert.deepEqual(
 		result.planItems.map((item) => [item.assetId, item.quantity]),

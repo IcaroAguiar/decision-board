@@ -11,7 +11,7 @@ function fixture(): AllocationVsTargetInput {
 		positions: [
 			{
 				assetId: "a",
-				part: "equities",
+				part: "variableIncome",
 				assetClass: "shares",
 				institution: "i",
 				segment: "s",
@@ -50,7 +50,7 @@ function fixture(): AllocationVsTargetInput {
 		partTargets: {
 			reserve: { target: 0, band: { min: 0, max: 0 } },
 			goal: { target: 0.5, band: { min: 0.45, max: 0.55 } },
-			equities: { target: 0.5, band: { min: 0.45, max: 0.55 } },
+			variableIncome: { target: 0.5, band: { min: 0.45, max: 0.55 } },
 		},
 		classTargets: { shares: { target: 0.5, band: { min: 0.45, max: 0.55 } } },
 		allowSales: false,

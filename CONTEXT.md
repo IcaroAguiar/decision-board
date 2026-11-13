@@ -29,7 +29,7 @@ _Avoid_: expected return, score, alpha
 
 **SimulationAuditFinding**:
 A traceable explanation of something the simulation blocked, warned about, or left unresolved.
-Hard constraints such as missing source evidence, invalid universe membership, price limits, budget, lot size, and concentration block simulated orders.
+Hard constraints such as missing source evidence, invalid universe membership, price limits, budget, lot size, and concentration block simulated operation-plan items.
 Unallocated cash can be informational when no valid whole lot remains.
 _Avoid_: hidden skip, silent fallback
 
@@ -44,7 +44,7 @@ If a metric affects inclusion, blocking, or ordering, that metric must carry a s
 _Avoid_: generic candidate source, unsourced fact
 
 **MinimumDecisionMetricSet**:
-The first core slice's metric set for contribution simulation: price, lot size, target weight, risk category, segment, liquidity, and concentration.
+The metric set for contribution simulation: price, lot size, target weight, portfolio part (reserve, goal, variable income), segment, liquidity, and concentration. Rates and weights are decimal fractions.
 Broader FII metrics such as P/VP, dividend yield, vacancy, manager, and dividend base date belong to the later FII metrics snapshot model.
 _Avoid_: full FII analysis in the core allocation slice
 
@@ -69,4 +69,4 @@ _Avoid_: full FII analysis in the core allocation slice
 
 - "account" can mean login credentials, cash account, or product user; use **User** for the person who owns data.
 - "session" can mean auth storage or request identity; use **AuthenticatedUser** for the request identity passed to domain-facing code.
-- "order" in contribution planning means a simulated order inside an **AuditableContributionSimulation**, never a broker order.
+- A simulation produces **operation-plan items** (`planItems`, with a `referencePrice`); the person executes them outside the product. Decision Board never sends broker orders.
