@@ -10,15 +10,15 @@ import {
 	defaultRegressiveIncomeTaxTable,
 	type FixedIncomeCandidate,
 	type FixedIncomeInput,
-	grow,
 	incomeTaxRate,
 	type RateScenario,
 	type RedemptionInput,
 	redemptionValue,
 	simulateFixedIncome,
 	turningPoint,
-	zeroCouponPrice,
 } from "./index.js";
+import { zeroCouponPrice } from "./rate-risk.js";
+import { grow } from "./rates.js";
 
 const calendar = createBusinessCalendar({
 	holidays: ["2026-03-04"],
@@ -129,6 +129,22 @@ test("IR boundaries change exactly at 181, 361 and 721 calendar days", () => {
 		assert.notEqual(days, undefined);
 		assert.notEqual(expected, undefined);
 		if (days === undefined) throw new Error("Caso sintético inválido");
+		if (expected === undefined) throw new Error("Caso sintético inválido");
+		const end = new Date(Date.parse(base.from) + days * 86_400_000).toISOString().slice(0, 10);
+		let businessDays = 0;
+		for (let day = 0; day < days; day += 1) {
+			const date = new Date(Date.parse(base.from) + day * 86_400_000);
+			if (
+				date.getUTCDay() !== 0 &&
+				date.getUTCDay() !== 6 &&
+				date.toISOString().slice(0, 10) !== "2026-03-04"
+			)
+				businessDays++;
+		}
+		const result = redemptionValue({ ...base, to: end });
+		const gain = 1000 * (1.1 ** (businessDays / 252) - 1);
+		assert.ok(approxEqual(result.incomeTax, gain * expected, { absolute: 1e-8 }));
+		assert.equal(result.calendarDays, days);
 		assert.equal(incomeTaxRate(base.taxTable, days, base.asOf), expected);
 	}
 	assert.equal(
@@ -226,6 +242,8 @@ test("zero coupon full repricing and duration agree with formulas; one-year +1pp
 	assert.ok(approxEqual(out.repricingPriceChange, shocked - pu, { relative: 1e-12 }));
 	assert.ok(approxEqual(out.modifiedDuration, 1 / 1.1));
 	assert.ok(approxEqual(out.durationRelativeChange, -0.01 / 1.1));
+	assert.equal(out.approximationError, out.durationRelativeChange - out.repricingRelativeChange);
+	assert.ok(analysis.notVerified.includes("Duração calculada apenas para títulos sem cupom."));
 	// Convexity makes duration first-order: <0.0001 of price for this 252-DU fixture.
 	assert.ok(Math.abs(out.durationRelativeChange - variation) < 0.0001);
 	assert.equal(zeroCouponPrice(1000, 0.1, 0), 1000);
@@ -252,6 +270,7 @@ test("R2 alerts on goal and strategy term and respects explicit shock", () => {
 	for (const finding of result.findings)
 		assert.doesNotMatch(finding.message, /compr|vend|recomend/i);
 	assert.deepEqual(result.notVerified, [
+		"Duração calculada apenas para títulos sem cupom.",
 		"preço efetivo de recompra pelo Tesouro",
 		"liquidez de papéis privados no secundário",
 	]);
@@ -408,4 +427,237 @@ test("reject invalid paths, expired assumptions, impossible rates and unbrackete
 		/único/,
 	);
 	assert.throws(() => zeroCouponPrice(1000, -1, 252), /maior que -1/);
+});
+
+test("R1 isolates maturity and solver data conditions while preserving other rows", () => {
+	const input = simulationInput();
+	const comparisons = [
+		{ candidateId: candidate.id, product: "cdb", custody: datum(noCustody) },
+	] satisfies NonNullable<FixedIncomeInput["comparisons"]>;
+	for (const change of [
+		{ solver: { upper: 0.001 } },
+		{ scenarios: [datum({ ...scenario, steps: [{ effectiveFrom: base.from, annualRate: 0 }] })] },
+		{
+			scenarios: [datum({ ...scenario, steps: [{ effectiveFrom: base.from, annualRate: -0.01 }] })],
+		},
+	]) {
+		const result = simulateFixedIncome({ ...input, comparisons, ...change }, calendar);
+		assert.equal(result.status, "partial");
+		assert.ok(result.output?.length);
+		for (const row of result.output) {
+			assert.deepEqual(row.breakEvens, []);
+			assert.equal(row.turningPoint, null);
+		}
+		assert.ok(
+			result.findings.some((f) => f.severity === "warning" && f.subject === "fixed/constant"),
+		);
+		assert.ok(result.notVerified.length > 3);
+	}
+	const result = simulateFixedIncome(
+		{
+			...input,
+			candidates: [
+				datum({ ...candidate, id: "expired", maturity: "2026-03-01" }),
+				datum(candidate),
+			],
+		},
+		calendar,
+	);
+	assert.equal(result.status, "partial");
+	assert.deepEqual(
+		result.output?.map((row) => row.candidateId),
+		["fixed"],
+	);
+	assert.ok(result.findings.some((f) => f.subject === "expired" && f.severity === "warning"));
+	const empty = simulateFixedIncome(
+		{
+			...input,
+			candidates: [datum({ ...candidate, maturity: "2026-03-01" })],
+		},
+		calendar,
+	);
+	assert.equal(empty.status, "partial");
+	assert.deepEqual(empty.output, []);
+
+	const mixed = simulateFixedIncome(
+		{
+			...input,
+			comparisons,
+			scenarios: [
+				datum(scenario),
+				datum({ ...scenario, id: "flat", steps: [{ effectiveFrom: base.from, annualRate: 0 }] }),
+			],
+		},
+		calendar,
+	);
+	assert.equal(mixed.status, "partial");
+	assert.equal(mixed.output?.length, 2);
+	assert.equal(mixed.output?.[0]?.breakEvens.length, 1);
+	assert.deepEqual(mixed.output?.[1]?.breakEvens, []);
+});
+
+test("R1 validates duplicate ids and reports unknown requests and non-prefixed turning points", () => {
+	const input = simulationInput();
+	const request = { candidateId: candidate.id, custody: datum(noCustody), taxExempt: false };
+	for (const change of [
+		{ candidates: [datum(candidate), datum(candidate)] },
+		{ scenarios: [datum(scenario), datum(scenario)] },
+		{ turningPoints: [request, request] },
+	])
+		assert.throws(() => simulateFixedIncome({ ...input, ...change }, calendar), /duplicados/);
+	for (const change of [
+		{
+			comparisons: [{ candidateId: "unknown", product: "cdb", custody: datum(noCustody) }],
+		} satisfies Partial<FixedIncomeInput>,
+		{ turningPoints: [{ ...request, candidateId: "unknown" }] },
+	]) {
+		const result = simulateFixedIncome({ ...input, ...change }, calendar);
+		assert.equal(result.status, "partial");
+		assert.ok(result.findings.some((f) => f.subject === "unknown" && f.severity === "warning"));
+		assert.ok(result.notVerified.includes("Candidato solicitado não encontrado."));
+	}
+	const result = simulateFixedIncome(
+		{
+			...input,
+			candidates: [datum({ ...candidate, rate: { kind: "selic-like" } })],
+			comparisons: [{ candidateId: candidate.id, product: "cdb", custody: datum(noCustody) }],
+			turningPoints: [request],
+		},
+		calendar,
+	);
+	assert.equal(result.status, "partial");
+	assert.deepEqual(result.output?.[0]?.breakEvens, []);
+	assert.equal(result.output?.[0]?.turningPoint, null);
+	assert.ok(result.findings.some((f) => f.subject === "fixed/constant"));
+});
+
+test("solver failures never swallow invalid dates, tables or calendar contracts", () => {
+	const input = {
+		...simulationInput(),
+		comparisons: [
+			{
+				candidateId: candidate.id,
+				product: "cdb",
+				custody: datum({ ...noCustody, validUntil: "2026-02-01" }),
+			},
+		],
+	} satisfies FixedIncomeInput;
+	assert.throws(() => simulateFixedIncome(input, calendar), /vigência/);
+	assert.throws(
+		() =>
+			simulateFixedIncome(
+				{
+					...simulationInput(),
+					candidates: [datum({ ...candidate, maturity: "invalid" })],
+				},
+				calendar,
+			),
+		/Data inválida/,
+	);
+	const result = simulateFixedIncome(
+		{
+			...simulationInput(),
+			comparisons: [{ candidateId: candidate.id, product: "cdb", custody: datum(noCustody) }],
+			solver: { tolerance: 1e-30 },
+		},
+		calendar,
+	);
+	assert.equal(result.status, "partial");
+	assert.ok(result.findings.some((f) => f.code === "SOLVER_UNAVAILABLE"));
+});
+
+test("R2 reports matured bonds and past goals as data conditions", () => {
+	const input = {
+		asOf: base.asOf,
+		strategyVersion: null,
+		bond: datum({ id: "zero", face: 1000, annualYield: 0.1, maturity: "2026-03-01" }),
+		goalDate: datum(base.to),
+	};
+	const matured = analyzeRateRisk(input, calendar);
+	assert.equal(matured.status, "inconclusive");
+	assert.equal(matured.output, null);
+	assert.ok(matured.findings.some((f) => f.subject === "zero" && f.severity === "warning"));
+	assert.ok(matured.notVerified.includes("Título vencido antes da data da análise."));
+	assert.equal(input.bond.status, "known");
+	if (input.bond.status !== "known") throw new Error("Fixture ausente");
+	const pastGoal = analyzeRateRisk(
+		{
+			...input,
+			bond: datum({ ...input.bond.value, maturity: base.to }),
+			goalDate: datum("2026-03-01"),
+		},
+		calendar,
+	);
+	assert.equal(pastGoal.status, "partial");
+	assert.ok(pastGoal.output);
+	assert.ok(pastGoal.findings.some((f) => f.code === "PAST_GOAL"));
+	assert.ok(pastGoal.notVerified.includes("Objetivo anterior à data da análise."));
+});
+
+test("both analysis envelopes snapshot full calendar provenance", () => {
+	const results = [
+		simulateFixedIncome(simulationInput(), calendar),
+		analyzeRateRisk(
+			{
+				asOf: base.asOf,
+				strategyVersion: null,
+				bond: datum({ id: "zero", face: 1000, annualYield: 0.1, maturity: base.to }),
+				goalDate: datum(base.to),
+			},
+			calendar,
+		),
+	];
+	for (const result of results) {
+		assert.deepEqual(result.assumptions.calendar, {
+			coveredFrom: "2026-01-01",
+			coveredUntil: "2030-12-31",
+			holidayCount: 1,
+			holidays: ["2026-03-04"],
+		});
+		assert.notEqual(result.assumptions.calendar.holidays, calendar.holidays);
+	}
+});
+
+test("calendar preparation stays bounded independently of solver iterations", () => {
+	function run(tolerance: number, turning: boolean) {
+		let calls = 0;
+		const counted = {
+			...calendar,
+			businessDaysBetween(...args: Parameters<typeof calendar.businessDaysBetween>) {
+				calls++;
+				return calendar.businessDaysBetween(...args);
+			},
+			isBusinessDay(date: string) {
+				calls++;
+				return calendar.isBusinessDay(date);
+			},
+			adjustToBusinessDay(...args: Parameters<typeof calendar.adjustToBusinessDay>) {
+				calls++;
+				return calendar.adjustToBusinessDay(...args);
+			},
+			addBusinessDays(...args: Parameters<typeof calendar.addBusinessDays>) {
+				calls++;
+				return calendar.addBusinessDays(...args);
+			},
+		};
+		if (turning)
+			turningPoint({
+				prefixed: { ...base, calendar: counted },
+				postfixed: { ...base, calendar: counted },
+				solver: { tolerance },
+			});
+		else
+			breakEvenCdi({
+				targetNet: 1000 + (1000 * 1.1 ** (260 / 252) - 1000) * 0.825,
+				product: "cdb",
+				investment: { ...base, calendar: counted },
+				solver: { tolerance },
+			});
+		return calls;
+	}
+	for (const turning of [false, true]) {
+		const coarse = run(0.01, turning);
+		assert.ok(coarse > 0 && coarse <= 522);
+		assert.equal(run(1e-12, turning), coarse);
+	}
 });

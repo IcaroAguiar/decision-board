@@ -4,8 +4,9 @@ Motor puro, sem provedores nem relógio. `simulateFixedIncome` e `analyzeRateRis
 recebem `Datum`, data de análise, versão da estratégia e um `BusinessCalendar`
 injetado. Ausências impedem o cálculo correspondente; resultados restantes são
 parciais. Cada valor de resgate inclui a evolução bruta e custódia acumulada
-ao final de cada DU para alimentar o gráfico do cenário. Nenhuma taxa de custódia ausente é interpretada como zero: para ausência
-de cobrança, informe explicitamente taxa zero. Saídas numéricas são estimativas.
+ao final de cada DU para alimentar o gráfico do cenário. Nenhuma taxa de
+custódia ausente é interpretada como zero: para ausência de cobrança, informe
+explicitamente taxa zero. Saídas numéricas são estimativas.
 
 ## Convenções
 
@@ -27,8 +28,10 @@ de cobrança, informe explicitamente taxa zero. Saídas numéricas são estimati
   antecipado permanecem fora do R1. R2 cobre apenas títulos sem cupom.
 - Empate usa bisseção crescente, intervalo padrão `[0,5]` e largura final no
   parâmetro `<=1e-10`. O erro no parâmetro é no máximo metade dessa largura.
-  Intervalo sem raiz ou sem crescimento é erro explícito. CDI negativo não é
-  aceito pelo solver de multiplicador; capitalização direta aceita taxas > -1.
+  O solver verifica apenas os valores nos extremos: exige crescimento entre
+  eles e uma raiz contida no intervalo; a monotonicidade no interior é assumida,
+  não verificada. CDI negativo não é aceito pelo solver de multiplicador;
+  capitalização direta aceita taxas > -1.
 - O ponto de virada usa um CDI anual constante equivalente, com mesma janela e
   principal, permitindo comparar IR/custódia distintos. Não é média aritmética
   dos degraus de um caminho variável. Acima da raiz o pós-fixado supera o
@@ -45,3 +48,22 @@ são verificados com erro absoluto < 0,0001 no multiplicador e tolerância monet
 choque +0,01, o caso sintético de um ano usa erro absoluto na variação relativa
 < 0,0001 (1 ponto base do preço). Esse limite verifica a aproximação nesse caso,
 não constitui garantia para todo prazo ou taxa: a convexidade cresce com o prazo.
+
+
+## Reprodutibilidade e resultados parciais
+
+R1 e R2 registram em `assumptions.calendar` os extremos de cobertura,
+a quantidade e a lista completa de feriados, copiada do calendário injetado.
+Datas úteis e fatores diários do CDI são preparados antes da bisseção.
+
+Candidato que vence antes do resgate é omitido com aviso. Referências a candidatos
+desconhecidos e falhas de solver geram aviso com `subject`, uma entrada em
+`notVerified` e status parcial. Na linha afetada, `breakEvens` fica vazio e
+`turningPoint` fica nulo; outras linhas continuam disponíveis. Sem linhas
+calculáveis por essas condições, R1 retorna uma lista vazia parcial. IDs duplicados
+de candidato, cenário ou pedido de ponto de virada são erros de programação.
+
+Em R2, título vencido gera resultado inconclusivo; objetivo passado gera resultado
+parcial. A saída inclui `approximationError = durationRelativeChange -
+repricingRelativeChange`. Datas inválidas, tabelas inválidas e cobertura insuficiente
+do calendário continuam sendo erros explícitos.

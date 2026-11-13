@@ -1,5 +1,16 @@
-export * from "./rate-risk.js";
-export * from "./rates.js";
-export * from "./simulation.js";
-export * from "./solvers.js";
-export * from "./taxation.js";
+export type { RateRiskInput, RateRiskOutput, ZeroCouponBond } from "./rate-risk.js";
+export { analyzeRateRisk } from "./rate-risk.js";
+export type { AccrualRate, RateScenario, RateStep } from "./rates.js";
+export { createRatePath } from "./rates.js";
+export type { FixedIncomeCandidate, FixedIncomeInput, SimulationRow } from "./simulation.js";
+export { simulateFixedIncome } from "./simulation.js";
+export type { SolverOptions } from "./solvers.js";
+export { breakEvenCdi, turningPoint } from "./solvers.js";
+export type {
+	AccrualPoint,
+	CustodyFee,
+	RedemptionInput,
+	RedemptionValue,
+	TaxTable,
+} from "./taxation.js";
+export { defaultRegressiveIncomeTaxTable, incomeTaxRate, redemptionValue } from "./taxation.js";

@@ -92,18 +92,33 @@ export interface GrowthInput {
 	calendar: BusinessCalendar;
 }
 
+export function compound(
+	principal: number,
+	dates: readonly string[],
+	factorOn: (index: number) => number,
+	onDay: (date: string, opening: number, closing: number) => void = () => {},
+): number {
+	let balance = nonNegative(principal);
+	for (const [index, date] of dates.entries()) {
+		const factor = factorOn(index);
+		if (factor <= 0) throw new Error("O fator diário deve ser positivo na simulação.");
+		const closing = finite(balance * factor);
+		onDay(date, balance, closing);
+		balance = closing;
+	}
+	return balance;
+}
+
 export function grow(input: GrowthInput): number {
-	nonNegative(input.principal);
 	calendarDaysBetween(input.from, input.to);
 	const path = createRatePath(input.scenario.steps);
-	let balance = input.principal;
-	for (const date of businessDates(input.calendar, input.from, input.to)) {
-		const factor = dailyGrowthFactor(
+	const dates = businessDates(input.calendar, input.from, input.to);
+	return compound(input.principal, dates, (index) => {
+		const date = dates[index];
+		if (date === undefined) throw new Error("Data de capitalização ausente.");
+		return dailyGrowthFactor(
 			input.rate,
 			input.rate.kind === "prefixed" ? 1 : path.dailyFactor(date),
 		);
-		if (factor <= 0) throw new Error("O fator diário deve ser positivo na simulação.");
-		balance = finite(balance * factor);
-	}
-	return balance;
+	});
 }

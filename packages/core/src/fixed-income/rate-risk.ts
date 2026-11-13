@@ -1,5 +1,5 @@
 import { type AnalysisFinding, createAnalysisResult, methodIds } from "../analysis.js";
-import { type BusinessCalendar, calendarDaysBetween } from "../calendar.js";
+import { type BusinessCalendar, parseIsoDate } from "../calendar.js";
 import { collectEvidence, type Datum } from "../provenance.js";
 import { annualFactor, finite, nonNegative } from "./rates.js";
 
@@ -36,8 +36,10 @@ export interface RateRiskOutput {
 	repricedPrice: number;
 	repricingPriceChange: number;
 	repricingRelativeChange: number;
+	approximationError: number;
 }
 export function analyzeRateRisk(input: RateRiskInput, calendar: BusinessCalendar) {
+	parseIsoDate(input.asOf);
 	const shock = finite(input.shock ?? 0.01);
 	if (
 		input.strategyMaxBusinessDays !== undefined &&
@@ -52,6 +54,12 @@ export function analyzeRateRisk(input: RateRiskInput, calendar: BusinessCalendar
 		asOf: input.asOf,
 		inputs: input,
 		assumptions: {
+			calendar: {
+				coveredFrom: calendar.coverage.from,
+				coveredUntil: calendar.coverage.until,
+				holidayCount: calendar.holidays.length,
+				holidays: [...calendar.holidays],
+			},
 			shock,
 			strategyMaxBusinessDays: input.strategyMaxBusinessDays ?? null,
 			model: "Título sem cupom; base 252 DU; duração modificada = (DU/252)/(1+y)",
@@ -59,6 +67,7 @@ export function analyzeRateRisk(input: RateRiskInput, calendar: BusinessCalendar
 		sources: evidence.sources,
 		natures: evidence.natures,
 		notVerified: [
+			"Duração calculada apenas para títulos sem cupom.",
 			"preço efetivo de recompra pelo Tesouro",
 			"liquidez de papéis privados no secundário",
 			...evidence.notVerified,
@@ -80,9 +89,27 @@ export function analyzeRateRisk(input: RateRiskInput, calendar: BusinessCalendar
 		});
 	}
 	const bond = input.bond.value;
+	parseIsoDate(bond.maturity);
+	if (bond.maturity < input.asOf) {
+		const message = "Título vencido antes da data da análise.";
+		return createAnalysisResult<RateRiskInput, RateRiskOutput, typeof common.assumptions>({
+			...common,
+			status: "inconclusive",
+			output: null,
+			findings: [{ code: "MATURED_BOND", severity: "warning", subject: bond.id, message }],
+			notVerified: [...common.notVerified, message],
+		});
+	}
 	const businessDays = calendar.businessDaysBetween(input.asOf, bond.maturity);
+	let pastGoal = false;
 	if (input.goalDate.status === "known") {
-		calendarDaysBetween(input.asOf, input.goalDate.value);
+		parseIsoDate(input.goalDate.value);
+		if (input.goalDate.value < input.asOf) {
+			pastGoal = true;
+			const message = "Objetivo anterior à data da análise.";
+			findings.push({ code: "PAST_GOAL", severity: "warning", subject: bond.id, message });
+			common.notVerified.push(message);
+		}
 		if (bond.maturity > input.goalDate.value)
 			findings.push({
 				code: "MATURITY_AFTER_GOAL",
@@ -106,7 +133,7 @@ export function analyzeRateRisk(input: RateRiskInput, calendar: BusinessCalendar
 	const repricingPriceChange = finite(repricedPrice - price);
 	return createAnalysisResult<RateRiskInput, RateRiskOutput, typeof common.assumptions>({
 		...common,
-		status: evidence.hasMissing ? "partial" : "complete",
+		status: pastGoal || evidence.hasMissing ? "partial" : "complete",
 		findings,
 		output: {
 			nature: "estimated",
@@ -118,6 +145,7 @@ export function analyzeRateRisk(input: RateRiskInput, calendar: BusinessCalendar
 			repricedPrice,
 			repricingPriceChange,
 			repricingRelativeChange: finite(repricingPriceChange / price),
+			approximationError: finite(durationRelativeChange - repricingPriceChange / price),
 		},
 	});
 }

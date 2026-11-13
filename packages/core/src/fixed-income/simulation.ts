@@ -1,8 +1,8 @@
 import { createAnalysisResult, methodIds } from "../analysis.js";
-import { type BusinessCalendar, calendarDaysBetween } from "../calendar.js";
+import { type BusinessCalendar, parseIsoDate } from "../calendar.js";
 import { collectEvidence, type Datum } from "../provenance.js";
 import type { AccrualRate, RateScenario } from "./rates.js";
-import { breakEvenCdi, type SolverOptions, turningPoint } from "./solvers.js";
+import { breakEvenCdi, SolverFailure, type SolverOptions, turningPoint } from "./solvers.js";
 import { type CustodyFee, redemptionValue, type TaxTable } from "./taxation.js";
 
 export interface FixedIncomeCandidate {
@@ -47,6 +47,12 @@ const r1NotVerified = [
 ];
 
 export function simulateFixedIncome(input: FixedIncomeInput, calendar: BusinessCalendar) {
+	parseIsoDate(input.asOf);
+	const candidateIds = uniqueIds(
+		input.candidates.flatMap((d) => (d.status === "known" ? [d.value.id] : [])),
+	);
+	uniqueIds(input.scenarios.flatMap((d) => (d.status === "known" ? [d.value.id] : [])));
+	uniqueIds((input.turningPoints ?? []).map((r) => r.candidateId));
 	const evidence = collectEvidence([
 		input.principal,
 		input.taxTable,
@@ -58,6 +64,13 @@ export function simulateFixedIncome(input: FixedIncomeInput, calendar: BusinessC
 		...(input.comparisons ?? []).map((comparison) => comparison.custody),
 		...(input.turningPoints ?? []).map((point) => point.custody),
 	]);
+	const findings: import("../analysis.js").AnalysisFinding[] = [
+		{
+			code: "SCENARIO_SIMULATION",
+			severity: "info",
+			message: "Simulação na curva por cenário; revisão necessária das premissas.",
+		},
+	];
 	const common = {
 		method: { id: methodIds.fixedIncomeSimulation, version: "1.0.0" },
 		strategyVersion: input.strategyVersion,
@@ -65,6 +78,12 @@ export function simulateFixedIncome(input: FixedIncomeInput, calendar: BusinessC
 		inputs: input,
 		assumptions: {
 			paths: input.scenarios,
+			calendar: {
+				coveredFrom: calendar.coverage.from,
+				coveredUntil: calendar.coverage.until,
+				holidayCount: calendar.holidays.length,
+				holidays: [...calendar.holidays],
+			},
 			taxTable: input.taxTable,
 			custody: input.candidates.map((candidate) =>
 				candidate.status === "known" ? candidate.value.custody : candidate,
@@ -76,14 +95,18 @@ export function simulateFixedIncome(input: FixedIncomeInput, calendar: BusinessC
 		sources: evidence.sources,
 		natures: evidence.natures,
 		notVerified: [...r1NotVerified, ...evidence.notVerified],
-		findings: [
-			{
-				code: "SCENARIO_SIMULATION",
-				severity: "info",
-				message: "Simulação na curva por cenário; revisão necessária das premissas.",
-			},
-		] satisfies import("../analysis.js").AnalysisFinding[],
+		findings,
 	};
+	let partial = false;
+	function warning(code: string, subject: string, message: string) {
+		partial = true;
+		common.findings.push({ code, severity: "warning", subject, message });
+		common.notVerified.push(message);
+	}
+	for (const request of [...(input.comparisons ?? []), ...(input.turningPoints ?? [])]) {
+		if (!candidateIds.has(request.candidateId))
+			warning("UNKNOWN_CANDIDATE", request.candidateId, "Candidato solicitado não encontrado.");
+	}
 	const rows: SimulationRow[] = [];
 	// Valida a cobertura mesmo quando faltam outros dados; nunca extrapola feriados.
 	calendar.businessDaysBetween(input.from, input.redemptionDate);
@@ -91,9 +114,15 @@ export function simulateFixedIncome(input: FixedIncomeInput, calendar: BusinessC
 		for (const candidateDatum of input.candidates) {
 			if (candidateDatum.status === "missing") continue;
 			const candidate = candidateDatum.value;
-			calendarDaysBetween(input.from, candidate.maturity);
-			if (input.redemptionDate > candidate.maturity)
-				throw new Error("O resgate não pode ultrapassar o vencimento do candidato.");
+			parseIsoDate(candidate.maturity);
+			if (input.redemptionDate > candidate.maturity) {
+				warning(
+					"MATURITY_BEFORE_REDEMPTION",
+					candidate.id,
+					"Vencimento anterior ao resgate; candidato não calculado.",
+				);
+				continue;
+			}
 			if (candidate.custody.status === "missing") continue;
 			for (const scenario of input.scenarios) {
 				if (scenario.status === "missing") continue;
@@ -110,32 +139,40 @@ export function simulateFixedIncome(input: FixedIncomeInput, calendar: BusinessC
 				const prefixed = { ...investment, rate: candidate.rate, taxExempt: candidate.taxExempt };
 				const value = redemptionValue(prefixed);
 				const breakEvens: SimulationRow["breakEvens"] = [];
-				for (const comparison of input.comparisons ?? []) {
-					if (comparison.candidateId !== candidate.id || comparison.custody.status === "missing")
-						continue;
-					breakEvens.push({
-						product: comparison.product,
-						multiplier: breakEvenCdi({
-							targetNet: value.net,
-							product: comparison.product,
-							investment: { ...investment, custody: comparison.custody.value },
-							solver: input.solver,
-						}),
-					});
-				}
 				let point: number | null = null;
-				for (const request of input.turningPoints ?? []) {
-					if (request.candidateId !== candidate.id || request.custody.status === "missing")
-						continue;
-					point = turningPoint({
-						prefixed,
-						postfixed: {
-							...investment,
-							custody: request.custody.value,
-							taxExempt: request.taxExempt,
-						},
-						solver: input.solver,
-					});
+				try {
+					for (const comparison of input.comparisons ?? []) {
+						if (comparison.candidateId !== candidate.id || comparison.custody.status === "missing")
+							continue;
+						breakEvens.push({
+							product: comparison.product,
+							multiplier: breakEvenCdi({
+								targetNet: value.net,
+								product: comparison.product,
+								investment: { ...investment, custody: comparison.custody.value },
+								solver: input.solver,
+							}),
+						});
+					}
+
+					for (const request of input.turningPoints ?? []) {
+						if (request.candidateId !== candidate.id || request.custody.status === "missing")
+							continue;
+						point = turningPoint({
+							prefixed,
+							postfixed: {
+								...investment,
+								custody: request.custody.value,
+								taxExempt: request.taxExempt,
+							},
+							solver: input.solver,
+						});
+					}
+				} catch (error) {
+					if (!(error instanceof SolverFailure)) throw error;
+					breakEvens.length = 0;
+					point = null;
+					warning("SOLVER_UNAVAILABLE", `${candidate.id}/${scenario.value.id}`, error.message);
 				}
 				rows.push({
 					candidateId: candidate.id,
@@ -146,6 +183,13 @@ export function simulateFixedIncome(input: FixedIncomeInput, calendar: BusinessC
 				});
 			}
 		}
+	}
+	if (rows.length === 0 && partial) {
+		return createAnalysisResult<FixedIncomeInput, SimulationRow[], typeof common.assumptions>({
+			...common,
+			status: "partial",
+			output: [],
+		});
 	}
 	if (rows.length === 0) {
 		return createAnalysisResult<FixedIncomeInput, SimulationRow[], typeof common.assumptions>({
@@ -164,7 +208,13 @@ export function simulateFixedIncome(input: FixedIncomeInput, calendar: BusinessC
 	}
 	return createAnalysisResult<FixedIncomeInput, SimulationRow[], typeof common.assumptions>({
 		...common,
-		status: evidence.hasMissing ? "partial" : "complete",
+		status: partial || evidence.hasMissing ? "partial" : "complete",
 		output: rows,
 	});
+}
+
+function uniqueIds(ids: readonly string[]): Set<string> {
+	const unique = new Set(ids);
+	if (unique.size !== ids.length) throw new Error("IDs duplicados na simulação.");
+	return unique;
 }

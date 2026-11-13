@@ -1,5 +1,7 @@
-import { finite, nonNegative } from "./rates.js";
-import { type RedemptionInput, redemptionValue } from "./taxation.js";
+import { finite } from "./rates.js";
+import { prepareRedemption, type RedemptionInput } from "./taxation.js";
+
+export class SolverFailure extends Error {}
 
 export interface SolverOptions {
 	lower?: number;
@@ -17,25 +19,34 @@ export function bisectIncreasing(
 	finite(upper);
 	if (lower >= upper || finite(tolerance) <= 0)
 		throw new Error("Intervalo ou tolerância de empate inválido.");
+	function evaluate(parameter: number): number {
+		try {
+			return finite(value(parameter));
+		} catch (error) {
+			throw new SolverFailure(
+				error instanceof Error ? error.message : "Falha na avaliação numérica.",
+			);
+		}
+	}
 	let left = lower;
 	let right = upper;
-	const lowValue = finite(value(left));
-	const highValue = finite(value(right));
+	const lowValue = evaluate(left);
+	const highValue = evaluate(right);
 	if (lowValue >= highValue)
-		throw new Error("O cenário não define um empate crescente único no intervalo.");
+		throw new SolverFailure("O cenário não define um empate crescente único no intervalo.");
 	if (target < lowValue || target > highValue)
-		throw new Error("O empate não está contido no intervalo informado.");
+		throw new SolverFailure("O empate não está contido no intervalo informado.");
 	if (target === lowValue) return left;
 	if (target === highValue) return right;
 	for (let i = 0; i < 256; i += 1) {
 		const mid = (left + right) / 2;
 		if (right - left <= tolerance) return mid;
 		if (mid === left || mid === right)
-			throw new Error("A tolerância excede a precisão numérica disponível.");
-		if (finite(value(mid)) < target) left = mid;
+			throw new SolverFailure("A tolerância excede a precisão numérica disponível.");
+		if (evaluate(mid) < target) left = mid;
 		else right = mid;
 	}
-	throw new Error("O empate não convergiu com a tolerância informada.");
+	throw new SolverFailure("O empate não convergiu com a tolerância informada.");
 }
 
 export function breakEvenCdi({
@@ -49,15 +60,12 @@ export function breakEvenCdi({
 	investment: Omit<RedemptionInput, "rate" | "taxExempt">;
 	solver?: SolverOptions;
 }): number {
-	// Com CDI negativo ou custódia muito alta, não se pressupõe monotonicidade.
-	for (const step of investment.scenario.steps) nonNegative(step.annualRate);
+	const evaluate = prepareRedemption({ ...investment, taxExempt: product === "lci" });
+	for (const step of investment.scenario.steps) {
+		if (step.annualRate < 0) throw new SolverFailure("CDI negativo impede o solver crescente.");
+	}
 	return bisectIncreasing(
-		(multiplier) =>
-			redemptionValue({
-				...investment,
-				rate: { kind: "cdi-percentage", multiplier },
-				taxExempt: product === "lci",
-			}).net,
+		(multiplier) => evaluate({ kind: "cdi-percentage", multiplier }).net,
 		targetNet,
 		solver,
 	);
@@ -73,7 +81,7 @@ export function turningPoint({
 	solver?: SolverOptions;
 }): number {
 	if (prefixed.rate.kind !== "prefixed")
-		throw new Error("O ponto de virada exige um candidato prefixado.");
+		throw new SolverFailure("O ponto de virada exige um candidato prefixado.");
 	if (
 		prefixed.principal !== postfixed.principal ||
 		prefixed.from !== postfixed.from ||
@@ -81,18 +89,11 @@ export function turningPoint({
 	) {
 		throw new Error("O ponto de virada exige o mesmo principal e período nos dois cenários.");
 	}
+	const target = prepareRedemption(prefixed)(prefixed.rate).net;
+	const evaluate = prepareRedemption({ ...postfixed, scenario: prefixed.scenario });
 	return bisectIncreasing(
-		(annualRate) =>
-			redemptionValue({
-				...postfixed,
-				rate: { kind: "selic-like" },
-				scenario: {
-					id: "constant-equivalent",
-					kind: "manual",
-					steps: [{ effectiveFrom: postfixed.from, annualRate }],
-				},
-			}).net,
-		redemptionValue(prefixed).net,
+		(annualRate) => evaluate({ kind: "prefixed", annualRate }).net,
+		target,
 		solver,
 	);
 }

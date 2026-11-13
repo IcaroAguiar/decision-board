@@ -1,6 +1,8 @@
 import { calendarDaysBetween, parseIsoDate } from "../calendar.js";
 import {
+	type AccrualRate,
 	businessDates,
+	compound,
 	createRatePath,
 	dailyGrowthFactor,
 	finite,
@@ -97,38 +99,46 @@ export interface RedemptionInput extends GrowthInput {
 	custody: CustodyFee;
 }
 export function redemptionValue(input: RedemptionInput): RedemptionValue {
+	return prepareRedemption(input)(input.rate);
+}
+
+/** Prepara o período e o CDI uma vez; avaliações do solver só capitalizam. */
+export function prepareRedemption(input: Omit<RedemptionInput, "rate">) {
 	assertValidity(input.custody, input.asOf);
 	nonNegative(input.custody.annualRate);
 	nonNegative(input.custody.exemptBalance);
 	const held = calendarDaysBetween(input.from, input.to);
 	const taxRate = incomeTaxRate(input.taxTable, held, input.asOf);
 	const dates = businessDates(input.calendar, input.from, input.to);
-	let balance = nonNegative(input.principal);
-	let custody = 0;
-	const evolution: AccrualPoint[] = [];
+	nonNegative(input.principal);
 	const path = createRatePath(input.scenario.steps);
-	for (const date of dates) {
-		custody = finite(
-			custody +
-				(Math.max(0, balance - input.custody.exemptBalance) * input.custody.annualRate) / 252,
+	const cdiFactors = dates.map((date) => path.dailyFactor(date));
+	return (rate: AccrualRate): RedemptionValue => {
+		let custody = 0;
+		const evolution: AccrualPoint[] = [];
+		const balance = compound(
+			input.principal,
+			dates,
+			(index) => dailyGrowthFactor(rate, cdiFactors[index] ?? 1),
+			(date, opening, closing) => {
+				custody = finite(
+					custody +
+						(Math.max(0, opening - input.custody.exemptBalance) * input.custody.annualRate) / 252,
+				);
+				evolution.push({ businessDate: date, gross: closing, custodyAccrued: custody });
+			},
 		);
-		const factor = dailyGrowthFactor(
-			input.rate,
-			input.rate.kind === "prefixed" ? 1 : path.dailyFactor(date),
-		);
-		if (factor <= 0) throw new Error("O fator diário deve ser positivo na simulação.");
-		balance = finite(balance * factor);
-		evolution.push({ businessDate: date, gross: balance, custodyAccrued: custody });
-	}
-	const incomeTax = input.taxExempt ? 0 : Math.max(0, balance - input.principal) * taxRate;
-	return {
-		evolution,
-		gross: balance,
-		incomeTax,
-		custody,
-		net: finite(balance - incomeTax - custody),
-		businessDays: dates.length,
-		calendarDays: held,
-		nature: "estimated",
+
+		const incomeTax = input.taxExempt ? 0 : Math.max(0, balance - input.principal) * taxRate;
+		return {
+			evolution,
+			gross: balance,
+			incomeTax,
+			custody,
+			net: finite(balance - incomeTax - custody),
+			businessDays: dates.length,
+			calendarDays: held,
+			nature: "estimated",
+		};
 	};
 }
