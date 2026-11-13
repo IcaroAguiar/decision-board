@@ -7,6 +7,7 @@ import {
 import { parseIsoDate } from "../calendar.js";
 import {
 	collectEvidence,
+	type DataNature,
 	type Datum,
 	known,
 	type SourceRef,
@@ -146,6 +147,7 @@ function resolveAssumptions(raw?: Partial<CorrelationTestAssumptions>): Correlat
 
 function validateAndCollectEvidence(input: CorrelationTestInput): {
 	sources: SourceRef[];
+	natures: DataNature[];
 	notVerified: string[];
 } {
 	const datums: Datum<unknown>[] = [input.contribution];
@@ -172,6 +174,7 @@ function validateAndCollectEvidence(input: CorrelationTestInput): {
 	const evidence = collectEvidence(datums);
 	return {
 		sources: evidence.sources,
+		natures: evidence.natures,
 		notVerified: evidence.notVerified,
 	};
 }
@@ -340,7 +343,7 @@ export function runCorrelationTest(
 		}
 	}
 
-	const { sources, notVerified } = validateAndCollectEvidence(input);
+	const { sources, natures, notVerified } = validateAndCollectEvidence(input);
 	addUniqueNote(notVerified, pastCorrelationCaveat);
 	const findings: AnalysisFinding[] = [];
 	const inconclusive = () =>
@@ -352,6 +355,7 @@ export function runCorrelationTest(
 			inputs: input,
 			assumptions,
 			sources,
+			natures,
 			notVerified,
 			findings,
 			output: null,
@@ -581,6 +585,7 @@ export function runCorrelationTest(
 		inputs: input,
 		assumptions,
 		sources,
+		natures,
 		notVerified,
 		findings,
 		output: {
