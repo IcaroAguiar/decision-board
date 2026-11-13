@@ -1,17 +1,17 @@
 {
   "schemaVersion": 1,
-  "reviewer": "claude-sonnet-5-5 (revisão independente, calls 793a98cc05cf/e0ffdf3d2642/97b4f931e223; correções IOF/Selic: gpt-6.1-sol 8f3e87b15d15; sinais: b7ed4365c751)",
-  "reviewedAt": "2026-11-14T06:13:00Z",
+  "reviewer": "gpt-6.1-sol (revisão independente, calls cde21de8f701/c8862d3188c8/96ebda89f9a5; sinais: claude-sonnet-5-5 b7ed4365c751)",
+  "reviewedAt": "2026-11-13T21:20:35Z",
   "verdict": "approved_with_risk",
   "deterministicSignalsReviewed": true,
-  "reviewedFingerprint": "fc2db10eed4b87a81bcc5693af0babecd9ad7bc9a07b3ef2bde18e223a727cda",
+  "reviewedFingerprint": "534afbc002b640f813d4ea17db215791ccf1baa67b8e56de3b35d94bc677d5cd",
   "reviewedDeterministicSignals": {
-    "blocking": 40,
+    "blocking": 4,
     "high": 0,
-    "medium": 65
+    "medium": 17
   },
   "scope": [
-    "packages/core/src/fixed-income: R1 simulação e R2 duração"
+    "packages/core/src/risk: R3 teste de correlação"
   ],
-  "residualRisk": "Base de 252 DU e teto da bisseção nomeados; demais sinais são tags de união. Adiados: falha isolada por solve na mesma linha, atribuição de fonte do calendário, deduplicação de avisos."
+  "residualRisk": "Tolerâncias de variância nula nomeadas e documentadas; correlation-test.ts é grande, sem defeito apontado."
 }
