@@ -5,6 +5,7 @@ import {
 	createAnalysisResult,
 	methodIds,
 	type SourceRef,
+	statusFromCoverage,
 	toAnalysisRef,
 } from "./index.js";
 
@@ -99,11 +100,12 @@ test("requires an explanation for partial and inconclusive analyses", () => {
 	);
 });
 
-test("deduplicates sources by id, preserving first occurrence and input arrays", () => {
+test("deduplicates sources by id and date, preserving first occurrence and input arrays", () => {
 	const other = { ...source, id: "synthetic-other" };
-	const sources = [source, { ...source, label: "Duplicada" }, other];
-	assert.deepEqual(createAnalysisResult({ ...complete, sources }).sources, [source, other]);
-	assert.equal(sources.length, 3);
+	const later = { ...source, asOf: "2026-03-03" };
+	const sources = [source, { ...source }, other, later];
+	assert.deepEqual(createAnalysisResult({ ...complete, sources }).sources, [source, other, later]);
+	assert.equal(sources.length, 4);
 });
 
 test("rejects empty method identity, invalid analysis dates and invalid source dates", () => {
@@ -179,4 +181,47 @@ test("exports stable method identities and caller-assigned analysis references",
 	);
 	assert.equal(toAnalysisRef("synthetic-analysis", complete).strategyVersion, null);
 	assert.throws(() => toAnalysisRef(" ", complete), /identificador/);
+});
+
+test("rejects conflicting source metadata for the same id and date", () => {
+	for (const conflicting of [
+		{ ...source, label: "Outro rótulo" },
+		{ ...source, url: "https://example.test/source" },
+		{ ...source, official: true },
+	]) {
+		assert.throws(
+			() => createAnalysisResult({ ...complete, sources: [source, conflicting] }),
+			/Fonte duplicada com dados divergentes/,
+		);
+	}
+});
+
+test("requires warning or blocked findings when no non-empty limitation is provided", () => {
+	for (const status of ["partial", "inconclusive"] satisfies ("partial" | "inconclusive")[]) {
+		const result: AnalysisResult<{ value: number }, { total: number }> =
+			status === "partial" ? { ...complete, status } : { ...complete, status, output: null };
+		assert.throws(
+			() =>
+				createAnalysisResult({
+					...result,
+					findings: [{ code: "NOTE", severity: "info", message: "Nota sintética" }],
+				}),
+			/explique/,
+		);
+		for (const severity of ["warning", "blocked"] satisfies ("warning" | "blocked")[]) {
+			assert.equal(
+				createAnalysisResult({
+					...result,
+					findings: [{ code: "LIMITATION", severity, message: "Revisão necessária" }],
+				}).status,
+				status,
+			);
+		}
+	}
+});
+
+test("maps complete, partial and empty coverage to analysis status", () => {
+	assert.equal(statusFromCoverage("complete"), "complete");
+	assert.equal(statusFromCoverage("partial"), "partial");
+	assert.equal(statusFromCoverage("empty"), "inconclusive");
 });

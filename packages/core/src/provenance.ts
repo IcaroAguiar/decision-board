@@ -26,13 +26,16 @@ export function missing(reason: string): Datum<never> {
 	return { status: "missing", reason };
 }
 
-export function sumWithCoverage(items: Datum<number>[]): {
-	total: number;
-	coverage: "complete" | "partial" | "empty";
+type SumWithCoverage = (
+	| { coverage: "empty"; total: null }
+	| { coverage: "complete" | "partial"; total: number }
+) & {
 	knownCount: number;
 	missingCount: number;
 	missingReasons: string[];
-} {
+};
+
+export function sumWithCoverage(items: Datum<number>[]): SumWithCoverage {
 	let total = 0;
 	let knownCount = 0;
 	const missingReasons: string[] = [];
@@ -52,13 +55,9 @@ export function sumWithCoverage(items: Datum<number>[]): {
 		}
 	}
 	const missingCount = missingReasons.length;
-	return {
-		total,
-		coverage: knownCount === 0 ? "empty" : missingCount > 0 ? "partial" : "complete",
-		knownCount,
-		missingCount,
-		missingReasons,
-	};
+	const counts = { knownCount, missingCount, missingReasons };
+	if (knownCount === 0) return { ...counts, coverage: "empty", total: null };
+	return { ...counts, total, coverage: missingCount > 0 ? "partial" : "complete" };
 }
 
 export function assessFreshness<T>(
@@ -75,13 +74,39 @@ export function assessFreshness<T>(
 	return { state: ageDays > maxAgeDays ? "stale" : "fresh", ageDays };
 }
 
+function sourceKey(source: SourceRef): string {
+	return JSON.stringify([source.id, source.asOf]);
+}
+
+export function deduplicateSources(sources: readonly SourceRef[]): SourceRef[] {
+	const unique = new Map<string, SourceRef>();
+	for (const source of sources) {
+		parseIsoDate(source.asOf);
+		const key = sourceKey(source);
+		const previous = unique.get(key);
+		if (previous) {
+			if (
+				previous.label !== source.label ||
+				previous.url !== source.url ||
+				previous.official !== source.official
+			) {
+				throw new Error("Fonte duplicada com dados divergentes");
+			}
+		} else unique.set(key, source);
+	}
+	return [...unique.values()];
+}
+
 export function collectEvidence(datums: Datum<unknown>[]): {
 	sources: SourceRef[];
 	notVerified: string[];
 	hasMissing: boolean;
+	natures: DataNature[];
 } {
-	const sources = new Map<string, SourceRef>();
+	const sources: SourceRef[] = [];
 	const reasons = new Set<string>();
+	const disclosures = new Set<string>();
+	const natures = new Set<DataNature>();
 	const notVerified: string[] = [];
 	let hasMissing = false;
 	for (const datum of datums) {
@@ -91,17 +116,33 @@ export function collectEvidence(datums: Datum<unknown>[]): {
 				reasons.add(datum.reason);
 				notVerified.push(datum.reason);
 			}
-		} else if (!sources.has(datum.source.id)) {
-			sources.set(datum.source.id, datum.source);
-			if (!datum.source.official) notVerified.push(`Fonte não oficial: ${datum.source.label}`);
+		} else {
+			sources.push(datum.source);
+			natures.add(datum.nature);
+			const key = JSON.stringify([sourceKey(datum.source), datum.nature]);
+			if (!disclosures.has(key)) {
+				disclosures.add(key);
+				if (datum.nature === "observed" && !datum.source.official) {
+					notVerified.push(`Fonte não oficial: ${datum.source.label}`);
+				} else if (datum.nature === "estimated") {
+					notVerified.push(`Valor estimado: ${datum.source.label}`);
+				}
+			}
 		}
 	}
-	return { sources: [...sources.values()], notVerified, hasMissing };
+	const natureOrder: DataNature[] = ["informed", "observed", "estimated"];
+	return {
+		sources: deduplicateSources(sources),
+		notVerified,
+		hasMissing,
+		natures: natureOrder.filter((nature) => natures.has(nature)),
+	};
 }
 
-/** Normaliza sobre o total conhecido; total zero não define pesos e tem cobertura vazia. */
+/** Pesos sobre o subconjunto conhecido; total zero não define pesos e tem cobertura vazia. */
 export function weightsWithCoverage(items: { key: string; value: Datum<number> }[]): {
 	weights: Record<string, number>;
+	knownTotal: number | null;
 	coverage: "complete" | "partial" | "empty";
 	missingKeys: string[];
 } {
@@ -120,9 +161,10 @@ export function weightsWithCoverage(items: { key: string; value: Datum<number> }
 	const { total, coverage } = sumWithCoverage(items.map((item) => item.value));
 	return {
 		weights: Object.fromEntries(
-			total === 0 ? [] : entries.map(([key, value]) => [key, value / total]),
+			total === null || total === 0 ? [] : entries.map(([key, value]) => [key, value / total]),
 		),
 		coverage: total === 0 ? "empty" : coverage,
+		knownTotal: total === 0 ? null : total,
 		missingKeys,
 	};
 }

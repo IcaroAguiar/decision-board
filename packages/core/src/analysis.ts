@@ -1,5 +1,5 @@
 import { parseIsoDate } from "./calendar.js";
-import type { SourceRef } from "./provenance.js";
+import { deduplicateSources, type SourceRef } from "./provenance.js";
 
 export const methodIds = {
 	fixedIncomeSimulation: "r1.fixed-income-simulation",
@@ -17,6 +17,10 @@ export interface MethodRef {
 }
 
 export type AnalysisStatus = "complete" | "partial" | "inconclusive";
+export function statusFromCoverage(coverage: "complete" | "partial" | "empty"): AnalysisStatus {
+	return coverage === "empty" ? "inconclusive" : coverage;
+}
+
 export type FindingSeverity = "info" | "warning" | "blocked";
 
 export interface AnalysisFinding {
@@ -57,7 +61,11 @@ export function createAnalysisResult<TInput, TOutput, TAssumptions = Record<stri
 	if (
 		result.status !== "complete" &&
 		!result.notVerified.some((entry) => entry.trim().length > 0) &&
-		!result.findings.some((finding) => finding.message.trim().length > 0)
+		!result.findings.some(
+			(finding) =>
+				(finding.severity === "warning" || finding.severity === "blocked") &&
+				finding.message.trim().length > 0,
+		)
 	) {
 		throw new Error("Revisão necessária: explique por que a análise é parcial ou inconclusiva.");
 	}
@@ -67,12 +75,7 @@ export function createAnalysisResult<TInput, TOutput, TAssumptions = Record<stri
 	) {
 		throw new Error("Uma análise com bloqueio não pode ser completa.");
 	}
-	const sources = new Map<string, SourceRef>();
-	for (const source of result.sources) {
-		parseIsoDate(source.asOf);
-		if (!sources.has(source.id)) sources.set(source.id, source);
-	}
-	return { ...result, sources: [...sources.values()] };
+	return { ...result, sources: deduplicateSources(result.sources) };
 }
 
 export interface AnalysisRef {

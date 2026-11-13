@@ -4,8 +4,8 @@
  * Choques em pontos percentuais também são decimais: +1 p.p. = 0.01.
  * Arredonde somente na apresentação; o motor nunca arredonda valores intermediários.
  */
-export type PortfolioPart = "reserve" | "goal" | "equities";
-export const portfolioParts: readonly PortfolioPart[] = ["reserve", "goal", "equities"];
+export type PortfolioPart = "reserve" | "goal" | "variableIncome";
+export const portfolioParts: readonly PortfolioPart[] = ["reserve", "goal", "variableIncome"];
 
 /** Compara float64 com tolerância relativa padrão de 1e-12 e absoluta opcional. */
 export function approxEqual(

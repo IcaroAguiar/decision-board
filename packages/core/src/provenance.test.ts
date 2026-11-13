@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+	approxEqual,
 	assessFreshness,
 	collectEvidence,
 	known,
@@ -61,14 +62,14 @@ test("sums only known parts and explains partial coverage", () => {
 
 test("reports empty coverage when every part is missing or there are no parts", () => {
 	assert.deepEqual(sumWithCoverage([missing("Sem A"), missing("Sem B")]), {
-		total: 0,
+		total: null,
 		coverage: "empty",
 		knownCount: 0,
 		missingCount: 2,
 		missingReasons: ["Sem A", "Sem B"],
 	});
 	assert.deepEqual(sumWithCoverage([]), {
-		total: 0,
+		total: null,
 		coverage: "empty",
 		knownCount: 0,
 		missingCount: 0,
@@ -88,11 +89,12 @@ test("preserves known zero and negative values without rounding float64 sums", (
 		sumWithCoverage([known(-2, "informed", source), known(3, "informed", source)]).total,
 		1,
 	);
-	assert.ok(
-		Math.abs(
-			sumWithCoverage([known(0.1, "informed", source), known(0.2, "informed", source)]).total - 0.3,
-		) <= 0.3e-12,
-	);
+	const decimalSum = sumWithCoverage([
+		known(0.1, "informed", source),
+		known(0.2, "informed", source),
+	]);
+	if (decimalSum.coverage === "empty") assert.fail("A soma deve ter valores conhecidos.");
+	assert.ok(approxEqual(decimalSum.total, 0.3));
 });
 
 test("rejects non-finite known numbers and sum overflow", () => {
@@ -151,9 +153,15 @@ test("collects deduplicated sources and reasons with non-official disclosure", (
 			sources: [source, official],
 			notVerified: ["Fonte não oficial: Fonte sintética", "Sem A", "Sem B"],
 			hasMissing: true,
+			natures: ["observed"],
 		},
 	);
-	assert.deepEqual(collectEvidence([]), { sources: [], notVerified: [], hasMissing: false });
+	assert.deepEqual(collectEvidence([]), {
+		sources: [],
+		notVerified: [],
+		hasMissing: false,
+		natures: [],
+	});
 });
 
 test("normalizes known weights and preserves missing coverage", () => {
@@ -163,21 +171,25 @@ test("normalizes known weights and preserves missing coverage", () => {
 	];
 	assert.deepEqual(weightsWithCoverage(items), {
 		weights: { a: 0.25, b: 0.75 },
+		knownTotal: 8,
 		coverage: "complete",
 		missingKeys: [],
 	});
 	assert.deepEqual(weightsWithCoverage([...items, { key: "c", value: missing("Sem C") }]), {
 		weights: { a: 0.25, b: 0.75 },
+		knownTotal: 8,
 		coverage: "partial",
 		missingKeys: ["c"],
 	});
 	assert.deepEqual(weightsWithCoverage([{ key: "c", value: missing("Sem C") }]), {
 		weights: {},
+		knownTotal: null,
 		coverage: "empty",
 		missingKeys: ["c"],
 	});
 	assert.deepEqual(weightsWithCoverage([{ key: "zero", value: known(0, "informed", source) }]), {
 		weights: {},
+		knownTotal: null,
 		coverage: "empty",
 		missingKeys: [],
 	});
@@ -194,4 +206,73 @@ test("normalizes known weights and preserves missing coverage", () => {
 		weightsWithCoverage([{ key: "__proto__", value: known(1, "informed", source) }]).weights,
 		Object.fromEntries([["__proto__", 1]]),
 	);
+});
+
+test("preserves dated sources and rejects conflicting metadata for the same identity", () => {
+	const later = { ...source, asOf: "2026-03-03", label: "Fonte atualizada" };
+	assert.deepEqual(
+		collectEvidence([
+			known(1, "informed", source),
+			known(2, "informed", { ...source }),
+			known(3, "informed", later),
+		]).sources,
+		[source, later],
+	);
+	for (const conflicting of [
+		{ ...source, label: "Outro rótulo" },
+		{ ...source, url: "https://example.test/source" },
+		{ ...source, official: true },
+	]) {
+		assert.throws(
+			() => collectEvidence([known(1, "informed", source), known(2, "observed", conflicting)]),
+			/Fonte duplicada com dados divergentes/,
+		);
+	}
+});
+
+test("discloses observed non-official and estimated sources independently of first nature", () => {
+	const official = { ...source, id: "official", official: true };
+	assert.deepEqual(collectEvidence([known(1, "informed", source)]).notVerified, []);
+	assert.deepEqual(
+		collectEvidence([
+			known(1, "estimated", source),
+			known(2, "estimated", { ...source }),
+			known(3, "informed", source),
+			known(4, "observed", source),
+			known(5, "observed", { ...source }),
+			known(6, "observed", official),
+			known(7, "estimated", official),
+		]),
+		{
+			sources: [source, official],
+			notVerified: [
+				"Valor estimado: Fonte sintética",
+				"Fonte não oficial: Fonte sintética",
+				"Valor estimado: Fonte sintética",
+			],
+			hasMissing: false,
+			natures: ["informed", "observed", "estimated"],
+		},
+	);
+	assert.deepEqual(
+		collectEvidence([known(1, "informed", source), known(2, "observed", source)]).notVerified,
+		["Fonte não oficial: Fonte sintética"],
+	);
+});
+
+test("empty sums narrow to null and empty weights have no known total", () => {
+	const sum = sumWithCoverage([missing("Sem valor")]);
+	if (sum.coverage === "empty") {
+		const total: null = sum.total;
+		assert.equal(total, null);
+	} else {
+		const total: number = sum.total;
+		assert.fail(`Cobertura inesperada com total ${total}`);
+	}
+	assert.deepEqual(weightsWithCoverage([]), {
+		weights: {},
+		knownTotal: null,
+		coverage: "empty",
+		missingKeys: [],
+	});
 });

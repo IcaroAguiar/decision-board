@@ -3,7 +3,7 @@ import test from "node:test";
 import { approxEqual, portfolioParts } from "./index.js";
 
 test("uses shared portfolio parts and decimal comparison tolerances", () => {
-	assert.deepEqual(portfolioParts, ["reserve", "goal", "equities"]);
+	assert.deepEqual(portfolioParts, ["reserve", "goal", "variableIncome"]);
 	assert.equal(approxEqual(1, 1 + 0.5e-12), true);
 	assert.equal(approxEqual(1, 1 + 2e-12), false);
 	assert.equal(approxEqual(0, 0.125, { absolute: 0.125, relative: 0 }), true);
