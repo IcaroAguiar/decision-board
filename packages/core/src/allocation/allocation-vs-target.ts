@@ -181,6 +181,7 @@ export function analyzeAllocationVsTarget(input: AllocationVsTargetInput) {
 			allowSales: input.allowSales,
 		},
 		sources: evidence.sources,
+		natures: evidence.natures,
 		notVerified,
 		findings,
 		status:

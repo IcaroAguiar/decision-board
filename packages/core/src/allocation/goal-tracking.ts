@@ -178,6 +178,7 @@ export function analyzeGoalTracking(input: GoalTrackingInput) {
 				"Aporte declarado positivo e fechamento sem crescimento: causa provável, também compatível com perdas.",
 		},
 		sources: evidence.sources,
+		natures: evidence.natures,
 		notVerified,
 		findings,
 		status: aligned.coverage === "complete" ? "complete" : "partial",
