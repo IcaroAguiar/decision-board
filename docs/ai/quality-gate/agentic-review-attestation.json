@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
   "reviewer": "gpt-6.1-sol (revisão independente, calls cde21de8f701/c8862d3188c8/96ebda89f9a5; sinais: claude-sonnet-5-5 b7ed4365c751)",
-  "reviewedAt": "2026-11-13T21:35:53Z",
+  "reviewedAt": "2026-11-13T22:09:27Z",
   "verdict": "approved_with_risk",
   "deterministicSignalsReviewed": true,
-  "reviewedFingerprint": "0e0df725c100b8b42843332a6548fe58d78888a35316d65eb235c37e303e2f04",
+  "reviewedFingerprint": "55a3b6bd12cc199ba9fca9f03d547447e77c4c25cd4ed1a25db32263f2699d2f",
   "reviewedDeterministicSignals": {
-    "blocking": 4,
+    "blocking": 42,
     "high": 0,
-    "medium": 17
+    "medium": 75
   },
   "scope": [
     "packages/core/src/risk: R3 teste de correlação"
