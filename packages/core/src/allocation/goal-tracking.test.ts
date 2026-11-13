@@ -37,7 +37,11 @@ test("R8: rendimento 20% abaixo do projetado gera causa rendimento", () => {
 	assert.deepEqual(row.causes, ["rendimento"]);
 	assert.equal(result.output.months[0]?.realizedGain, null);
 	assert.equal(result.findings[0]?.code, "cumulative_gain_shortfall");
-	assert.ok(result.findings.every((finding) => !/compr|vend|recomend/i.test(finding.message)));
+	assert.ok(
+		[...result.findings.map((finding) => finding.message), ...result.notVerified].every(
+			(message) => !/compr|vend|recomend/i.test(message),
+		),
+	);
 	assert.equal(JSON.stringify(input.frozenProjection), snapshot);
 });
 test("R8: aporte conhecido zero tem causa aporte; ausente fica não verificado", () => {
@@ -52,16 +56,11 @@ test("R8: aporte conhecido zero tem causa aporte; ausente fica não verificado",
 		{ month: "2026-02", value: missing("Caixa não declarado") },
 	];
 	const partial = analyzeGoalTracking(input);
-	assert.equal(partial.status, "partial");
-	assert.equal(partial.output.months[1]?.realizedContribution, null);
-	assert.equal(partial.output.months[1]?.realizedGain, null);
-	assert.deepEqual(partial.output.months[1]?.causes, []);
+	assert.equal(partial.status, "inconclusive");
+	assert.equal(partial.output, null);
 	assert.ok(partial.notVerified.includes("Caixa não declarado"));
 	assert.ok(partial.notVerified.includes("Aporte do mês 2026-02 não informado."));
 	assert.deepEqual(partial.findings, []);
-	assert.equal(partial.output.cumulativeRealizedGain, null);
-	assert.equal(partial.output.cumulativeProjectedGain, null);
-	assert.equal(partial.output.comparableMonths, 0);
 });
 test("R8: mês ausente não vira zero nem conecta ganhos através do intervalo", () => {
 	const input = fixture();
@@ -73,10 +72,8 @@ test("R8: mês ausente não vira zero nem conecta ganhos através do intervalo",
 	input.realizedValues = series([1000, 1180, 1400]).filter((point) => point.month !== "2026-02");
 	input.realizedContributions = series([0, 100, 100]);
 	const result = analyzeGoalTracking(input);
-	assert.ok(result.output);
-	assert.equal(result.status, "partial");
-	assert.equal(result.output.months[1]?.realizedValue, null);
-	assert.equal(result.output.months[2]?.realizedGain, null);
+	assert.equal(result.output, null);
+	assert.equal(result.status, "inconclusive");
 	assert.ok(result.notVerified.includes("Mês sem cobertura completa: 2026-02"));
 });
 test("R8: dinheiro parado requer aporte positivo e fechamento sem crescimento", () => {
@@ -114,10 +111,10 @@ test("R8: soma ganhos mensais e emite um único alerta acumulado com causas agre
 	assert.equal(result.output.cumulativeProjectedGain, 300);
 	assert.equal(result.output.cumulativeRealizedGain, 80);
 	assert.equal(result.output.comparableMonths, 3);
-	assert.equal(result.findings.length, 1);
+	assert.equal(result.findings.length, 2);
 	assert.equal(
 		result.findings[0]?.message,
-		"Alerta: ganho acumulado abaixo do cenário projetado; causas prováveis: aporte, rendimento, dinheiro parado.",
+		"Alerta: ganho acumulado abaixo do cenário projetado; causas prováveis: rendimento, dinheiro parado.",
 	);
 });
 test("R8: recuperação mensal evita alerta quando o acumulado fica só 10% abaixo", () => {
@@ -156,21 +153,97 @@ test("R8: compara somente os mesmos meses completos, sem preencher lacunas", () 
 	assert.equal(result.findings.length, 1);
 	assert.match(result.findings[0]?.message ?? "", /causas prováveis: rendimento\./);
 });
-test("R8: ausência de fechamento ou projeção não gera causa por rendimento ou caixa", () => {
-	for (const field of ["projected", "realized"]) {
+test("R8: ausência de projeção inicial é recusada", () => {
+	const input = fixture();
+	input.frozenProjection.projectedValues = [];
+	assert.throws(() => analyzeGoalTracking(input), /fechamento inicial/);
+});
+test("R8: ausência de fechamentos realizados é inconclusiva e não atribui causas", () => {
+	const input = fixture();
+	input.realizedValues = [];
+	const result = analyzeGoalTracking(input);
+	assert.equal(result.status, "inconclusive");
+	assert.equal(result.output, null);
+	assert.deepEqual(result.findings, []);
+});
+test("R8: aporte isolado emite alerta próprio com valor exato sem alerta de ganho", () => {
+	const input = fixture();
+	input.realizedContributions = series([0, 0]);
+	input.realizedValues = series([1000, 1100]);
+	const result = analyzeGoalTracking(input);
+	assert.ok(result.output);
+	assert.equal(result.output.contributionShortfall, 100);
+	assert.equal(result.output.returnShortfall, 0);
+	assert.deepEqual(
+		result.findings.map((finding) => finding.code),
+		["contribution_shortfall"],
+	);
+	assert.match(
+		result.findings[0]?.message ?? "",
+		/aporte abaixo do planejado; déficit conhecido de 100/,
+	);
+});
+test("R8: alerta de rendimento puro quantifica déficit sem causa aporte", () => {
+	const result = analyzeGoalTracking(fixture());
+	assert.ok(result.output);
+	assert.equal(result.output.contributionShortfall, 0);
+	assert.equal(result.output.returnShortfall, 20);
+	assert.match(result.findings[0]?.message ?? "", /causas prováveis: rendimento\./);
+});
+test("R8: aporte quase igual usa tolerância na atribuição", () => {
+	const input = fixture();
+	input.realizedContributions = series([0, 100 - 1e-11]);
+	const result = analyzeGoalTracking(input);
+	assert.ok(result.output);
+	assert.deepEqual(result.output.months[1]?.causes, ["rendimento"]);
+});
+test("R8: contribuição ausente no mês base não torna ganhos parciais", () => {
+	const input = fixture();
+	input.realizedContributions = series([0, 100]).slice(1);
+	input.frozenProjection.plannedContributions = series([0, 100]).slice(1);
+	const result = analyzeGoalTracking(input);
+	assert.equal(result.status, "complete");
+	assert.ok(result.output);
+	assert.equal(result.output.comparableMonths, 1);
+});
+test("R8: valores negativos são recusados em qualquer série", () => {
+	for (const field of [
+		"plannedContributions",
+		"projectedValues",
+		"realizedContributions",
+		"realizedValues",
+	]) {
 		const input = fixture();
-		if (field === "projected") input.frozenProjection.projectedValues = [];
-		else input.realizedValues = [];
-		if (field === "projected")
-			assert.throws(() => analyzeGoalTracking(input), /fechamento inicial/);
-		else {
-			const result = analyzeGoalTracking(input);
-			assert.ok(result.output);
-			assert.deepEqual(result.findings, []);
-			assert.deepEqual(
-				result.output.months.map((row) => row.causes),
-				[[], []],
-			);
+		const negative = series([1000, -1]);
+		switch (field) {
+			case "plannedContributions":
+				input.frozenProjection.plannedContributions = negative;
+				break;
+			case "projectedValues":
+				input.frozenProjection.projectedValues = negative;
+				break;
+			case "realizedContributions":
+				input.realizedContributions = negative;
+				break;
+			case "realizedValues":
+				input.realizedValues = negative;
+				break;
 		}
+		assert.throws(() => analyzeGoalTracking(input), /negativos/);
 	}
+});
+test("R8: prazo anterior ao plano é recusado", () => {
+	const input = fixture();
+	input.targetMonth = "2025-12";
+	assert.throws(() => analyzeGoalTracking(input), /antes do início/);
+});
+test("R8: referência anterior ao plano é recusada", () => {
+	const input = fixture();
+	input.asOf = "2025-12";
+	assert.throws(() => analyzeGoalTracking(input), /fechamento inicial/);
+});
+test("R8: déficit logo acima do limite dispara alerta", () => {
+	const input = fixture();
+	input.realizedValues = series([1000, 1185 - 1e-7]);
+	assert.equal(analyzeGoalTracking(input).findings[0]?.code, "cumulative_gain_shortfall");
 });

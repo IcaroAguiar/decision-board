@@ -80,9 +80,13 @@ test("R7: faixa por classe, aporte sem quantidade negativa e redução exata do 
 	);
 	assert.ok(proposal.planItems.every((position) => position.quantity >= 0));
 	assert.equal(proposal.investedAmount, 600);
-	assert.ok(approxEqual(result.output.maxDeviationBefore ?? NaN, 0.3));
+	assert.ok(approxEqual(result.output.maxDeviationBefore ?? NaN, 0.375));
 	assert.equal(result.output.maxDeviationAfter, 0);
-	assert.ok(result.findings.every((finding) => !/compr|vend|recomend/i.test(finding.message)));
+	assert.ok(
+		[...result.findings.map((finding) => finding.message), ...result.notVerified].every(
+			(message) => !/compr|vend|recomend/i.test(message),
+		),
+	);
 });
 test("R7: posição ausente é parcial, identificada e impede proposta", () => {
 	const input = fixture();
@@ -142,6 +146,95 @@ test("R7: alvos decimais inválidos e metadados inconsistentes são recusados", 
 	const other = fixture();
 	const candidate = other.candidates[0];
 	assert.ok(candidate);
-	candidate.institution = "wrong";
+	candidate.assetClass = "wrong";
 	assert.throws(() => analyzeAllocationVsTarget(other), /inconsistentes/);
+});
+test("R7: agrega ativo em duas custódias sem agregar concentração institucional", () => {
+	const input = fixture();
+	const position = input.positions[0];
+	assert.ok(position);
+	input.positions = [
+		{ ...position, value: datum(400), segment: undefined },
+		{ ...position, institution: "k", value: datum(400) },
+		...input.positions.slice(1),
+	];
+	input.concentrationLimits = { perAsset: 0.7, perInstitution: 0.5 };
+	const result = analyzeAllocationVsTarget(input);
+	assert.ok(result.output?.proposal);
+	assert.equal(result.output.proposal.postAllocation.byAsset.a, 0.5);
+	assert.equal(result.output.proposal.postAllocation.byInstitution.i, 0.25);
+	assert.equal(result.output.proposal.postAllocation.byInstitution.k, 0.25);
+	assert.equal(result.output.proposal.postAllocation.bySegment.s, 0.5);
+	assert.ok(result.findings.some((finding) => finding.code === "concentration_asset"));
+	assert.ok(!result.findings.some((finding) => finding.code === "concentration_institution"));
+});
+test("R7: setores conflitantes e candidato sem setor são não verificados", () => {
+	const input = fixture();
+	const position = input.positions[0];
+	assert.ok(position);
+	input.positions.push({ ...position, segment: "outro", value: datum(0) });
+	const candidate = input.candidates[0];
+	assert.ok(candidate);
+	candidate.segment = undefined;
+	candidate.institution = "new-custody";
+	const result = analyzeAllocationVsTarget(input);
+	assert.ok(result.notVerified.includes("Setores conflitantes para o ativo: a"));
+	assert.ok(result.notVerified.includes("Ativo sem classificação de setor: b"));
+	assert.equal(result.output?.proposal?.postAllocation.bySegment.t, 0.5);
+	assert.equal(result.output?.proposal?.postAllocation.byInstitution["new-custody"], 0.375);
+});
+test("R7: cobertura vazia é inconclusiva com saída nula", () => {
+	const input = fixture();
+	input.positions = [];
+	const result = analyzeAllocationVsTarget(input);
+	assert.equal(result.status, "inconclusive");
+	assert.equal(result.output, null);
+});
+test("R7: alertas de base parcial qualificam patrimônio e alvos ainda são validados", () => {
+	const input = fixture();
+	const position = input.positions[1];
+	assert.ok(position);
+	position.value = missing("Valor sintético ausente");
+	input.concentrationLimits = { perAsset: 0.7 };
+	const result = analyzeAllocationVsTarget(input);
+	assert.ok(result.output);
+	const alerts = result.findings.filter((finding) =>
+		["allocation_out_of_band", "concentration_asset"].includes(finding.code),
+	);
+	assert.ok(alerts.length >= 2);
+	assert.ok(alerts.every((finding) => finding.message.includes("sobre o patrimônio conhecido")));
+	input.partTargets.goal.target = 0.45;
+	assert.throws(() => analyzeAllocationVsTarget(input), /somar 1/);
+	input.partTargets.goal.band.min = 0.6;
+	assert.throws(() => analyzeAllocationVsTarget(input), /faixa/);
+});
+test("R7: saturação é informativa e desvios por dimensão usam o denominador final", () => {
+	const input = fixture();
+	input.concentrationLimits = { perAsset: 0.25 };
+	const result = analyzeAllocationVsTarget(input);
+	assert.ok(result.output);
+	assert.equal(result.status, "complete");
+	assert.equal(
+		result.findings.find((finding) => finding.code === "allocation_limit_reached")?.severity,
+		"info",
+	);
+	assert.equal(result.output.maxDeviationBefore, 0.375);
+	assert.equal(result.output.byPart.find((row) => row.key === "goal")?.deviationAfter, -0.25);
+	assert.equal(result.output.byClass[0]?.deviationAfter, 0);
+});
+test("R7: emissor é distinto de custódia e dado ausente retém proposta", () => {
+	const input = fixture();
+	input.positions = input.positions.map((position) => ({ ...position, issuer: "issuer" }));
+	input.candidates = input.candidates.map((candidate) => ({ ...candidate, issuer: "issuer" }));
+	input.concentrationLimits = { perIssuer: 0.7 };
+	const result = analyzeAllocationVsTarget(input);
+	assert.ok(result.findings.some((finding) => finding.code === "concentration_issuer"));
+	assert.equal(result.status, "complete");
+	const candidate = input.candidates[0];
+	assert.ok(candidate);
+	candidate.issuer = undefined;
+	const incomplete = analyzeAllocationVsTarget(input);
+	assert.equal(incomplete.status, "partial");
+	assert.equal(incomplete.output?.proposal, null);
+	assert.ok(incomplete.notVerified.includes("Emissor não informado: b"));
 });

@@ -17,13 +17,13 @@ A deterministic scenario for applying a contribution amount under explicit const
 It is not financial advice, a recommendation, or a broker order.
 _Avoid_: buy list, recommendation, order execution
 
-**ContributionCandidate**:
+**PartContributionCandidate**:
 An asset considered as an input to an **AuditableContributionSimulation**, already enriched with the price, constraints, metrics, and source references needed for deterministic evaluation.
 It is not a persisted market-data snapshot.
 _Avoid_: provider row, raw metric snapshot
 
 **TargetWeightGap**:
-The distance between an asset's current portfolio weight and its target weight inside an **AuditableContributionSimulation**.
+The distance between a portfolio part or asset class's current weight and its target weight inside an **AuditableContributionSimulation**.
 The simulation uses this gap to choose the next whole lot while constraints still pass.
 _Avoid_: expected return, score, alpha
 
@@ -35,7 +35,7 @@ _Avoid_: hidden skip, silent fallback
 
 **AllowedInvestmentUniverse**:
 The explicit set of assets or tickers that an **AuditableContributionSimulation** is allowed to consider.
-A **ContributionCandidate** outside this universe must be blocked and explained by a **SimulationAuditFinding**.
+A **PartContributionCandidate** outside this universe must be blocked and explained by a **SimulationAuditFinding**.
 _Avoid_: implicit candidate list, provider universe
 
 **MetricSourceRef**:
@@ -44,7 +44,7 @@ If a metric affects inclusion, blocking, or ordering, that metric must carry a s
 _Avoid_: generic candidate source, unsourced fact
 
 **MinimumDecisionMetricSet**:
-The metric set for contribution simulation: price, lot size, target weight, portfolio part (reserve, goal, variable income), segment, liquidity, and concentration. Rates and weights are decimal fractions.
+The metric set for contribution simulation: price, lot size, portfolio part (reserve, goal, variable income), asset class, segment, issuer (security issuer, distinct from custody institution), liquidity, and concentration. Target weights and bands belong to parts and classes, never individual assets. Rates and weights are decimal fractions.
 Broader FII metrics such as P/VP, dividend yield, vacancy, manager, and dividend base date belong to the later FII metrics snapshot model.
 _Avoid_: full FII analysis in the core allocation slice
 
@@ -52,10 +52,10 @@ _Avoid_: full FII analysis in the core allocation slice
 
 - A **User** owns portfolio-related data.
 - An **AuthenticatedUser** is a **User** in the context of one request.
-- A **ContributionCandidate** can be included or blocked by an **AuditableContributionSimulation**.
+- A **PartContributionCandidate** can be included or blocked by an **AuditableContributionSimulation**.
 - An **AuditableContributionSimulation** explains blocked or unresolved outcomes with **SimulationAuditFinding** entries.
-- An **AllowedInvestmentUniverse** bounds which **ContributionCandidate** entries can be simulated.
-- A **ContributionCandidate** carries **MetricSourceRef** entries for each metric that affects simulation behavior.
+- An **AllowedInvestmentUniverse** bounds which **PartContributionCandidate** entries can be simulated.
+- A **PartContributionCandidate** carries **MetricSourceRef** entries for each metric that affects simulation behavior.
 
 ## Example dialogue
 
@@ -70,3 +70,19 @@ _Avoid_: full FII analysis in the core allocation slice
 - "account" can mean login credentials, cash account, or product user; use **User** for the person who owns data.
 - "session" can mean auth storage or request identity; use **AuthenticatedUser** for the request identity passed to domain-facing code.
 - A simulation produces **operation-plan items** (`planItems`, with a `referencePrice`); the person executes them outside the product. Decision Board never sends broker orders.
+
+## Allocation analysis contracts
+
+R7 aggregates asset values across custody institutions; institution concentration uses each position's custody and candidates use the institution of the simulated lot.
+Only part and asset class must agree for the same asset. A unique non-empty segment fills empty entries; conflicting segments remain not verified.
+Issuer limits are distinct from custody limits; missing issuer data with an issuer limit withholds the proposal.
+Partial-base alerts refer to known wealth. Empty weight coverage is inconclusive with null output.
+Part and class rows expose weightAfter and deviationAfter. Both maximum deviations use known wealth plus the contribution as denominator.
+Whole lots may converge from below a band, but may neither exceed its upper bound nor increase distance from a touched target. Concentration saturation is informational.
+
+R8 compares cumulative gains net of contributions over the same known months.
+Gain-alert causes come only from months with lower realized gain.
+contributionShortfall sums positive planned-minus-realized contributions where both are known; returnShortfall is projected-minus-realized cumulative gain over comparable months.
+A positive contribution shortfall emits its own warning, independently of the gain threshold.
+Some comparable months preserve partial rows; none yield inconclusive status and null output.
+The first closing is the gain base; its contribution is not required for gain coverage.

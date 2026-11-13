@@ -231,3 +231,58 @@ test("fractional prices are not rounded while allocating", () => {
 	assert.equal(result.planItems[0]?.estimatedValue, 0.9990000000000001);
 	assert.ok(result.investedAmount <= 1);
 });
+test("rejects an overshooting lot even when it would reduce the absolute gap", () => {
+	const input = fixture({
+		contributionAmount: 1000,
+		candidates: [candidate({ currentPrice: 600 })],
+	});
+	input.partTargets.goal = { target: 0.5, band: { min: 0.45, max: 0.55 } };
+	input.partTargets.variableIncome = { target: 0.5, band: { min: 0, max: 1 } };
+	assert.deepEqual(simulateContributionAllocation(input).planItems, []);
+});
+test("class target changes the choice within the same portfolio part", () => {
+	const input = fixture({
+		contributionAmount: 100,
+		positions: [
+			{ assetId: "held", part: "goal", value: 100, assetClass: "full", institution: "i" },
+		],
+		candidates: [
+			candidate({ assetClass: "full", priority: 0 }),
+			candidate({ assetId: "synthetic-equities", ticker: "SYN2", assetClass: "empty" }),
+		],
+		classTargets: {
+			full: { target: 0.5, band: { min: 0, max: 1 } },
+			empty: { target: 0.5, band: { min: 0, max: 1 } },
+		},
+	});
+	assert.equal(simulateContributionAllocation(input).planItems[0]?.ticker, "SYN2");
+});
+test("a lot cannot worsen one dimension in exchange for another", () => {
+	const result = simulateContributionAllocation(
+		fixture({
+			contributionAmount: 100,
+			positions: [
+				{ assetId: "held", part: "goal", value: 100, assetClass: "full", institution: "i" },
+			],
+			classTargets: { full: { target: 0.4, band: { min: 0, max: 1 } } },
+			candidates: [candidate({ assetClass: "full" })],
+		}),
+	);
+	assert.deepEqual(result.planItems, []);
+});
+test("concentration tolerates float noise at boundary but rejects the next lot", () => {
+	const result = simulateContributionAllocation(
+		fixture({
+			contributionAmount: 1,
+			candidates: [candidate({ currentPrice: 0.1, issuer: "issuer" })],
+			concentrationLimits: { perIssuer: 0.3 - 1e-14 },
+		}),
+	);
+	assert.equal(result.planItems[0]?.quantity, 3);
+	assert.ok(
+		result.auditFindings.some(
+			(finding) => finding.code === "allocation_limit_reached" && finding.severity === "info",
+		),
+	);
+	assert.ok(Math.abs((result.postAllocation.byIssuer.issuer ?? 0) - 0.3) < 1e-12);
+});

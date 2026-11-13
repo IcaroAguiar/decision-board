@@ -1,4 +1,9 @@
-import { type AnalysisFinding, createAnalysisResult, methodIds } from "../analysis.js";
+import {
+	type AnalysisFinding,
+	createAnalysisResult,
+	methodIds,
+	statusFromCoverage,
+} from "../analysis.js";
 import { collectEvidence } from "../provenance.js";
 import {
 	addMonths,
@@ -36,6 +41,8 @@ export interface GoalTrackingMonth {
  * Fechamentos mensais: o primeiro é a base, nunca um ganho sobre zero.
  * Atribuição mensal preserva ausências; o alerta usa ganhos acumulados apenas
  * nos meses com ganhos projetado e realizado conhecidos, acima do limite relativo.
+ * Com algum mês comparável, lacunas mantêm linhas e status parcial; sem nenhum,
+ * a saída é inconclusiva. Aporte do mês base não participa da cobertura de ganhos.
  */
 export function analyzeGoalTracking(input: GoalTrackingInput) {
 	parseYearMonth(input.asOf);
@@ -106,7 +113,8 @@ export function analyzeGoalTracking(input: GoalTrackingInput) {
 			plannedContribution !== null &&
 			plannedContribution > 0 &&
 			realizedContribution !== null &&
-			realizedContribution < plannedContribution
+			realizedContribution < plannedContribution &&
+			!approxEqual(realizedContribution, plannedContribution)
 		)
 			causes.push("aporte");
 		const returnShortfall =
@@ -124,8 +132,7 @@ export function analyzeGoalTracking(input: GoalTrackingInput) {
 			(realizedValue <= previousRealized || approxEqual(realizedValue, previousRealized));
 		if (idle) causes.push("dinheiro parado");
 		else if (returnShortfall) causes.push("rendimento");
-		if (realizedContribution === null) {
-			causes.length = 0;
+		if (realizedContribution === null && monthIndex > 0) {
 			notVerified.push(`Aporte do mês ${month} não informado.`);
 		}
 		rows.push({
@@ -141,12 +148,35 @@ export function analyzeGoalTracking(input: GoalTrackingInput) {
 	}
 	const comparableMonths = rows.flatMap((row) =>
 		row.projectedGain !== null && row.realizedGain !== null
-			? [{ projectedGain: row.projectedGain, realizedGain: row.realizedGain }]
+			? [{ ...row, projectedGain: row.projectedGain, realizedGain: row.realizedGain }]
 			: [],
 	);
 	const cumulativeProjectedGain = comparableMonths.reduce((sum, row) => sum + row.projectedGain, 0);
 	const cumulativeRealizedGain = comparableMonths.reduce((sum, row) => sum + row.realizedGain, 0);
-	const causes = [...new Set(rows.flatMap((row) => row.causes))];
+	const causes = [
+		...new Set(
+			comparableMonths
+				.filter(
+					(row) =>
+						row.realizedGain < row.projectedGain &&
+						!approxEqual(row.realizedGain, row.projectedGain),
+				)
+				.flatMap((row) => row.causes),
+		),
+	];
+	const knownContributions = rows.filter(
+		(row) => row.plannedContribution !== null && row.realizedContribution !== null,
+	);
+	const contributionShortfall =
+		knownContributions.length > 0
+			? knownContributions.reduce(
+					(sum, row) =>
+						sum + Math.max(0, (row.plannedContribution ?? 0) - (row.realizedContribution ?? 0)),
+					0,
+				)
+			: null;
+	const returnShortfall =
+		comparableMonths.length > 0 ? cumulativeProjectedGain - cumulativeRealizedGain : null;
 	if (
 		comparableMonths.length > 0 &&
 		cumulativeProjectedGain - cumulativeRealizedGain >
@@ -163,6 +193,23 @@ export function analyzeGoalTracking(input: GoalTrackingInput) {
 		});
 	}
 
+	if (
+		contributionShortfall !== null &&
+		contributionShortfall > 0 &&
+		!approxEqual(contributionShortfall, 0)
+	)
+		findings.push({
+			code: "contribution_shortfall",
+			severity: "warning",
+			message: `Alerta: aporte abaixo do planejado; déficit conhecido de ${contributionShortfall}.`,
+		});
+	const coverage =
+		comparableMonths.length === 0
+			? "empty"
+			: comparableMonths.length === rows.length - 1
+				? "complete"
+				: "partial";
+	const status = statusFromCoverage(coverage);
 	notVerified.push(
 		`Ganho do primeiro fechamento (${start}) não calculado: falta fechamento anterior ao plano.`,
 	);
@@ -181,15 +228,21 @@ export function analyzeGoalTracking(input: GoalTrackingInput) {
 		natures: evidence.natures,
 		notVerified,
 		findings,
-		status: aligned.coverage === "complete" ? "complete" : "partial",
-		output: {
-			targetValue: input.targetValue,
-			targetMonth: input.targetMonth,
-			months: rows,
-			cumulativeProjectedGain: comparableMonths.length > 0 ? cumulativeProjectedGain : null,
-			cumulativeRealizedGain: comparableMonths.length > 0 ? cumulativeRealizedGain : null,
-			comparableMonths: comparableMonths.length,
-			coverage: aligned.coverage,
-		},
+		...(status === "inconclusive"
+			? { status, output: null }
+			: {
+					status,
+					output: {
+						targetValue: input.targetValue,
+						targetMonth: input.targetMonth,
+						months: rows,
+						cumulativeProjectedGain: comparableMonths.length > 0 ? cumulativeProjectedGain : null,
+						cumulativeRealizedGain: comparableMonths.length > 0 ? cumulativeRealizedGain : null,
+						comparableMonths: comparableMonths.length,
+						coverage,
+						contributionShortfall,
+						returnShortfall,
+					},
+				}),
 	});
 }

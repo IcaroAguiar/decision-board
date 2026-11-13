@@ -1,4 +1,4 @@
-import type { PortfolioPart } from "./units.js";
+import { approxEqual, type PortfolioPart } from "./units.js";
 
 export type ContributionCandidateMetric =
 	| "price"
@@ -19,6 +19,7 @@ export interface AllocationHolding {
 	value: number;
 	assetClass: string;
 	institution: string;
+	issuer?: string;
 	segment?: string;
 }
 export interface PartContributionCandidate {
@@ -28,6 +29,7 @@ export interface PartContributionCandidate {
 	part: PortfolioPart;
 	assetClass: string;
 	institution: string;
+	issuer?: string;
 	segment?: string;
 	maxPrice?: number;
 	lotSize?: number;
@@ -48,7 +50,12 @@ export interface PartContributionInput {
 	candidates: PartContributionCandidate[];
 	partTargets: Record<PortfolioPart, AllocationTarget>;
 	classTargets?: Record<string, AllocationTarget>;
-	concentrationLimits?: { perAsset?: number; perClass?: number; perInstitution?: number };
+	concentrationLimits?: {
+		perAsset?: number;
+		perClass?: number;
+		perInstitution?: number;
+		perIssuer?: number;
+	};
 	minDailyLiquidity?: number;
 	maxConcentration?: number;
 	minOperationValue: number;
@@ -87,6 +94,9 @@ export interface AuditableContributionSimulation {
 		totalValue: number;
 		cash: number;
 		byAsset: Record<string, number>;
+		byClass: Record<string, number>;
+		byInstitution: Record<string, number>;
+		byIssuer: Record<string, number>;
 		byPart: Partial<Record<PortfolioPart, number>>;
 		bySegment: Record<string, number>;
 	};
@@ -98,7 +108,7 @@ interface Bucket {
 interface Candidate {
 	input: PartContributionCandidate;
 	buckets: string[];
-	targets: Bucket[];
+	targets: (Bucket & { band: AllocationTarget["band"] })[];
 	required: ContributionCandidateMetric[];
 	concentration: number | undefined;
 	quantity: number;
@@ -139,22 +149,35 @@ export function validateAllocationTarget(target: AllocationTarget) {
 	if (target.band.min > target.target || target.target > target.band.max)
 		throw new Error("O alvo deve estar dentro da faixa.");
 }
+export function validateAllocationTargets(
+	input: Pick<PartContributionInput, "partTargets" | "classTargets">,
+) {
+	for (const target of [
+		...Object.values(input.partTargets),
+		...Object.values(input.classTargets ?? {}),
+	])
+		validateAllocationTarget(target);
+	if (
+		!approxEqual(
+			Object.values(input.partTargets).reduce((sum, target) => sum + target.target, 0),
+			1,
+		)
+	)
+		throw new Error("Os alvos das partes devem somar 1.");
+}
 function prepareAllocation(input: PartContributionInput): EngineInput {
+	validateAllocationTargets(input);
 	const values = new Map<string, number>();
-	const targets: Bucket[] = [];
+	const targets: Candidate["targets"] = [];
 	const limits: Bucket[] = [];
 	const candidates: Candidate[] = [];
 	let total = 0;
 	nonNegative(input.minOperationValue, "minOperationValue");
 	for (const [part, target] of Object.entries(input.partTargets)) {
-		validateAllocationTarget(target);
-		targets.push({ key: `part:${part}`, value: target.target });
+		targets.push({ key: `part:${part}`, value: target.target, band: target.band });
 	}
-	if (Math.abs(targets.reduce((sum, target) => sum + target.value, 0) - 1) > 1e-12)
-		throw new Error("Os alvos das partes devem somar 1.");
 	for (const [label, target] of Object.entries(input.classTargets ?? {})) {
-		validateAllocationTarget(target);
-		targets.push({ key: classKey(label), value: target.target });
+		targets.push({ key: classKey(label), value: target.target, band: target.band });
 	}
 	for (const position of input.positions) {
 		nonNegative(position.value, "position.value");
@@ -164,6 +187,7 @@ function prepareAllocation(input: PartContributionInput): EngineInput {
 			partKey(position.part),
 			classKey(position.assetClass),
 			institutionKey(position.institution),
+			...(position.issuer?.trim() ? [`issuer:${position.issuer.trim()}`] : []),
 			segmentKey(position.segment),
 		])
 			add(values, key, position.value);
@@ -176,6 +200,7 @@ function prepareAllocation(input: PartContributionInput): EngineInput {
 				partKey(candidate.part),
 				classKey(candidate.assetClass),
 				institutionKey(candidate.institution),
+				...(candidate.issuer?.trim() ? [`issuer:${candidate.issuer.trim()}`] : []),
 				segmentKey(candidate.segment),
 			],
 			targets: targets.filter(
@@ -189,7 +214,17 @@ function prepareAllocation(input: PartContributionInput): EngineInput {
 		});
 	}
 	const all = [...input.positions, ...input.candidates];
+	if (
+		input.concentrationLimits?.perIssuer !== undefined &&
+		all.some((position) => !position.issuer?.trim())
+	)
+		throw new Error("Emissor necessário para verificar limite por emissor.");
 	for (const [field, prefix, labels] of [
+		[
+			input.concentrationLimits?.perIssuer,
+			"issuer",
+			all.flatMap((position) => (position.issuer?.trim() ? [position.issuer.trim()] : [])),
+		],
 		[input.concentrationLimits?.perAsset, "asset", all.map((position) => position.assetId)],
 		[input.concentrationLimits?.perClass, "class", all.map((position) => position.assetClass)],
 		[
@@ -311,20 +346,35 @@ function allocateWholeLots(
 					engine.limits.some(
 						(limit) =>
 							candidate.buckets.includes(limit.key) &&
-							((engine.values.get(limit.key) ?? 0) + value) / finalTotal > limit.value,
+							((engine.values.get(limit.key) ?? 0) + value) / finalTotal > limit.value &&
+							!approxEqual(((engine.values.get(limit.key) ?? 0) + value) / finalTotal, limit.value),
 					)
 				) {
 					if (!limitRecorded.has(candidate.input.assetId)) {
 						limitRecorded.add(candidate.input.assetId);
 						findings.push({
 							code: "allocation_limit_reached",
-							severity: "blocked",
+							severity: "info",
 							ticker: candidate.input.ticker,
 							message: `${candidate.input.ticker}: limite de alocação impede outro lote simulado.`,
 						});
 					}
 					return [];
 				}
+				// Uma dimensão abaixo da faixa pode convergir; não pode ultrapassar a faixa
+				// nem piorar o desvio em nenhuma dimensão tocada pelo lote.
+				if (
+					candidate.targets.some((target) => {
+						const current = (engine.values.get(target.key) ?? 0) / finalTotal;
+						const after = current + value / finalTotal;
+						return (
+							(after > target.band.max && !approxEqual(after, target.band.max)) ||
+							(Math.abs(after - target.value) > Math.abs(current - target.value) &&
+								!approxEqual(Math.abs(after - target.value), Math.abs(current - target.value)))
+						);
+					})
+				)
+					return [];
 				const improvement = candidate.targets.reduce((sum, target) => {
 					const current = (engine.values.get(target.key) ?? 0) / finalTotal;
 					return (
@@ -421,6 +471,9 @@ export function simulateContributionAllocation(
 		postAllocation: {
 			totalValue: finalTotal,
 			byAsset: record("asset:"),
+			byClass: record("class:"),
+			byInstitution: record("institution:"),
+			byIssuer: record("issuer:"),
 			cash: weight("segment:cash"),
 			bySegment: record("segment:"),
 			byPart: {

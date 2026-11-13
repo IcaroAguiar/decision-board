@@ -1,9 +1,15 @@
-import { type AnalysisFinding, createAnalysisResult, methodIds } from "../analysis.js";
+import {
+	type AnalysisFinding,
+	createAnalysisResult,
+	methodIds,
+	statusFromCoverage,
+} from "../analysis.js";
 import {
 	type AllocationHolding,
 	type PartContributionInput,
 	simulateContributionAllocation,
 	validateAllocationTarget,
+	validateAllocationTargets,
 } from "../contribution-allocation.js";
 import {
 	assessFreshness,
@@ -27,16 +33,20 @@ export interface AllocationVsTargetInput extends Omit<PartContributionInput, "po
 	freshnessLimitDays?: number;
 }
 export function analyzeAllocationVsTarget(input: AllocationVsTargetInput) {
+	validateAllocationTargets(input);
 	const evidence = collectEvidence(input.positions.map((position) => position.value));
 	const notVerified = [
 		...evidence.notVerified,
 		"Viabilidade operacional e custos (R10) não verificados.",
 	];
 	if (input.allowSales) notVerified.push("Venda não simulada nesta versão");
-	for (const position of input.positions) {
+	for (const position of [...input.positions, ...input.candidates]) {
+		if (input.concentrationLimits?.perIssuer !== undefined && !position.issuer?.trim())
+			notVerified.push(`Emissor não informado: ${position.assetId}`);
 		if (!position.segment?.trim())
 			notVerified.push(`Ativo sem classificação de setor: ${position.assetId}`);
 		if (
+			"custody" in position &&
 			position.custody === "outside-b3" &&
 			assessFreshness(position.value, input.asOf, input.freshnessLimitDays ?? 30).state === "stale"
 		)
@@ -57,6 +67,7 @@ export function analyzeAllocationVsTarget(input: AllocationVsTargetInput) {
 		holdings.filter(predicate).reduce((sum, position) => sum + position.value, 0);
 	const weight = (value: number) => (total !== null && total > 0 ? value / total : null);
 	const findings: AnalysisFinding[] = [];
+	const scope = coverage.coverage === "partial" ? " sobre o patrimônio conhecido" : "";
 	const deviation = (
 		key: string,
 		value: number | null,
@@ -72,7 +83,7 @@ export function analyzeAllocationVsTarget(input: AllocationVsTargetInput) {
 				code: "allocation_out_of_band",
 				severity: "warning",
 				subject: key,
-				message: `Alerta: ${key} fora da faixa da estratégia; revisão necessária.`,
+				message: `Alerta: ${key} fora da faixa da estratégia${scope}; revisão necessária.`,
 			});
 		return {
 			key,
@@ -103,6 +114,11 @@ export function analyzeAllocationVsTarget(input: AllocationVsTargetInput) {
 			(position: AllocationHolding) => position.assetClass,
 		],
 		[
+			"issuer",
+			input.concentrationLimits?.perIssuer,
+			(position: AllocationHolding) => position.issuer?.trim() ?? "",
+		],
+		[
 			"institution",
 			input.concentrationLimits?.perInstitution,
 			(position: AllocationHolding) => position.institution,
@@ -112,37 +128,60 @@ export function analyzeAllocationVsTarget(input: AllocationVsTargetInput) {
 		if (!Number.isFinite(limit) || limit < 0 || limit > 1)
 			throw new Error("Limite de concentração inválido.");
 		for (const label of new Set(holdings.map(labelOf))) {
+			if (!label) continue;
 			const current = weight(knownValues((position) => labelOf(position) === label));
 			if (current !== null && current > limit && !approxEqual(current, limit))
 				findings.push({
 					code: `concentration_${dimension}`,
 					severity: "warning",
 					subject: label,
-					message: `Alerta de concentração em ${label}; revisão necessária.`,
+					message: `Alerta de concentração em ${label}${scope}; revisão necessária.`,
 				});
 		}
 	}
-	for (const position of [...holdings, ...input.candidates]) {
-		const sameAsset = [...holdings, ...input.candidates].filter(
-			(other) => other.assetId === position.assetId,
-		);
+	const classifications = [...input.positions, ...input.candidates];
+	const segments = new Map<string, string>();
+	for (const position of classifications) {
+		const sameAsset = classifications.filter((other) => other.assetId === position.assetId);
 		if (
 			sameAsset.some(
-				(other) =>
-					other.part !== position.part ||
-					other.assetClass !== position.assetClass ||
-					other.institution !== position.institution ||
-					other.segment !== position.segment,
+				(other) => other.part !== position.part || other.assetClass !== position.assetClass,
 			)
 		)
 			throw new Error("Classificações inconsistentes para o mesmo ativo.");
+		const labels = [
+			...new Set(
+				sameAsset.flatMap((other) => (other.segment?.trim() ? [other.segment.trim()] : [])),
+			),
+		];
+		if (labels.length > 1)
+			notVerified.push(`Setores conflitantes para o ativo: ${position.assetId}`);
+		if (labels.length === 1 && labels[0]) segments.set(position.assetId, labels[0]);
 	}
+	const normalizedHoldings = holdings.map((position) => ({
+		...position,
+		segment: segments.get(position.assetId) ?? position.segment,
+	}));
 	const missingPositions = input.positions
 		.filter((position) => position.value.status === "missing")
 		.map((position) => position.assetId);
 	let proposal = null;
-	if (missingPositions.length === 0) {
-		proposal = simulateContributionAllocation({ ...input, positions: holdings });
+	if (
+		missingPositions.length === 0 &&
+		coverage.coverage !== "empty" &&
+		!(
+			input.concentrationLimits?.perIssuer !== undefined &&
+			classifications.some((position) => !position.issuer?.trim())
+		)
+	) {
+		proposal = simulateContributionAllocation({
+			...input,
+			positions: normalizedHoldings,
+			candidates: input.candidates.map((candidate) => ({
+				...candidate,
+				segment: segments.get(candidate.assetId) ?? candidate.segment,
+			})),
+		});
 		findings.push(
 			...proposal.auditFindings.map((finding) => ({
 				code: finding.code,
@@ -151,32 +190,43 @@ export function analyzeAllocationVsTarget(input: AllocationVsTargetInput) {
 				message: finding.message,
 			})),
 		);
-	} else {
+	} else if (missingPositions.length > 0) {
 		notVerified.push(
 			`Proposta não calculada: valor ausente nas posições ${missingPositions.join(", ")}.`,
 		);
 	}
 	if (coverage.coverage === "empty")
 		notVerified.push("Pesos indefinidos: patrimônio conhecido nulo ou ausente.");
+	// Antes e depois usam patrimônio conhecido + aporte; caixa ainda não alocado permanece no total.
+	const denominator = total === null ? null : total + input.contributionAmount;
+	const afterRows = (rows: typeof byPart, weights: Record<string, number> | undefined) =>
+		rows.map((row) => ({
+			...row,
+			weightAfter: weights ? (weights[row.key] ?? 0) : null,
+			deviationAfter: weights ? (weights[row.key] ?? 0) - row.target : null,
+		}));
+	const parts = afterRows(byPart, proposal?.postAllocation.byPart);
+	const classes = afterRows(byClass, proposal?.postAllocation.byClass);
 	const maxDeviationBefore =
-		total !== null && total > 0
-			? Math.max(...byPart.map((row) => Math.abs(row.deviation ?? 0)))
-			: null;
-	const maxDeviationAfter =
-		proposal && proposal.postAllocation.totalValue > 0
+		denominator !== null && denominator > 0
 			? Math.max(
-					...portfolioParts.map((part) =>
-						Math.abs((proposal.postAllocation.byPart[part] ?? 0) - input.partTargets[part].target),
+					...[...byPart, ...byClass].map((row) =>
+						Math.abs(((row.currentWeight ?? 0) * (total ?? 0)) / denominator - row.target),
 					),
 				)
 			: null;
+	const maxDeviationAfter = proposal
+		? Math.max(...[...parts, ...classes].map((row) => Math.abs(row.deviationAfter ?? 0)))
+		: null;
+	const status = statusFromCoverage(coverage.coverage);
 	return createAnalysisResult({
 		method: { id: methodIds.allocationVsTarget, version: "1.0.0" },
 		strategyVersion: input.strategyVersion,
 		asOf: input.asOf,
 		inputs: input,
 		assumptions: {
-			weights: "Fração do patrimônio conhecido; caixa do aporte integra o denominador final.",
+			weights:
+				"Pesos atuais sobre patrimônio conhecido; desvios máximos antes/depois sobre patrimônio conhecido + aporte.",
 			freshnessLimitDays: input.freshnessLimitDays ?? 30,
 			allowSales: input.allowSales,
 		},
@@ -184,20 +234,22 @@ export function analyzeAllocationVsTarget(input: AllocationVsTargetInput) {
 		natures: evidence.natures,
 		notVerified,
 		findings,
-		status:
-			missingPositions.length > 0 ||
-			coverage.coverage === "empty" ||
-			findings.some((finding) => finding.severity === "blocked")
-				? "partial"
-				: "complete",
-		output: {
-			byPart,
-			byClass,
-			coverage: coverage.coverage,
-			missingPositions,
-			proposal,
-			maxDeviationBefore,
-			maxDeviationAfter,
-		},
+		...(status === "inconclusive"
+			? { status, output: null }
+			: {
+					status:
+						findings.some((finding) => finding.severity === "blocked") || proposal === null
+							? "partial"
+							: status,
+					output: {
+						byPart: parts,
+						byClass: classes,
+						coverage: coverage.coverage,
+						missingPositions,
+						proposal,
+						maxDeviationBefore,
+						maxDeviationAfter,
+					},
+				}),
 	});
 }
