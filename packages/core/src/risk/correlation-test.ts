@@ -343,6 +343,19 @@ export function runCorrelationTest(
 	const { sources, notVerified } = validateAndCollectEvidence(input);
 	addUniqueNote(notVerified, pastCorrelationCaveat);
 	const findings: AnalysisFinding[] = [];
+	const inconclusive = () =>
+		createAnalysisResult<CorrelationTestInput, CorrelationTestOutput, CorrelationTestAssumptions>({
+			method: { id: methodIds.correlationTest, version: correlationTestMethodVersion },
+			status: "inconclusive",
+			strategyVersion: input.strategyVersion,
+			asOf: input.asOf,
+			inputs: input,
+			assumptions,
+			sources,
+			notVerified,
+			findings,
+			output: null,
+		});
 
 	const weightCoverage = weightsWithCoverage(
 		input.holdings.map((holding) => ({ key: holding.key, value: holding.value })),
@@ -367,22 +380,7 @@ export function runCorrelationTest(
 			severity: "blocked",
 			message,
 		});
-		return createAnalysisResult<
-			CorrelationTestInput,
-			CorrelationTestOutput,
-			CorrelationTestAssumptions
-		>({
-			method: { id: methodIds.correlationTest, version: correlationTestMethodVersion },
-			status: "inconclusive",
-			strategyVersion: input.strategyVersion,
-			asOf: input.asOf,
-			inputs: input,
-			assumptions,
-			sources,
-			notVerified,
-			findings,
-			output: null,
-		});
+		return inconclusive();
 	}
 
 	if (input.contribution.status === "missing") {
@@ -393,22 +391,7 @@ export function runCorrelationTest(
 			severity: "blocked",
 			message,
 		});
-		return createAnalysisResult<
-			CorrelationTestInput,
-			CorrelationTestOutput,
-			CorrelationTestAssumptions
-		>({
-			method: { id: methodIds.correlationTest, version: correlationTestMethodVersion },
-			status: "inconclusive",
-			strategyVersion: input.strategyVersion,
-			asOf: input.asOf,
-			inputs: input,
-			assumptions,
-			sources,
-			notVerified,
-			findings,
-			output: null,
-		});
+		return inconclusive();
 	}
 
 	if (input.candidates.length === 0) {
@@ -419,22 +402,7 @@ export function runCorrelationTest(
 			severity: "blocked",
 			message,
 		});
-		return createAnalysisResult<
-			CorrelationTestInput,
-			CorrelationTestOutput,
-			CorrelationTestAssumptions
-		>({
-			method: { id: methodIds.correlationTest, version: correlationTestMethodVersion },
-			status: "inconclusive",
-			strategyVersion: input.strategyVersion,
-			asOf: input.asOf,
-			inputs: input,
-			assumptions,
-			sources,
-			notVerified,
-			findings,
-			output: null,
-		});
+		return inconclusive();
 	}
 
 	const knownHoldings = input.holdings.filter((holding) => holding.value.status === "known");
@@ -600,22 +568,7 @@ export function runCorrelationTest(
 	}
 
 	if (!anyWindowComplete) {
-		return createAnalysisResult<
-			CorrelationTestInput,
-			CorrelationTestOutput,
-			CorrelationTestAssumptions
-		>({
-			method: { id: methodIds.correlationTest, version: correlationTestMethodVersion },
-			status: "inconclusive",
-			strategyVersion: input.strategyVersion,
-			asOf: input.asOf,
-			inputs: input,
-			assumptions,
-			sources,
-			notVerified,
-			findings,
-			output: null,
-		});
+		return inconclusive();
 	}
 
 	const status = anyWindowPartial || weightCoverage.missingKeys.length > 0 ? "partial" : "complete";
