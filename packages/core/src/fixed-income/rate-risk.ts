@@ -57,6 +57,7 @@ export function analyzeRateRisk(input: RateRiskInput, calendar: BusinessCalendar
 			model: "Título sem cupom; base 252 DU; duração modificada = (DU/252)/(1+y)",
 		},
 		sources: evidence.sources,
+		natures: evidence.natures,
 		notVerified: [
 			"preço efetivo de recompra pelo Tesouro",
 			"liquidez de papéis privados no secundário",

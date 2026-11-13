@@ -74,6 +74,7 @@ export function simulateFixedIncome(input: FixedIncomeInput, calendar: BusinessC
 			solverTolerance: input.solver?.tolerance ?? 1e-10,
 		},
 		sources: evidence.sources,
+		natures: evidence.natures,
 		notVerified: [...r1NotVerified, ...evidence.notVerified],
 		findings: [
 			{
