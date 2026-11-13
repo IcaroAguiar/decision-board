@@ -165,10 +165,11 @@ test("R7: agrega ativo em duas custódias sem agregar concentração institucion
 	assert.equal(result.output.proposal.postAllocation.byInstitution.i, 0.25);
 	assert.equal(result.output.proposal.postAllocation.byInstitution.k, 0.25);
 	assert.equal(result.output.proposal.postAllocation.bySegment.s, 0.5);
+	assert.ok(!result.notVerified.includes("Ativo sem classificação de setor: a"));
 	assert.ok(result.findings.some((finding) => finding.code === "concentration_asset"));
 	assert.ok(!result.findings.some((finding) => finding.code === "concentration_institution"));
 });
-test("R7: setores conflitantes e candidato sem setor são não verificados", () => {
+test("R7: conflito é único por ativo e setor conhecido preenche candidato", () => {
 	const input = fixture();
 	const position = input.positions[0];
 	assert.ok(position);
@@ -178,8 +179,14 @@ test("R7: setores conflitantes e candidato sem setor são não verificados", () 
 	candidate.segment = undefined;
 	candidate.institution = "new-custody";
 	const result = analyzeAllocationVsTarget(input);
-	assert.ok(result.notVerified.includes("Setores conflitantes para o ativo: a"));
-	assert.ok(result.notVerified.includes("Ativo sem classificação de setor: b"));
+	assert.equal(
+		result.notVerified.filter((message) => message === "Setores conflitantes para o ativo: a")
+			.length,
+		1,
+	);
+	assert.ok(
+		!result.notVerified.some((message) => message.startsWith("Ativo sem classificação de setor:")),
+	);
 	assert.equal(result.output?.proposal?.postAllocation.bySegment.t, 0.5);
 	assert.equal(result.output?.proposal?.postAllocation.byInstitution["new-custody"], 0.375);
 });
@@ -237,4 +244,15 @@ test("R7: emissor é distinto de custódia e dado ausente retém proposta", () =
 	assert.equal(incomplete.status, "partial");
 	assert.equal(incomplete.output?.proposal, null);
 	assert.ok(incomplete.notVerified.includes("Emissor não informado: b"));
+});
+
+test("R7: setor ausente em todas as entradas é reportado uma vez por ativo", () => {
+	const input = fixture();
+	input.positions = input.positions.map((position) => ({ ...position, segment: undefined }));
+	input.candidates = input.candidates.map((candidate) => ({ ...candidate, segment: " " }));
+	const result = analyzeAllocationVsTarget(input);
+	assert.deepEqual(
+		result.notVerified.filter((message) => message.startsWith("Ativo sem classificação de setor:")),
+		["Ativo sem classificação de setor: a", "Ativo sem classificação de setor: b"],
+	);
 });

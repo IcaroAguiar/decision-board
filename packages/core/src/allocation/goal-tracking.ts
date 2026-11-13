@@ -161,7 +161,7 @@ export function analyzeGoalTracking(input: GoalTrackingInput) {
 						row.realizedGain < row.projectedGain &&
 						!approxEqual(row.realizedGain, row.projectedGain),
 				)
-				.flatMap((row) => row.causes),
+				.flatMap((row) => row.causes.filter((cause) => cause !== "aporte")),
 		),
 	];
 	const knownContributions = rows.filter(
@@ -169,11 +169,11 @@ export function analyzeGoalTracking(input: GoalTrackingInput) {
 	);
 	const contributionShortfall =
 		knownContributions.length > 0
-			? knownContributions.reduce(
-					(sum, row) =>
-						sum + Math.max(0, (row.plannedContribution ?? 0) - (row.realizedContribution ?? 0)),
-					0,
-				)
+			? knownContributions.reduce((sum, row) => {
+					const planned = row.plannedContribution ?? 0;
+					const realized = row.realizedContribution ?? 0;
+					return approxEqual(realized, planned) ? sum : sum + Math.max(0, planned - realized);
+				}, 0)
 			: null;
 	const returnShortfall =
 		comparableMonths.length > 0 ? cumulativeProjectedGain - cumulativeRealizedGain : null;
@@ -193,15 +193,11 @@ export function analyzeGoalTracking(input: GoalTrackingInput) {
 		});
 	}
 
-	if (
-		contributionShortfall !== null &&
-		contributionShortfall > 0 &&
-		!approxEqual(contributionShortfall, 0)
-	)
+	if (contributionShortfall !== null && contributionShortfall > 0)
 		findings.push({
 			code: "contribution_shortfall",
 			severity: "warning",
-			message: `Alerta: aporte abaixo do planejado; déficit conhecido de ${contributionShortfall}.`,
+			message: `Alerta: aporte abaixo do planejado; déficit conhecido de ${Number(contributionShortfall.toFixed(2))}.`,
 		});
 	const coverage =
 		comparableMonths.length === 0
@@ -241,6 +237,10 @@ export function analyzeGoalTracking(input: GoalTrackingInput) {
 						comparableMonths: comparableMonths.length,
 						coverage,
 						contributionShortfall,
+						/**
+						 * Diferença de ganhos líquidos, incluindo rendimento perdido por principal não aportado.
+						 * Pode ser negativa quando o ganho realizado supera o projetado.
+						 */
 						returnShortfall,
 					},
 				}),

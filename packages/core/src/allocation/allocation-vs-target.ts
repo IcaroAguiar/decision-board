@@ -43,8 +43,6 @@ export function analyzeAllocationVsTarget(input: AllocationVsTargetInput) {
 	for (const position of [...input.positions, ...input.candidates]) {
 		if (input.concentrationLimits?.perIssuer !== undefined && !position.issuer?.trim())
 			notVerified.push(`Emissor não informado: ${position.assetId}`);
-		if (!position.segment?.trim())
-			notVerified.push(`Ativo sem classificação de setor: ${position.assetId}`);
 		if (
 			"custody" in position &&
 			position.custody === "outside-b3" &&
@@ -141,8 +139,10 @@ export function analyzeAllocationVsTarget(input: AllocationVsTargetInput) {
 	}
 	const classifications = [...input.positions, ...input.candidates];
 	const segments = new Map<string, string>();
-	for (const position of classifications) {
-		const sameAsset = classifications.filter((other) => other.assetId === position.assetId);
+	for (const assetId of new Set(classifications.map((position) => position.assetId))) {
+		const sameAsset = classifications.filter((other) => other.assetId === assetId);
+		const position = sameAsset[0];
+		if (!position) continue;
 		if (
 			sameAsset.some(
 				(other) => other.part !== position.part || other.assetClass !== position.assetClass,
@@ -154,9 +154,9 @@ export function analyzeAllocationVsTarget(input: AllocationVsTargetInput) {
 				sameAsset.flatMap((other) => (other.segment?.trim() ? [other.segment.trim()] : [])),
 			),
 		];
-		if (labels.length > 1)
-			notVerified.push(`Setores conflitantes para o ativo: ${position.assetId}`);
-		if (labels.length === 1 && labels[0]) segments.set(position.assetId, labels[0]);
+		if (labels.length > 1) notVerified.push(`Setores conflitantes para o ativo: ${assetId}`);
+		else if (labels[0]) segments.set(assetId, labels[0]);
+		else notVerified.push(`Ativo sem classificação de setor: ${assetId}`);
 	}
 	const normalizedHoldings = holdings.map((position) => ({
 		...position,
@@ -210,8 +210,17 @@ export function analyzeAllocationVsTarget(input: AllocationVsTargetInput) {
 	const maxDeviationBefore =
 		denominator !== null && denominator > 0
 			? Math.max(
-					...[...byPart, ...byClass].map((row) =>
-						Math.abs(((row.currentWeight ?? 0) * (total ?? 0)) / denominator - row.target),
+					...portfolioParts.map((part) =>
+						Math.abs(
+							knownValues((position) => position.part === part) / denominator -
+								input.partTargets[part].target,
+						),
+					),
+					...Object.entries(input.classTargets ?? {}).map(([label, target]) =>
+						Math.abs(
+							knownValues((position) => position.assetClass === label) / denominator -
+								target.target,
+						),
 					),
 				)
 			: null;

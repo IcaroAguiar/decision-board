@@ -74,15 +74,15 @@ _Avoid_: full FII analysis in the core allocation slice
 ## Allocation analysis contracts
 
 R7 aggregates asset values across custody institutions; institution concentration uses each position's custody and candidates use the institution of the simulated lot.
-Only part and asset class must agree for the same asset. A unique non-empty segment fills empty entries; conflicting segments remain not verified.
+Only part and asset class must agree for the same asset. A unique non-empty segment fills empty entries; conflicting segments remain not verified. Missing or conflicting sectors are reported once per asset after resolving all entries.
 Issuer limits are distinct from custody limits; missing issuer data with an issuer limit withholds the proposal.
 Partial-base alerts refer to known wealth. Empty weight coverage is inconclusive with null output.
 Part and class rows expose weightAfter and deviationAfter. Both maximum deviations use known wealth plus the contribution as denominator.
 Whole lots may converge from below a band, but may neither exceed its upper bound nor increase distance from a touched target. Concentration saturation is informational.
 
 R8 compares cumulative gains net of contributions over the same known months.
-Gain-alert causes come only from months with lower realized gain.
-contributionShortfall sums positive planned-minus-realized contributions where both are known; returnShortfall is projected-minus-realized cumulative gain over comparable months.
+Gain-alert causes come only from months with lower realized gain and exclude contribution shortfalls (reported separately).
+contributionShortfall sums positive planned-minus-realized contributions where both are known and not approximately equal; only its warning message rounds to two decimal places. returnShortfall is projected-minus-realized cumulative gain over comparable months: it includes yield lost on missing principal and may be negative when realized gain beats projected gain.
 A positive contribution shortfall emits its own warning, independently of the gain threshold.
 Some comparable months preserve partial rows; none yield inconclusive status and null output.
 The first closing is the gain base; its contribution is not required for gain coverage.

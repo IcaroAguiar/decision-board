@@ -190,12 +190,15 @@ test("R8: alerta de rendimento puro quantifica déficit sem causa aporte", () =>
 	assert.equal(result.output.returnShortfall, 20);
 	assert.match(result.findings[0]?.message ?? "", /causas prováveis: rendimento\./);
 });
-test("R8: aporte quase igual usa tolerância na atribuição", () => {
+test("R8: aporte quase igual não gera achado", () => {
 	const input = fixture();
 	input.realizedContributions = series([0, 100 - 1e-11]);
+	input.realizedValues = series([1000, 1200]);
 	const result = analyzeGoalTracking(input);
 	assert.ok(result.output);
-	assert.deepEqual(result.output.months[1]?.causes, ["rendimento"]);
+	assert.deepEqual(result.output.months[1]?.causes, []);
+	assert.equal(result.output.contributionShortfall, 0);
+	assert.deepEqual(result.findings, []);
 });
 test("R8: contribuição ausente no mês base não torna ganhos parciais", () => {
 	const input = fixture();
@@ -246,4 +249,34 @@ test("R8: déficit logo acima do limite dispara alerta", () => {
 	const input = fixture();
 	input.realizedValues = series([1000, 1185 - 1e-7]);
 	assert.equal(analyzeGoalTracking(input).findings[0]?.code, "cumulative_gain_shortfall");
+});
+
+test("R8: déficit de aporte e ganho têm alertas separados sem atribuir ganho ao aporte", () => {
+	const input = fixture();
+	input.realizedContributions = series([0, 50]);
+	input.realizedValues = series([1000, 1130]);
+	const result = analyzeGoalTracking(input);
+	assert.ok(result.output);
+	assert.equal(result.output.contributionShortfall, 50);
+	assert.equal(result.output.returnShortfall, 20);
+	assert.deepEqual(result.output.months[1]?.causes, ["aporte", "rendimento"]);
+	assert.deepEqual(
+		result.findings.map((finding) => finding.code),
+		["cumulative_gain_shortfall", "contribution_shortfall"],
+	);
+	assert.match(result.findings[0]?.message ?? "", /causas prováveis: rendimento\./);
+});
+
+test("R8: arredonda déficit só na mensagem e preserva ganho superior como negativo", () => {
+	const input = fixture();
+	input.realizedContributions = series([0, 99.7]);
+	input.realizedValues = series([1000, 1210]);
+	const result = analyzeGoalTracking(input);
+	assert.ok(result.output);
+	assert.equal(result.output.contributionShortfall, 100 - 99.7);
+	assert.ok(result.output.returnShortfall !== null && result.output.returnShortfall < 0);
+	assert.equal(
+		result.findings[0]?.message,
+		"Alerta: aporte abaixo do planejado; déficit conhecido de 0.3.",
+	);
 });

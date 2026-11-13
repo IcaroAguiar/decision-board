@@ -257,14 +257,26 @@ test("class target changes the choice within the same portfolio part", () => {
 	});
 	assert.equal(simulateContributionAllocation(input).planItems[0]?.ticker, "SYN2");
 });
-test("a lot cannot worsen one dimension in exchange for another", () => {
+test("a lot cannot worsen one dimension even when summed improvement is positive", () => {
 	const result = simulateContributionAllocation(
 		fixture({
 			contributionAmount: 100,
 			positions: [
 				{ assetId: "held", part: "goal", value: 100, assetClass: "full", institution: "i" },
+				{
+					assetId: "other",
+					part: "variableIncome",
+					value: 100,
+					assetClass: "other",
+					institution: "i",
+				},
 			],
-			classTargets: { full: { target: 0.4, band: { min: 0, max: 1 } } },
+			partTargets: {
+				reserve: { target: 0, band: { min: 0, max: 0 } },
+				goal: { target: 0.8, band: { min: 0, max: 1 } },
+				variableIncome: { target: 0.2, band: { min: 0, max: 1 } },
+			},
+			classTargets: { full: { target: 0.45, band: { min: 0, max: 1 } } },
 			candidates: [candidate({ assetClass: "full" })],
 		}),
 	);
