@@ -21,6 +21,8 @@ export function calendarDaysBetween(start: string, end: string): number {
 }
 
 export interface BusinessCalendar {
+	readonly coverage: { readonly from: string; readonly until: string };
+	readonly holidays: readonly string[];
 	adjustToBusinessDay(date: string, direction: "following" | "preceding"): string;
 	isBusinessDay(date: string): boolean;
 	businessDaysBetween(start: string, end: string): number;
@@ -51,6 +53,8 @@ export function createBusinessCalendar({
 	}
 
 	return {
+		coverage: { from: coveredFrom, until: coveredUntil },
+		holidays: [...holidaySet].sort(),
 		isBusinessDay,
 		adjustToBusinessDay(date, direction) {
 			let result = date;

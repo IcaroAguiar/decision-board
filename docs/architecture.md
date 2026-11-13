@@ -154,7 +154,7 @@ cada método nos testes de aceite. Valores monetários gravados no banco usam
 `Decimal`, e a conversão acontece na fronteira da API. Taxas e percentuais são
 frações decimais (0,1375 representa 13,75%), e o motor só arredonda na
 apresentação. Os cálculos de carteira herdados da visão anterior
-(`portfolio.ts`) ainda usam pontos percentuais e arredondam valores; serão
+ainda usam pontos percentuais e arredondam valores; serão
 migrados para a convenção nova.
 
 As datas são datas de calendário ISO (`AAAA-MM-DD`), tratadas em UTC. Os dias

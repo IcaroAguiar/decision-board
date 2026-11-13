@@ -23,6 +23,7 @@ const complete: AnalysisResult<{ value: number }, { total: number }> = {
 	inputs: { value: 2 },
 	assumptions: { scenario: "sintético", factor: 2, simulated: true },
 	sources: [source],
+	natures: ["observed"],
 	notVerified: [],
 	findings: [],
 	output: { total: 4 },

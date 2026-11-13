@@ -125,3 +125,13 @@ test("adjusts in both directions across weekend and synthetic holidays", () => {
 	assert.throws(() => bounded.adjustToBusinessDay("2026-03-07", "following"), /não cobre/);
 	assert.throws(() => bounded.adjustToBusinessDay("2026-03-08", "preceding"), /não cobre/);
 });
+
+test("exposes its coverage and sorted holidays for reproducibility", () => {
+	const covered = createBusinessCalendar({
+		holidays: ["2026-03-04", "2026-01-01", "2026-03-04"],
+		coveredFrom: "2026-01-01",
+		coveredUntil: "2026-12-31",
+	});
+	assert.deepEqual(covered.coverage, { from: "2026-01-01", until: "2026-12-31" });
+	assert.deepEqual(covered.holidays, ["2026-01-01", "2026-03-04"]);
+});

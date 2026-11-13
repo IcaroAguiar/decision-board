@@ -26,7 +26,7 @@ export function missing(reason: string): Datum<never> {
 	return { status: "missing", reason };
 }
 
-type SumWithCoverage = (
+export type SumWithCoverage = (
 	| { coverage: "empty"; total: null }
 	| { coverage: "complete" | "partial"; total: number }
 ) & {
@@ -90,7 +90,7 @@ export function deduplicateSources(sources: readonly SourceRef[]): SourceRef[] {
 				previous.url !== source.url ||
 				previous.official !== source.official
 			) {
-				throw new Error("Fonte duplicada com dados divergentes");
+				throw new Error(`Fonte duplicada com dados divergentes: ${source.id} em ${source.asOf}.`);
 			}
 		} else unique.set(key, source);
 	}
@@ -119,14 +119,15 @@ export function collectEvidence(datums: Datum<unknown>[]): {
 		} else {
 			sources.push(datum.source);
 			natures.add(datum.nature);
-			const key = JSON.stringify([sourceKey(datum.source), datum.nature]);
-			if (!disclosures.has(key)) {
-				disclosures.add(key);
-				if (datum.nature === "observed" && !datum.source.official) {
-					notVerified.push(`Fonte não oficial: ${datum.source.label}`);
-				} else if (datum.nature === "estimated") {
-					notVerified.push(`Valor estimado: ${datum.source.label}`);
-				}
+			const disclosure =
+				datum.nature === "observed" && !datum.source.official
+					? `Fonte não oficial: ${datum.source.label}`
+					: datum.nature === "estimated"
+						? `Valor estimado: ${datum.source.label}`
+						: null;
+			if (disclosure !== null && !disclosures.has(disclosure)) {
+				disclosures.add(disclosure);
+				notVerified.push(disclosure);
 			}
 		}
 	}

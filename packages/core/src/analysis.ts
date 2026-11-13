@@ -1,5 +1,5 @@
 import { parseIsoDate } from "./calendar.js";
-import { deduplicateSources, type SourceRef } from "./provenance.js";
+import { type DataNature, deduplicateSources, type SourceRef } from "./provenance.js";
 
 export const methodIds = {
 	fixedIncomeSimulation: "r1.fixed-income-simulation",
@@ -37,6 +37,7 @@ interface AnalysisCommon<TInput, TAssumptions> {
 	inputs: TInput;
 	assumptions: TAssumptions;
 	sources: SourceRef[];
+	natures: DataNature[];
 	notVerified: string[];
 	findings: AnalysisFinding[];
 }

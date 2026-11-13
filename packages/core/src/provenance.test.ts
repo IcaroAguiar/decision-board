@@ -245,11 +245,7 @@ test("discloses observed non-official and estimated sources independently of fir
 		]),
 		{
 			sources: [source, official],
-			notVerified: [
-				"Valor estimado: Fonte sintética",
-				"Fonte não oficial: Fonte sintética",
-				"Valor estimado: Fonte sintética",
-			],
+			notVerified: ["Valor estimado: Fonte sintética", "Fonte não oficial: Fonte sintética"],
 			hasMissing: false,
 			natures: ["informed", "observed", "estimated"],
 		},
