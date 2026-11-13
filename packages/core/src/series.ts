@@ -10,14 +10,18 @@ export function parseYearMonth(value: string): YearMonth {
 	return value;
 }
 
+const monthsPerYear = 12;
+/** Índice de dezembro de 9999, o último mês representável em YYYY-MM. */
+const maxMonthIndex = 9999 * monthsPerYear + 11;
+
 export function addMonths(ym: YearMonth, n: number): YearMonth {
 	if (!Number.isSafeInteger(n))
 		throw new Error("A quantidade de meses deve ser um inteiro seguro.");
 	const index = monthIndex(ym) + n;
-	if (!Number.isSafeInteger(index) || index < 0 || index > 119999) {
+	if (!Number.isSafeInteger(index) || index < 0 || index > maxMonthIndex) {
 		throw new Error("Mês fora do intervalo YYYY-MM.");
 	}
-	return `${String(Math.floor(index / 12)).padStart(4, "0")}-${String((index % 12) + 1).padStart(2, "0")}`;
+	return `${String(Math.floor(index / monthsPerYear)).padStart(4, "0")}-${String((index % monthsPerYear) + 1).padStart(2, "0")}`;
 }
 
 export function monthsBetween(start: YearMonth, end: YearMonth): number {
@@ -113,5 +117,5 @@ export function alignSeries(
 
 function monthIndex(ym: YearMonth): number {
 	parseYearMonth(ym);
-	return Number(ym.slice(0, 4)) * 12 + Number(ym.slice(5, 7)) - 1;
+	return Number(ym.slice(0, 4)) * monthsPerYear + Number(ym.slice(5, 7)) - 1;
 }
