@@ -73,6 +73,19 @@ export function covarianceMatrix(series: readonly (readonly number[])[]): number
 	return matrix;
 }
 
+function weightedDiagonalScale(
+	weights: readonly number[],
+	matrix: readonly (readonly number[])[],
+): number {
+	let scale = 0;
+	for (let index = 0; index < weights.length; index += 1) {
+		const weight = weights[index] ?? 0;
+		const diag = matrix[index]?.[index] ?? 0;
+		scale += Math.abs(weight * weight * diag);
+	}
+	return scale;
+}
+
 export function portfolioVolatility(
 	weights: readonly number[],
 	matrix: readonly (readonly number[])[],
@@ -80,9 +93,9 @@ export function portfolioVolatility(
 	assertSquareMatrix(weights, matrix);
 	const sigmaW = matrixVectorMultiply(matrix, weights);
 	let variance = 0;
-	for (let i = 0; i < weights.length; i += 1) {
-		const weight = weights[i];
-		const marginal = sigmaW[i];
+	for (let index = 0; index < weights.length; index += 1) {
+		const weight = weights[index];
+		const marginal = sigmaW[index];
 		if (weight !== undefined && marginal !== undefined) {
 			variance += weight * marginal;
 		}
@@ -90,31 +103,49 @@ export function portfolioVolatility(
 	if (!Number.isFinite(variance)) {
 		throw new Error("A variância da carteira excede o intervalo numérico finito.");
 	}
+	const zeroTolerance = weightedDiagonalScale(weights, matrix) * 1e-12;
 	if (variance < 0) {
-		if (approxEqual(variance, 0, { absolute: 1e-12 })) return 0;
+		if (approxEqual(variance, 0, { absolute: Math.max(1e-12, zeroTolerance) })) return 0;
 		throw new Error("Matriz de covariância inválida: variância da carteira negativa.");
 	}
+	if (variance <= zeroTolerance) return 0;
 	return Math.sqrt(variance);
+}
+
+/**
+ * Calcula a contribuição percentual ao risco de cada ativo ou retorna `null` quando a
+ * variância da carteira é nula (incluindo neutralização perfeita dentro da tolerância numérica).
+ */
+export function tryRiskContributions(
+	weights: readonly number[],
+	matrix: readonly (readonly number[])[],
+): number[] | null {
+	assertSquareMatrix(weights, matrix);
+	const sigmaW = matrixVectorMultiply(matrix, weights);
+	let portfolioVariance = 0;
+	const weightedMarginal: number[] = [];
+	for (let index = 0; index < weights.length; index += 1) {
+		const weight = weights[index];
+		const marginal = sigmaW[index];
+		if (weight === undefined || marginal === undefined) continue;
+		const contribution = weight * marginal;
+		weightedMarginal.push(contribution);
+		portfolioVariance += contribution;
+	}
+	const zeroTolerance = weightedDiagonalScale(weights, matrix) * 1e-12;
+	if (!Number.isFinite(portfolioVariance) || portfolioVariance <= zeroTolerance) {
+		return null;
+	}
+	return weightedMarginal.map((value) => value / portfolioVariance);
 }
 
 export function riskContributions(
 	weights: readonly number[],
 	matrix: readonly (readonly number[])[],
 ): number[] {
-	assertSquareMatrix(weights, matrix);
-	const sigmaW = matrixVectorMultiply(matrix, weights);
-	let portfolioVariance = 0;
-	const weightedMarginal: number[] = [];
-	for (let i = 0; i < weights.length; i += 1) {
-		const weight = weights[i];
-		const marginal = sigmaW[i];
-		if (weight === undefined || marginal === undefined) continue;
-		const contribution = weight * marginal;
-		weightedMarginal.push(contribution);
-		portfolioVariance += contribution;
-	}
-	if (!Number.isFinite(portfolioVariance) || portfolioVariance <= 0) {
+	const contributions = tryRiskContributions(weights, matrix);
+	if (contributions === null) {
 		throw new Error("Variância nula ou inválida impede o cálculo da contribuição ao risco.");
 	}
-	return weightedMarginal.map((value) => value / portfolioVariance);
+	return contributions;
 }

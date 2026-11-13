@@ -297,7 +297,7 @@ test("marks partial and lists key when a holding balance is missing", () => {
 	assert.ok(result.notVerified.some((note) => note.includes("SMAL11")));
 });
 
-test("returns inconclusive with null output when no window is complete or essential inputs are missing", () => {
+test("returns partial on short history when worst months are computable, and inconclusive when nothing is computable or essential inputs are missing", () => {
 	const endMonth = "2026-10";
 	const rand = createLcg(55);
 	const rShort = Array.from({ length: 12 }, () => 0.003 + (rand() - 0.5) * 0.05);
@@ -316,9 +316,36 @@ test("returns inconclusive with null output when no window is complete or essent
 		candidates: [{ key: "C1", returns: toSeries(endMonth, rShort) }],
 		contribution: known(1_000, "informed", officialSource),
 	});
-	assert.equal(shortResult.status, "inconclusive");
-	assert.equal(shortResult.output, null);
+	assert.equal(shortResult.status, "partial");
+	const shortCandidate = shortResult.output.candidates[0];
+	assert.ok(shortCandidate);
+	assert.equal(shortCandidate.classification, "inconclusivo");
+	assert.equal(shortCandidate.longestCompleteWindow, null);
+	assert.equal(shortCandidate.rollingCorrelation, null);
+	assert.equal(shortCandidate.worstMonths.length, 5);
+	for (const windowResult of shortCandidate.windows) {
+		assert.equal(windowResult.status, "partial");
+		assert.equal(windowResult.correlation, null);
+	}
 	assertNoPrescriptiveWording(shortResult.notVerified, shortResult.findings);
+
+	const emptyHistoryResult = runCorrelationTest({
+		asOf: "2026-10-31",
+		endMonth,
+		strategyVersion: null,
+		holdings: [
+			{
+				key: "A1",
+				value: known(10_000, "observed", officialSource),
+				returns: createMonthlySeries([]),
+			},
+		],
+		candidates: [{ key: "C1", returns: createMonthlySeries([]) }],
+		contribution: known(1_000, "informed", officialSource),
+	});
+	assert.equal(emptyHistoryResult.status, "inconclusive");
+	assert.equal(emptyHistoryResult.output, null);
+	assertNoPrescriptiveWording(emptyHistoryResult.notVerified, emptyHistoryResult.findings);
 
 	const missingContributionResult = runCorrelationTest({
 		asOf: "2026-10-31",
@@ -343,7 +370,51 @@ test("returns inconclusive with null output when no window is complete or essent
 	);
 });
 
-test("handles adding contribution to a candidate that is already in holdings", () => {
+test("keeps partial status with output and 1 rolling observation for 24 aligned months", () => {
+	const endMonth = "2026-10";
+	const rand = createLcg(612);
+	const rHolding = Array.from({ length: 24 }, () => 0.004 + (rand() - 0.5) * 0.06);
+	const rCandidate = makeExactCorrelatedReturns(rHolding, -0.5, 0.03, 613);
+
+	const result = runCorrelationTest({
+		asOf: "2026-10-31",
+		endMonth,
+		strategyVersion: null,
+		holdings: [
+			{
+				key: "CART11",
+				value: known(100_000, "observed", officialSource),
+				returns: toSeries(endMonth, rHolding),
+			},
+		],
+		candidates: [{ key: "CAND24", returns: toSeries(endMonth, rCandidate) }],
+		contribution: known(20_000, "informed", officialSource),
+	});
+
+	assert.equal(result.status, "partial");
+	const candidate = result.output.candidates[0];
+	assert.ok(candidate);
+	assert.equal(candidate.classification, "inconclusivo");
+	assert.equal(candidate.longestCompleteWindow, null);
+
+	const win30 = candidate.windows.find((w) => w.window === 30);
+	const win58 = candidate.windows.find((w) => w.window === 58);
+	assert.ok(win30 && win30.status === "partial" && win30.correlation === null);
+	assert.ok(win58 && win58.status === "partial" && win58.correlation === null);
+
+	assert.ok(candidate.rollingCorrelation !== null);
+	assert.equal(candidate.rollingCorrelation.windowMonths, 24);
+	assert.equal(candidate.rollingCorrelation.observations, 1);
+	assert.ok(
+		approxEqual(candidate.rollingCorrelation.min, -0.5, { relative: 1e-9, absolute: 1e-9 }),
+	);
+	assert.ok(
+		approxEqual(candidate.rollingCorrelation.max, -0.5, { relative: 1e-9, absolute: 1e-9 }),
+	);
+	assertNoPrescriptiveWording(result.notVerified, result.findings);
+});
+
+test("handles adding contribution to a candidate that is already in holdings with updated weights, volatility and risk contributions", () => {
 	const endMonth = "2026-10";
 	const rand = createLcg(808);
 	const r1 = Array.from({ length: 30 }, () => 0.005 + (rand() - 0.5) * 0.09);
@@ -372,10 +443,294 @@ test("handles adding contribution to a candidate that is already in holdings", (
 
 	if (result.status === "inconclusive") assert.fail("Esperado completo.");
 	assert.equal(result.status, "complete");
+	assert.ok(approxEqual(result.output.beforeWeights.ATIVO1 ?? 0, 0.8));
+	assert.ok(approxEqual(result.output.beforeWeights.ATIVO2 ?? 0, 0.2));
+
 	const candidate = result.output.candidates[0];
 	assert.ok(candidate);
+	assert.ok(approxEqual(candidate.afterWeights.ATIVO1 ?? 0, 0.64));
+	assert.ok(approxEqual(candidate.afterWeights.ATIVO2 ?? 0, 0.36));
+
+	// Cálculo independente dos momentos amostrais (n - 1) sobre r1 e r2 para pesos 0.64 / 0.36.
+	const mean1 = mean(r1);
+	const mean2 = mean(r2);
+	let sumSq1 = 0;
+	let sumSq2 = 0;
+	let sumProd = 0;
+	for (let index = 0; index < r1.length; index += 1) {
+		const delta1 = (r1[index] ?? 0) - mean1;
+		const delta2 = (r2[index] ?? 0) - mean2;
+		sumSq1 += delta1 * delta1;
+		sumSq2 += delta2 * delta2;
+		sumProd += delta1 * delta2;
+	}
+	const var1 = sumSq1 / (r1.length - 1);
+	const var2 = sumSq2 / (r2.length - 1);
+	const cov12 = sumProd / (r1.length - 1);
+
+	const w1After = 0.64;
+	const w2After = 0.36;
+	const marginal1After = w1After * var1 + w2After * cov12;
+	const marginal2After = w1After * cov12 + w2After * var2;
+	const portVarAfter = w1After * marginal1After + w2After * marginal2After;
+	const expectedVolAfter = Math.sqrt(portVarAfter) * Math.sqrt(12);
+	const expectedRc1After = (w1After * marginal1After) / portVarAfter;
+	const expectedRc2After = (w2After * marginal2After) / portVarAfter;
+
+	assert.ok(approxEqual(candidate.volatilityAfter ?? Number.NaN, expectedVolAfter));
 	assert.deepEqual(Object.keys(candidate.riskContributionsAfter ?? {}), ["ATIVO1", "ATIVO2"]);
-	const sumAfter = Object.values(candidate.riskContributionsAfter ?? {}).reduce((a, b) => a + b, 0);
-	assert.ok(approxEqual(sumAfter, 1));
+	assert.ok(approxEqual(candidate.riskContributionsAfter?.ATIVO1 ?? Number.NaN, expectedRc1After));
+	assert.ok(approxEqual(candidate.riskContributionsAfter?.ATIVO2 ?? Number.NaN, expectedRc2After));
+	assert.ok(!approxEqual(candidate.volatilityAfter ?? Number.NaN, candidate.volatilityBefore ?? 0));
 	assertNoPrescriptiveWording(result.notVerified, result.findings);
+});
+
+test("handles zero variance without aborting: constant candidate, constant rolling sub-window, variance-neutralizing contribution, and mixed batch", () => {
+	const endMonth = "2026-10";
+	const rand = createLcg(4242);
+	const rPortfolio = Array.from({ length: 30 }, () => 0.005 + (rand() - 0.5) * 0.08);
+
+	// 1. Candidato constante (variância nula em toda a série)
+	const constantReturns = Array.from({ length: 30 }, () => 0.008);
+	const constResult = runCorrelationTest({
+		asOf: "2026-10-31",
+		endMonth,
+		strategyVersion: null,
+		holdings: [
+			{
+				key: "BOLSA11",
+				value: known(80_000, "observed", officialSource),
+				returns: toSeries(endMonth, rPortfolio),
+			},
+		],
+		candidates: [{ key: "CAIXA_FIXO", returns: toSeries(endMonth, constantReturns) }],
+		contribution: known(20_000, "informed", officialSource),
+		assumptions: { windows: [30], rollingWindow: 24, worstMonths: 5 },
+	});
+	assert.equal(constResult.status, "partial");
+	const constCandidate = constResult.output.candidates[0];
+	assert.ok(constCandidate);
+	assert.equal(constCandidate.rollingCorrelation, null);
+	assert.equal(constCandidate.windows[0]?.status, "partial");
+	assert.equal(constCandidate.windows[0]?.correlation, null);
+	assert.ok((constCandidate.volatilityBefore ?? 0) > 0);
+	assert.ok((constCandidate.volatilityAfter ?? 0) < (constCandidate.volatilityBefore ?? 0));
+	assert.ok(constCandidate.riskContributionsBefore !== null);
+	assert.ok(constCandidate.riskContributionsAfter !== null);
+	assert.ok(
+		constResult.findings.some(
+			(finding) => finding.subject === "CAIXA_FIXO" && finding.severity === "warning",
+		),
+	);
+	assert.ok(constResult.notVerified.some((note) => note.includes("CAIXA_FIXO")));
+	assertNoPrescriptiveWording(constResult.notVerified, constResult.findings);
+
+	// 2. Subjanela móvel constante (24 primeiros meses constantes, 6 últimos variáveis)
+	const partialConstReturns = [
+		...Array.from({ length: 24 }, () => 0.004),
+		0.02,
+		-0.015,
+		0.03,
+		-0.02,
+		0.01,
+		-0.005,
+	];
+	const rollingSubResult = runCorrelationTest({
+		asOf: "2026-10-31",
+		endMonth,
+		strategyVersion: null,
+		holdings: [
+			{
+				key: "BOLSA11",
+				value: known(80_000, "observed", officialSource),
+				returns: toSeries(endMonth, rPortfolio),
+			},
+		],
+		candidates: [{ key: "SUB_CONST", returns: toSeries(endMonth, partialConstReturns) }],
+		contribution: known(20_000, "informed", officialSource),
+		assumptions: { windows: [30], rollingWindow: 24, worstMonths: 5 },
+	});
+	assert.equal(rollingSubResult.status, "partial");
+	const subCandidate = rollingSubResult.output.candidates[0];
+	assert.ok(subCandidate);
+	assert.equal(subCandidate.windows[0]?.status, "complete");
+	assert.ok(subCandidate.rollingCorrelation !== null);
+	// 30 meses com janela de 24 geram 7 subjanelas; a primeira é constante e as 6 restantes são válidas.
+	assert.equal(subCandidate.rollingCorrelation.observations, 6);
+	assert.ok(
+		rollingSubResult.findings.some(
+			(finding) => finding.subject === "SUB_CONST" && finding.severity === "warning",
+		),
+	);
+	assertNoPrescriptiveWording(rollingSubResult.notVerified, rollingSubResult.findings);
+
+	// 3. Aporte que neutraliza exatamente a volatilidade da carteira (variância posterior nula)
+	const neutralizingReturns = rPortfolio.map((value) => -value);
+	const neutralResult = runCorrelationTest({
+		asOf: "2026-10-31",
+		endMonth,
+		strategyVersion: null,
+		holdings: [
+			{
+				key: "BOLSA11",
+				value: known(50_000, "observed", officialSource),
+				returns: toSeries(endMonth, rPortfolio),
+			},
+		],
+		candidates: [{ key: "ESPELHO11", returns: toSeries(endMonth, neutralizingReturns) }],
+		contribution: known(50_000, "informed", officialSource),
+		assumptions: { windows: [30], rollingWindow: 24, worstMonths: 5 },
+	});
+	assert.equal(neutralResult.status, "partial");
+	const neutralCandidate = neutralResult.output.candidates[0];
+	assert.ok(neutralCandidate);
+	assert.equal(neutralCandidate.classification, "reduz risco");
+	assert.ok((neutralCandidate.volatilityBefore ?? 0) > 0);
+	assert.equal(neutralCandidate.volatilityAfter, 0);
+	assert.ok(neutralCandidate.riskContributionsBefore !== null);
+	assert.equal(neutralCandidate.riskContributionsAfter, null);
+	assert.ok(approxEqual(neutralCandidate.windows[0]?.correlation ?? 0, -1));
+	assert.ok(
+		neutralResult.findings.some(
+			(finding) => finding.subject === "ESPELHO11" && finding.severity === "warning",
+		),
+	);
+	assertNoPrescriptiveWording(neutralResult.notVerified, neutralResult.findings);
+
+	// 4. Lote misto: um candidato degenerado não impede o candidato válido de manter seus números
+	const validReturns = makeExactCorrelatedReturns(rPortfolio, -0.6, 0.03, 5151);
+	const batchResult = runCorrelationTest({
+		asOf: "2026-10-31",
+		endMonth,
+		strategyVersion: null,
+		holdings: [
+			{
+				key: "BOLSA11",
+				value: known(80_000, "observed", officialSource),
+				returns: toSeries(endMonth, rPortfolio),
+			},
+		],
+		candidates: [
+			{ key: "CAIXA_FIXO", returns: toSeries(endMonth, constantReturns) },
+			{ key: "VALIDO11", returns: toSeries(endMonth, validReturns) },
+		],
+		contribution: known(20_000, "informed", officialSource),
+		assumptions: { windows: [30], rollingWindow: 24, worstMonths: 5 },
+	});
+	assert.equal(batchResult.status, "partial");
+	const batchConst = batchResult.output.candidates[0];
+	const batchValid = batchResult.output.candidates[1];
+	assert.ok(batchConst && batchValid);
+	assert.equal(batchConst.windows[0]?.correlation, null);
+	assert.equal(batchValid.windows[0]?.status, "complete");
+	assert.ok(
+		approxEqual(batchValid.windows[0]?.correlation ?? Number.NaN, -0.6, {
+			relative: 1e-9,
+			absolute: 1e-9,
+		}),
+	);
+	assert.equal(batchValid.classification, "reduz risco");
+	assert.equal(batchValid.longestCompleteWindow, 30);
+	assert.ok(batchValid.rollingCorrelation !== null);
+	assert.equal(batchValid.rollingCorrelation.observations, 7);
+	assertNoPrescriptiveWording(batchResult.notVerified, batchResult.findings);
+});
+
+test("selects worst months from the portfolio series and keeps adverse month with null candidateReturn when candidate data is missing", () => {
+	const endMonth = "2026-10";
+	const rand = createLcg(7070);
+	// 60 meses para a carteira, com o pior mês (-90%) fora dos últimos 58 meses do candidato.
+	const rPortfolio = [
+		-0.9,
+		0.01,
+		...Array.from({ length: 58 }, () => 0.005 + (rand() - 0.5) * 0.06),
+	];
+	const rCandidate58 = makeExactCorrelatedReturns(rPortfolio.slice(2), -0.45, 0.03, 7071);
+
+	const result = runCorrelationTest({
+		asOf: "2026-10-31",
+		endMonth,
+		strategyVersion: null,
+		holdings: [
+			{
+				key: "PORT11",
+				value: known(100_000, "observed", officialSource),
+				returns: toSeries(endMonth, rPortfolio),
+			},
+		],
+		candidates: [{ key: "RECENTE11", returns: toSeries(endMonth, rCandidate58) }],
+		contribution: known(20_000, "informed", officialSource),
+		assumptions: { windows: [30, 58], rollingWindow: 24, worstMonths: 5 },
+	});
+
+	assert.equal(result.status, "partial");
+	const candidate = result.output.candidates[0];
+	assert.ok(candidate);
+	// As janelas de 30 e 58 meses continuam completas, mas a ausência no pior mês marca o resultado como parcial.
+	assert.equal(candidate.longestCompleteWindow, 58);
+
+	const worstEntry = candidate.worstMonths[0];
+	assert.ok(worstEntry);
+	assert.equal(worstEntry.month, addMonths(endMonth, -59));
+	assert.equal(worstEntry.portfolioReturn, -0.9);
+	assert.equal(worstEntry.candidateReturn, null);
+	assert.ok(worstEntry.reason.includes("RECENTE11"));
+	assert.ok(
+		result.notVerified.some(
+			(note) => note.includes(worstEntry.month) && note.includes("RECENTE11"),
+		),
+	);
+	assert.ok(
+		result.findings.some(
+			(finding) =>
+				finding.subject === "RECENTE11" &&
+				finding.severity === "warning" &&
+				finding.message.includes(worstEntry.month),
+		),
+	);
+	assertNoPrescriptiveWording(result.notVerified, result.findings);
+});
+
+test("ignores known zero-balance holdings without history and preserves computable portfolio results", () => {
+	const endMonth = "2026-10";
+	const rand = createLcg(8181);
+	const r1 = Array.from({ length: 30 }, () => 0.004 + (rand() - 0.5) * 0.08);
+	const rCand = makeExactCorrelatedReturns(r1, -0.5, 0.03, 8182);
+
+	const baseInput = {
+		asOf: "2026-10-31",
+		endMonth,
+		strategyVersion: "v1",
+		holdings: [
+			{
+				key: "ATIVO1",
+				value: known(100_000, "observed", officialSource),
+				returns: toSeries(endMonth, r1),
+			},
+		],
+		candidates: [{ key: "HEDGE11", returns: toSeries(endMonth, rCand) }],
+		contribution: known(25_000, "informed", officialSource),
+		assumptions: { windows: [30], rollingWindow: 24, worstMonths: 5 },
+	};
+
+	const baseResult = runCorrelationTest(baseInput);
+	const withZeroResult = runCorrelationTest({
+		...baseInput,
+		holdings: [
+			...baseInput.holdings,
+			{
+				key: "ZERADO11",
+				value: known(0, "observed", officialSource),
+				returns: createMonthlySeries([]),
+			},
+		],
+	});
+
+	assert.equal(baseResult.status, "complete");
+	assert.equal(withZeroResult.status, baseResult.status);
+	assert.deepEqual(withZeroResult.output.candidates, baseResult.output.candidates);
+	assert.deepEqual(withZeroResult.notVerified, baseResult.notVerified);
+	assert.deepEqual(withZeroResult.findings, baseResult.findings);
+	assert.equal(withZeroResult.output.beforeWeights.ZERADO11, 0);
+	assertNoPrescriptiveWording(withZeroResult.notVerified, withZeroResult.findings);
 });

@@ -77,7 +77,11 @@ export function covariance(xs: readonly number[], ys: readonly number[]): number
 	return cov;
 }
 
-export function pearson(xs: readonly number[], ys: readonly number[]): number {
+/**
+ * Calcula a correlação de Pearson ou retorna `null` quando alguma série possui variância nula.
+ * Continua lançando erro para incompatibilidade de tamanho, menos de 3 pontos ou valores não finitos.
+ */
+export function tryPearson(xs: readonly number[], ys: readonly number[]): number | null {
 	if (xs.length !== ys.length) {
 		throw new Error("As séries devem ter o mesmo tamanho.");
 	}
@@ -87,31 +91,45 @@ export function pearson(xs: readonly number[], ys: readonly number[]): number {
 	const meanX = mean(xs);
 	const meanY = mean(ys);
 	if (isConstant(xs) || isConstant(ys)) {
-		throw new Error("Variância nula impede o cálculo da correlação de Pearson.");
+		return null;
 	}
 	let sumSqX = 0;
 	let sumSqY = 0;
 	let sumProd = 0;
-	for (let i = 0; i < xs.length; i += 1) {
-		const x = xs[i];
-		const y = ys[i];
-		if (x === undefined || y === undefined) continue;
-		const dx = x - meanX;
-		const dy = y - meanY;
-		sumSqX += dx * dx;
-		sumSqY += dy * dy;
-		sumProd += dx * dy;
+	for (let index = 0; index < xs.length; index += 1) {
+		const valueX = xs[index];
+		const valueY = ys[index];
+		if (valueX === undefined || valueY === undefined) continue;
+		const deltaX = valueX - meanX;
+		const deltaY = valueY - meanY;
+		sumSqX += deltaX * deltaX;
+		sumSqY += deltaY * deltaY;
+		sumProd += deltaX * deltaY;
+	}
+	if (sumSqX === 0 || sumSqY === 0) {
+		return null;
 	}
 	const denom = Math.sqrt(sumSqX) * Math.sqrt(sumSqY);
-	if (denom === 0 || !Number.isFinite(denom)) {
-		throw new Error("Variância nula impede o cálculo da correlação de Pearson.");
+	if (denom === 0) {
+		return null;
 	}
-	const r = sumProd / denom;
-	if (!Number.isFinite(r)) {
+	if (!Number.isFinite(denom)) {
+		throw new Error("A correlação de Pearson não produziu um resultado finito.");
+	}
+	const correlation = sumProd / denom;
+	if (!Number.isFinite(correlation)) {
 		throw new Error("A correlação de Pearson não produziu um resultado finito.");
 	}
 	// Limita desvios de arredondamento de ponto flutuante apenas fora de [-1, 1].
-	return Math.max(-1, Math.min(1, r));
+	return Math.max(-1, Math.min(1, correlation));
+}
+
+export function pearson(xs: readonly number[], ys: readonly number[]): number {
+	const correlation = tryPearson(xs, ys);
+	if (correlation === null) {
+		throw new Error("Variância nula impede o cálculo da correlação de Pearson.");
+	}
+	return correlation;
 }
 
 export function annualizeMonthlyVolatility(monthlyVolatility: number): number {

@@ -22,8 +22,8 @@ import {
 	type YearMonth,
 } from "../series.js";
 import { approxEqual } from "../units.js";
-import { covarianceMatrix, portfolioVolatility, riskContributions } from "./portfolio-risk.js";
-import { annualizeMonthlyVolatility, pearson } from "./statistics.js";
+import { covarianceMatrix, portfolioVolatility, tryRiskContributions } from "./portfolio-risk.js";
+import { annualizeMonthlyVolatility, tryPearson } from "./statistics.js";
 
 export const correlationTestMethodVersion = "1.0.0";
 const defaultWindows = [30, 58] as const;
@@ -77,12 +77,12 @@ export type WindowCorrelationResult =
 			status: "partial";
 			overlap: number;
 			months: YearMonth[];
-			correlation: null;
+			correlation: number | null;
 			reason: string;
-			volatilityBefore: null;
-			volatilityAfter: null;
-			riskContributionsBefore: null;
-			riskContributionsAfter: null;
+			volatilityBefore: number | null;
+			volatilityAfter: number | null;
+			riskContributionsBefore: Record<string, number> | null;
+			riskContributionsAfter: Record<string, number> | null;
 	  };
 
 export interface RollingCorrelationRange {
@@ -92,15 +92,23 @@ export interface RollingCorrelationRange {
 	observations: number;
 }
 
-export interface WorstMonthPerformance {
-	month: YearMonth;
-	portfolioReturn: number;
-	candidateReturn: number;
-}
+export type WorstMonthPerformance =
+	| {
+			month: YearMonth;
+			portfolioReturn: number;
+			candidateReturn: number;
+	  }
+	| {
+			month: YearMonth;
+			portfolioReturn: number;
+			candidateReturn: null;
+			reason: string;
+	  };
 
 export interface CandidateCorrelationOutput {
 	key: string;
 	classification: RiskImpactClassification;
+	afterWeights: Record<string, number>;
 	longestCompleteWindow: number | null;
 	volatilityBefore: number | null;
 	volatilityAfter: number | null;
@@ -116,6 +124,17 @@ export interface CorrelationTestOutput {
 	beforeWeights: Record<string, number>;
 	missingHoldingKeys: string[];
 	candidates: CandidateCorrelationOutput[];
+}
+
+interface PortfolioWorstMonth {
+	month: YearMonth;
+	portfolioReturn: number;
+}
+
+interface RollingComputationResult {
+	range: RollingCorrelationRange | null;
+	eligibleSubwindows: number;
+	skippedZeroVarianceCount: number;
 }
 
 function resolveAssumptions(raw?: Partial<CorrelationTestAssumptions>): CorrelationTestAssumptions {
@@ -156,6 +175,8 @@ function validateAndCollectEvidence(input: CorrelationTestInput): {
 	for (const holding of input.holdings) {
 		datums.push(holding.value);
 		const series = createMonthlySeries(holding.returns);
+		const hasPositiveWeight = holding.value.status === "known" && holding.value.value > 0;
+		if (!hasPositiveWeight) continue;
 		for (const point of series) {
 			if (point.month <= input.endMonth) datums.push(point.value);
 		}
@@ -193,10 +214,10 @@ function computePortfolioReturns(
 		const weight = weights[assetIndex];
 		const assetSeries = holdingValues[assetIndex];
 		if (weight === undefined || !assetSeries) continue;
-		for (let t = 0; t < length; t += 1) {
-			const r = assetSeries[t];
-			if (r !== undefined) {
-				portfolioReturns[t] = (portfolioReturns[t] ?? 0) + weight * r;
+		for (let monthIndex = 0; monthIndex < length; monthIndex += 1) {
+			const returnValue = assetSeries[monthIndex];
+			if (returnValue !== undefined) {
+				portfolioReturns[monthIndex] = (portfolioReturns[monthIndex] ?? 0) + weight * returnValue;
 			}
 		}
 	}
@@ -211,7 +232,7 @@ function mapRiskContributions(
 }
 
 function buildAfterScenarioWeights(
-	knownHoldings: readonly CorrelationHoldingInput[],
+	activeHoldings: readonly CorrelationHoldingInput[],
 	candidateKey: string,
 	contribution: Datum<number> & { status: "known" },
 ): {
@@ -219,9 +240,9 @@ function buildAfterScenarioWeights(
 	afterWeights: Record<string, number>;
 	candidateAlreadyInHoldings: boolean;
 } {
-	const existingIndex = knownHoldings.findIndex((holding) => holding.key === candidateKey);
+	const existingIndex = activeHoldings.findIndex((holding) => holding.key === candidateKey);
 	if (existingIndex >= 0) {
-		const updatedItems = knownHoldings.map((holding, index) => {
+		const updatedItems = activeHoldings.map((holding, index) => {
 			if (index !== existingIndex || holding.value.status !== "known") {
 				return { key: holding.key, value: holding.value };
 			}
@@ -236,19 +257,19 @@ function buildAfterScenarioWeights(
 		});
 		const { weights } = weightsWithCoverage(updatedItems);
 		return {
-			afterKeys: knownHoldings.map((holding) => holding.key),
+			afterKeys: activeHoldings.map((holding) => holding.key),
 			afterWeights: weights,
 			candidateAlreadyInHoldings: true,
 		};
 	}
 
 	const items = [
-		...knownHoldings.map((holding) => ({ key: holding.key, value: holding.value })),
+		...activeHoldings.map((holding) => ({ key: holding.key, value: holding.value })),
 		{ key: candidateKey, value: contribution },
 	];
 	const { weights } = weightsWithCoverage(items);
 	return {
-		afterKeys: [...knownHoldings.map((holding) => holding.key), candidateKey],
+		afterKeys: [...activeHoldings.map((holding) => holding.key), candidateKey],
 		afterWeights: weights,
 		candidateAlreadyInHoldings: false,
 	};
@@ -278,11 +299,15 @@ function computeRollingCorrelation(
 	candidateReturns: readonly number[],
 	portfolioReturns: readonly number[],
 	rollingWindow: number,
-): RollingCorrelationRange | null {
-	if (months.length < rollingWindow) return null;
+): RollingComputationResult {
+	if (months.length < rollingWindow) {
+		return { range: null, eligibleSubwindows: 0, skippedZeroVarianceCount: 0 };
+	}
 	let min = Number.POSITIVE_INFINITY;
 	let max = Number.NEGATIVE_INFINITY;
 	let observations = 0;
+	let eligibleSubwindows = 0;
+	let skippedZeroVarianceCount = 0;
 
 	for (let start = 0; start <= months.length - rollingWindow; start += 1) {
 		const startMonth = months[start];
@@ -290,44 +315,103 @@ function computeRollingCorrelation(
 		if (startMonth === undefined || endMonth === undefined) continue;
 		// Garante que a janela móvel tenha exatamente rollingWindow meses de calendário contíguos.
 		if (monthsBetween(startMonth, endMonth) !== rollingWindow - 1) continue;
+		eligibleSubwindows += 1;
 		const candidateSlice = candidateReturns.slice(start, start + rollingWindow);
 		const portfolioSlice = portfolioReturns.slice(start, start + rollingWindow);
-		const r = pearson(candidateSlice, portfolioSlice);
-		if (r < min) min = r;
-		if (r > max) max = r;
+		const correlation = tryPearson(candidateSlice, portfolioSlice);
+		if (correlation === null) {
+			skippedZeroVarianceCount += 1;
+			continue;
+		}
+		if (correlation < min) min = correlation;
+		if (correlation > max) max = correlation;
 		observations += 1;
 	}
 
-	if (observations === 0) return null;
+	if (observations === 0) {
+		return { range: null, eligibleSubwindows, skippedZeroVarianceCount };
+	}
 	return {
-		windowMonths: rollingWindow,
-		min,
-		max,
-		observations,
+		range: {
+			windowMonths: rollingWindow,
+			min,
+			max,
+			observations,
+		},
+		eligibleSubwindows,
+		skippedZeroVarianceCount,
 	};
 }
 
-function computeWorstMonths(
+function rankWorstPortfolioMonths(
 	months: readonly YearMonth[],
 	portfolioReturns: readonly number[],
-	candidateReturns: readonly number[],
 	worstCount: number,
-): WorstMonthPerformance[] {
-	const combined: WorstMonthPerformance[] = [];
-	for (let i = 0; i < months.length; i += 1) {
-		const month = months[i];
-		const portfolioReturn = portfolioReturns[i];
-		const candidateReturn = candidateReturns[i];
-		if (month === undefined || portfolioReturn === undefined || candidateReturn === undefined) {
+): PortfolioWorstMonth[] {
+	const ranked: PortfolioWorstMonth[] = [];
+	for (let index = 0; index < months.length; index += 1) {
+		const month = months[index];
+		const portfolioReturn = portfolioReturns[index];
+		if (month === undefined || portfolioReturn === undefined) continue;
+		ranked.push({ month, portfolioReturn });
+	}
+	ranked.sort((left, right) => {
+		const diff = left.portfolioReturn - right.portfolioReturn;
+		return diff !== 0 ? diff : left.month.localeCompare(right.month);
+	});
+	return ranked.slice(0, worstCount);
+}
+
+function buildCandidateWorstMonths(
+	portfolioWorstMonths: readonly PortfolioWorstMonth[],
+	candidateKey: string,
+	candidateByMonth: ReadonlyMap<YearMonth, Datum<number>>,
+): {
+	worstMonths: WorstMonthPerformance[];
+	missingReasons: string[];
+} {
+	const worstMonths: WorstMonthPerformance[] = [];
+	const missingReasons: string[] = [];
+
+	for (const entry of portfolioWorstMonths) {
+		const datum = candidateByMonth.get(entry.month);
+		if (datum?.status === "known") {
+			worstMonths.push({
+				month: entry.month,
+				portfolioReturn: entry.portfolioReturn,
+				candidateReturn: datum.value,
+			});
 			continue;
 		}
-		combined.push({ month, portfolioReturn, candidateReturn });
+		const reason =
+			datum?.status === "missing"
+				? `Retorno de ${candidateKey} ausente em ${entry.month}: ${datum.reason}`
+				: `Histórico de ${candidateKey} indisponível em ${entry.month}.`;
+		missingReasons.push(reason);
+		worstMonths.push({
+			month: entry.month,
+			portfolioReturn: entry.portfolioReturn,
+			candidateReturn: null,
+			reason,
+		});
 	}
-	combined.sort((a, b) => {
-		const diff = a.portfolioReturn - b.portfolioReturn;
-		return diff !== 0 ? diff : a.month.localeCompare(b.month);
-	});
-	return combined.slice(0, worstCount);
+
+	return { worstMonths, missingReasons };
+}
+
+function hasAnyComputableMetric(candidate: CandidateCorrelationOutput): boolean {
+	const hasWindowMetric = candidate.windows.some(
+		(windowResult) =>
+			windowResult.status === "complete" ||
+			windowResult.correlation !== null ||
+			windowResult.volatilityBefore !== null ||
+			windowResult.volatilityAfter !== null ||
+			windowResult.riskContributionsBefore !== null ||
+			windowResult.riskContributionsAfter !== null,
+	);
+	return (
+		hasWindowMetric || candidate.rollingCorrelation !== null || candidate.worstMonths.length > 0
+	);
 }
 
 export function runCorrelationTest(
@@ -409,18 +493,42 @@ export function runCorrelationTest(
 		return inconclusive();
 	}
 
-	const knownHoldings = input.holdings.filter((holding) => holding.value.status === "known");
-	const knownKeys = knownHoldings.map((holding) => holding.key);
-	const beforeWeightsVec = knownKeys.map((key) => weightCoverage.weights[key] ?? 0);
-	const holdingSeries = knownHoldings.map((holding) => holding.returns);
+	// Posições com saldo conhecido nulo não afetam os retornos e não exigem série histórica.
+	const activeHoldings = input.holdings.filter(
+		(holding) => holding.value.status === "known" && holding.value.value > 0,
+	);
+	const activeKeys = activeHoldings.map((holding) => holding.key);
+	const activeBeforeWeightsVec = activeKeys.map((key) => weightCoverage.weights[key] ?? 0);
+	const activeHoldingSeries = activeHoldings.map((holding) => holding.returns);
 
-	let anyWindowComplete = false;
-	let anyWindowPartial = false;
+	const portfolioAligned = alignLongestSpanUpToEndMonth(activeHoldingSeries, input.endMonth);
+	const portfolioFullReturns = computePortfolioReturns(
+		portfolioAligned.values,
+		activeBeforeWeightsVec,
+	);
+	const portfolioWorstMonths = rankWorstPortfolioMonths(
+		portfolioAligned.months,
+		portfolioFullReturns,
+		assumptions.worstMonths,
+	);
+
+	let anyPartial = false;
+	if (portfolioAligned.overlap < assumptions.worstMonths) {
+		anyPartial = true;
+		const reason = `Histórico alinhado da carteira (${portfolioAligned.overlap} meses) menor que os ${assumptions.worstMonths} piores meses solicitados.`;
+		addUniqueNote(notVerified, reason);
+		findings.push({
+			code: "SHORT_WORST_MONTHS_HISTORY",
+			severity: "warning",
+			message: reason,
+		});
+	}
+
 	const candidateOutputs: CandidateCorrelationOutput[] = [];
 
 	for (const candidate of input.candidates) {
 		const { afterKeys, afterWeights, candidateAlreadyInHoldings } = buildAfterScenarioWeights(
-			knownHoldings,
+			activeHoldings,
 			candidate.key,
 			input.contribution,
 		);
@@ -428,15 +536,16 @@ export function runCorrelationTest(
 
 		const windowResults: WindowCorrelationResult[] = [];
 		let longestComplete: Extract<WindowCorrelationResult, { status: "complete" }> | undefined;
+		let longestFullOverlap: WindowCorrelationResult | undefined;
 
 		for (const window of assumptions.windows) {
-			const aligned = alignSeries([...holdingSeries, candidate.returns], {
+			const aligned = alignSeries([...activeHoldingSeries, candidate.returns], {
 				end: input.endMonth,
 				months: window,
 			});
 
 			if (aligned.overlap < window) {
-				anyWindowPartial = true;
+				anyPartial = true;
 				const reason = `Histórico menor que a janela de ${window} meses para ${candidate.key}`;
 				addUniqueNote(notVerified, reason);
 				findings.push({
@@ -460,84 +569,166 @@ export function runCorrelationTest(
 				continue;
 			}
 
-			anyWindowComplete = true;
-			const alignedHoldings = aligned.values.slice(0, knownHoldings.length);
-			const alignedCandidate = aligned.values[knownHoldings.length] ?? [];
-			const portfolioReturns = computePortfolioReturns(alignedHoldings, beforeWeightsVec);
-			const correlation = pearson(alignedCandidate, portfolioReturns);
+			const alignedHoldings = aligned.values.slice(0, activeHoldings.length);
+			const alignedCandidate = aligned.values[activeHoldings.length] ?? [];
+			const portfolioReturns = computePortfolioReturns(alignedHoldings, activeBeforeWeightsVec);
+			const correlation = tryPearson(alignedCandidate, portfolioReturns);
 
 			const covBefore = covarianceMatrix(alignedHoldings);
 			const volBefore = annualizeMonthlyVolatility(
-				portfolioVolatility(beforeWeightsVec, covBefore),
+				portfolioVolatility(activeBeforeWeightsVec, covBefore),
 			);
-			const rcBefore = mapRiskContributions(
-				knownKeys,
-				riskContributions(beforeWeightsVec, covBefore),
-			);
+			const rcBeforeVec = tryRiskContributions(activeBeforeWeightsVec, covBefore);
+			const rcBefore = rcBeforeVec === null ? null : mapRiskContributions(activeKeys, rcBeforeVec);
 
 			const afterSeries = candidateAlreadyInHoldings
 				? alignedHoldings
 				: [...alignedHoldings, alignedCandidate];
 			const covAfter = covarianceMatrix(afterSeries);
 			const volAfter = annualizeMonthlyVolatility(portfolioVolatility(afterWeightsVec, covAfter));
-			const rcAfter = mapRiskContributions(afterKeys, riskContributions(afterWeightsVec, covAfter));
+			const rcAfterVec = tryRiskContributions(afterWeightsVec, covAfter);
+			const rcAfter = rcAfterVec === null ? null : mapRiskContributions(afterKeys, rcAfterVec);
 
-			const completeResult: Extract<WindowCorrelationResult, { status: "complete" }> = {
-				window,
-				status: "complete",
-				overlap: aligned.overlap,
-				months: aligned.months,
-				correlation,
-				volatilityBefore: volBefore,
-				volatilityAfter: volAfter,
-				riskContributionsBefore: rcBefore,
-				riskContributionsAfter: rcAfter,
-			};
-			windowResults.push(completeResult);
-			if (longestComplete === undefined || window > longestComplete.window) {
-				longestComplete = completeResult;
+			const unavailableReasons: string[] = [];
+			if (correlation === null) {
+				unavailableReasons.push("correlação indefinida por variância nula");
+			}
+			if (rcBefore === null) {
+				unavailableReasons.push("contribuição ao risco atual indefinida por variância nula");
+			}
+			if (rcAfter === null) {
+				unavailableReasons.push("contribuição ao risco simulada indefinida por variância nula");
+			}
+
+			if (
+				correlation !== null &&
+				rcBefore !== null &&
+				rcAfter !== null &&
+				unavailableReasons.length === 0
+			) {
+				const completeResult: Extract<WindowCorrelationResult, { status: "complete" }> = {
+					window,
+					status: "complete",
+					overlap: aligned.overlap,
+					months: aligned.months,
+					correlation,
+					volatilityBefore: volBefore,
+					volatilityAfter: volAfter,
+					riskContributionsBefore: rcBefore,
+					riskContributionsAfter: rcAfter,
+				};
+				windowResults.push(completeResult);
+				if (longestComplete === undefined || window > longestComplete.window) {
+					longestComplete = completeResult;
+				}
+				if (longestFullOverlap === undefined || window > longestFullOverlap.window) {
+					longestFullOverlap = completeResult;
+				}
+			} else {
+				anyPartial = true;
+				const reason = `Janela de ${window} meses para ${candidate.key} com cálculo parcial (${unavailableReasons.join("; ")}).`;
+				addUniqueNote(notVerified, reason);
+				findings.push({
+					code: "ZERO_VARIANCE",
+					severity: "warning",
+					subject: candidate.key,
+					message: reason,
+				});
+				const partialWindowResult: Extract<WindowCorrelationResult, { status: "partial" }> = {
+					window,
+					status: "partial",
+					overlap: aligned.overlap,
+					months: aligned.months,
+					correlation,
+					reason,
+					volatilityBefore: volBefore,
+					volatilityAfter: volAfter,
+					riskContributionsBefore: rcBefore,
+					riskContributionsAfter: rcAfter,
+				};
+				windowResults.push(partialWindowResult);
+				if (longestFullOverlap === undefined || window > longestFullOverlap.window) {
+					longestFullOverlap = partialWindowResult;
+				}
 			}
 		}
 
 		const fullAligned = alignLongestSpanUpToEndMonth(
-			[...holdingSeries, candidate.returns],
+			[...activeHoldingSeries, candidate.returns],
 			input.endMonth,
 		);
-		const fullHoldings = fullAligned.values.slice(0, knownHoldings.length);
-		const fullCandidate = fullAligned.values[knownHoldings.length] ?? [];
-		const fullPortfolioReturns = computePortfolioReturns(fullHoldings, beforeWeightsVec);
+		const fullHoldings = fullAligned.values.slice(0, activeHoldings.length);
+		const fullCandidate = fullAligned.values[activeHoldings.length] ?? [];
+		const fullPortfolioReturns = computePortfolioReturns(fullHoldings, activeBeforeWeightsVec);
 
-		const rollingCorrelation = computeRollingCorrelation(
+		const rollingComputation = computeRollingCorrelation(
 			fullAligned.months,
 			fullCandidate,
 			fullPortfolioReturns,
 			assumptions.rollingWindow,
 		);
-		if (rollingCorrelation === null) {
+		const rollingCorrelation = rollingComputation.range;
+		if (rollingComputation.eligibleSubwindows === 0) {
+			anyPartial = true;
 			addUniqueNote(
 				notVerified,
 				`Histórico insuficiente para correlação móvel de ${assumptions.rollingWindow} meses para ${candidate.key}.`,
 			);
+		} else if (rollingCorrelation === null) {
+			anyPartial = true;
+			const reason = `Variância nula impediu o cálculo da correlação móvel de ${assumptions.rollingWindow} meses para ${candidate.key}.`;
+			addUniqueNote(notVerified, reason);
+			findings.push({
+				code: "ZERO_VARIANCE",
+				severity: "warning",
+				subject: candidate.key,
+				message: reason,
+			});
+		} else if (rollingComputation.skippedZeroVarianceCount > 0) {
+			anyPartial = true;
+			const reason = `Variância nula em ${rollingComputation.skippedZeroVarianceCount} subjanela(s) móvel(is) de ${assumptions.rollingWindow} meses para ${candidate.key}.`;
+			addUniqueNote(notVerified, reason);
+			findings.push({
+				code: "ZERO_VARIANCE",
+				severity: "warning",
+				subject: candidate.key,
+				message: reason,
+			});
 		}
 
-		const worstMonths = computeWorstMonths(
-			fullAligned.months,
-			fullPortfolioReturns,
-			fullCandidate,
-			assumptions.worstMonths,
+		const candidateByMonth = new Map(
+			createMonthlySeries(candidate.returns)
+				.filter((point) => point.month <= input.endMonth)
+				.map((point) => [point.month, point.value]),
 		);
-		if (fullAligned.overlap < assumptions.worstMonths) {
-			addUniqueNote(
-				notVerified,
-				`Histórico alinhado (${fullAligned.overlap} meses) menor que os ${assumptions.worstMonths} piores meses solicitados para ${candidate.key}.`,
-			);
+		const { worstMonths, missingReasons } = buildCandidateWorstMonths(
+			portfolioWorstMonths,
+			candidate.key,
+			candidateByMonth,
+		);
+		if (missingReasons.length > 0) {
+			anyPartial = true;
+			for (const reason of missingReasons) {
+				addUniqueNote(notVerified, reason);
+				findings.push({
+					code: "MISSING_WORST_MONTH_CANDIDATE_RETURN",
+					severity: "warning",
+					subject: candidate.key,
+					message: reason,
+				});
+			}
 		}
 
+		const summaryWindow = longestComplete ?? longestFullOverlap;
 		let classification: RiskImpactClassification = "inconclusivo";
-		if (longestComplete !== undefined) {
-			if (approxEqual(longestComplete.volatilityAfter, longestComplete.volatilityBefore)) {
+		if (
+			summaryWindow !== undefined &&
+			summaryWindow.volatilityBefore !== null &&
+			summaryWindow.volatilityAfter !== null
+		) {
+			if (approxEqual(summaryWindow.volatilityAfter, summaryWindow.volatilityBefore)) {
 				classification = "inconclusivo";
-			} else if (longestComplete.volatilityAfter < longestComplete.volatilityBefore) {
+			} else if (summaryWindow.volatilityAfter < summaryWindow.volatilityBefore) {
 				classification = "reduz risco";
 			} else {
 				classification = "aumenta risco";
@@ -546,7 +737,7 @@ export function runCorrelationTest(
 				code: "CORRELATION_SUMMARY",
 				severity: classification === "inconclusivo" ? "warning" : "info",
 				subject: candidate.key,
-				message: `Cenário simulado para ${candidate.key} na janela de ${longestComplete.window} meses: ${classification} em relação à carteira atual.`,
+				message: `Cenário simulado para ${candidate.key} na janela de ${summaryWindow.window} meses: ${classification} em relação à carteira atual.`,
 			});
 		} else {
 			findings.push({
@@ -560,22 +751,31 @@ export function runCorrelationTest(
 		candidateOutputs.push({
 			key: candidate.key,
 			classification,
+			afterWeights,
 			longestCompleteWindow: longestComplete?.window ?? null,
-			volatilityBefore: longestComplete?.volatilityBefore ?? null,
-			volatilityAfter: longestComplete?.volatilityAfter ?? null,
-			riskContributionsBefore: longestComplete?.riskContributionsBefore ?? null,
-			riskContributionsAfter: longestComplete?.riskContributionsAfter ?? null,
+			volatilityBefore: summaryWindow?.volatilityBefore ?? null,
+			volatilityAfter: summaryWindow?.volatilityAfter ?? null,
+			riskContributionsBefore: summaryWindow?.riskContributionsBefore ?? null,
+			riskContributionsAfter: summaryWindow?.riskContributionsAfter ?? null,
 			rollingCorrelation,
 			worstMonths,
 			windows: windowResults,
 		});
 	}
 
-	if (!anyWindowComplete) {
+	if (!candidateOutputs.some(hasAnyComputableMetric)) {
+		const message =
+			"Nenhuma métrica de risco ou histórico mínimo pôde ser calculada para os candidatos.";
+		addUniqueNote(notVerified, message);
+		findings.push({
+			code: "NO_COMPUTABLE_METRICS",
+			severity: "blocked",
+			message,
+		});
 		return inconclusive();
 	}
 
-	const status = anyWindowPartial || weightCoverage.missingKeys.length > 0 ? "partial" : "complete";
+	const status = anyPartial || weightCoverage.missingKeys.length > 0 ? "partial" : "complete";
 
 	return createAnalysisResult({
 		method: { id: methodIds.correlationTest, version: correlationTestMethodVersion },

@@ -8,6 +8,7 @@ import {
 	pearson,
 	sampleStdev,
 	sampleVariance,
+	tryPearson,
 } from "../index.js";
 
 function createLcg(seed: number): () => number {
@@ -83,4 +84,13 @@ test("validates Pearson inputs and throws on zero variance or length mismatch", 
 	assert.throws(() => mean([]), /vazia/);
 	assert.throws(() => sampleVariance([0.01]), /pelo menos 2/);
 	assert.throws(() => annualizeMonthlyVolatility(-0.1), /não negativo/);
+});
+
+test("tryPearson returns null on zero variance while keeping contract checks", () => {
+	assert.equal(tryPearson([0.1, 0.1, 0.1], [0.01, 0.02, 0.03]), null);
+	assert.equal(tryPearson([0.01, 0.02, 0.03], [0.05, 0.05, 0.05]), null);
+	assert.ok(approxEqual(tryPearson([0.01, 0.02, 0.03], [0.02, 0.04, 0.06]) ?? 0, 1));
+	assert.throws(() => tryPearson([0.01, 0.02], [0.01, 0.02]), /pelo menos 3/);
+	assert.throws(() => tryPearson([0.01, 0.02, 0.03], [0.01, 0.02]), /mesmo tamanho/);
+	assert.throws(() => tryPearson([0.01, Number.NaN, 0.03], [0.01, 0.02, 0.03]), /finitos/);
 });

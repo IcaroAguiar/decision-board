@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { approxEqual, covarianceMatrix, portfolioVolatility, riskContributions } from "../index.js";
+import {
+	approxEqual,
+	covarianceMatrix,
+	portfolioVolatility,
+	riskContributions,
+	tryRiskContributions,
+} from "../index.js";
 
 test("R3 acceptance 2: matches hand-computed 3-asset covariance matrix and portfolio volatility", () => {
 	const r1 = [0.05, 0.01, -0.03, 0.01, 0.01];
@@ -80,4 +86,13 @@ test("validates matrix dimensions and rejects degenerate or invalid inputs", () 
 	assert.throws(() => portfolioVolatility([0.5, 0.5], [[0.01], [0.01]]), /quadrada/);
 	assert.throws(() => portfolioVolatility([1], [[-0.01]]), /negativa/);
 	assert.throws(() => riskContributions([1], [[0]]), /Variância nula/);
+});
+
+test("tryRiskContributions returns null on zero or neutralized portfolio variance", () => {
+	assert.equal(tryRiskContributions([1], [[0]]), null);
+	const r1 = [0.05, -0.03, 0.02, 0.01, -0.05];
+	const r2 = r1.map((value) => -value);
+	const cancelledMatrix = covarianceMatrix([r1, r2]);
+	assert.equal(portfolioVolatility([0.5, 0.5], cancelledMatrix), 0);
+	assert.equal(tryRiskContributions([0.5, 0.5], cancelledMatrix), null);
 });
