@@ -1,11 +1,6 @@
 import type { AnalysisStatus, MethodId } from "../analysis.js";
 import { parseIsoDate } from "../calendar.js";
-import {
-	evaluateProposal,
-	type OperationPlanItem,
-	type Proposal,
-	type ProposalEvaluation,
-} from "./proposal.js";
+import { evaluateProposal, type OperationPlanItem, type Proposal } from "./proposal.js";
 import { type StrategyVersion, versionLabel } from "./strategy.js";
 
 export type DecisionOutcome = "approved" | "adjusted" | "postponed" | "rejected";
@@ -41,7 +36,6 @@ export interface DecisionRecord {
 
 export interface RecordDecisionInput {
 	proposal: Proposal;
-	evaluation: ProposalEvaluation;
 	outcome: DecisionOutcome;
 	reason: string;
 	decidedAt: string;
@@ -77,7 +71,6 @@ export function authorizeMovementRecording(
 
 export function recordDecision({
 	proposal,
-	evaluation,
 	outcome,
 	reason,
 	decidedAt,
@@ -93,15 +86,13 @@ export function recordDecision({
 	if (!reason.trim()) {
 		throw new Error("Informe o motivo da decisão.");
 	}
-	const currentEvaluation = evaluateProposal(proposal, strategy);
+	const evaluation = evaluateProposal(proposal, strategy);
+	if (proposal.analyses.length === 0) {
+		throw new Error("Toda decisão registrada precisa referenciar ao menos uma análise.");
+	}
 	const isApprovalOutcome = outcome === "approved" || outcome === "adjusted";
-	if (isApprovalOutcome) {
-		if (!evaluation.approvable || !currentEvaluation.approvable) {
-			throw new Error("Proposta bloqueada não pode ser aprovada ou ajustada; revisão necessária.");
-		}
-		if (proposal.analyses.length === 0) {
-			throw new Error("Proposta aprovada ou ajustada precisa referenciar ao menos uma análise.");
-		}
+	if (isApprovalOutcome && !evaluation.approvable) {
+		throw new Error("Proposta bloqueada não pode ser aprovada ou ajustada; revisão necessária.");
 	}
 	return {
 		proposalId: proposal.id,

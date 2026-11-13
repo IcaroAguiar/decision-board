@@ -1,5 +1,15 @@
-import { type AnalysisFinding, type AnalysisRef, methodIds } from "../analysis.js";
+import {
+	type AnalysisFinding,
+	type AnalysisRef,
+	type AnalysisResult,
+	methodIds,
+} from "../analysis.js";
 import { parseIsoDate } from "../calendar.js";
+import type {
+	CorrelationTestAssumptions,
+	CorrelationTestInput,
+	CorrelationTestOutput,
+} from "../risk/index.js";
 import { type PortfolioPart, portfolioParts } from "../units.js";
 import { classifyAnalysesByStrategy, type StrategyVersion } from "./strategy.js";
 
@@ -16,6 +26,7 @@ export interface OperationPlanItem {
 export interface ProposalJustification {
 	code: string;
 	reason: string;
+	subject: string | null;
 }
 
 export interface ProposalClaim {
@@ -53,6 +64,17 @@ export interface ProposalEvaluation {
 
 const knownPartSet = new Set<string>(portfolioParts);
 
+export function correlationTestSubjects(
+	result: AnalysisResult<CorrelationTestInput, CorrelationTestOutput, CorrelationTestAssumptions>,
+): string[] {
+	if (result.status === "inconclusive") {
+		return [];
+	}
+	return result.output.candidates
+		.filter((candidate) => candidate.longestCompleteWindow !== null)
+		.map((candidate) => candidate.key);
+}
+
 export function evaluateProposal(proposal: Proposal, current: StrategyVersion): ProposalEvaluation {
 	if (!proposal.id.trim()) {
 		throw new Error("Informe o identificador da proposta.");
@@ -80,37 +102,41 @@ export function evaluateProposal(proposal: Proposal, current: StrategyVersion): 
 		seenItems.add(itemKey);
 	}
 
-	const analysisIds = new Set<string>();
+	const analysesById = new Map<string, AnalysisRef>();
 	for (const ref of proposal.analyses) {
 		if (!ref.id.trim()) {
 			throw new Error("Informe o identificador da análise referenciada.");
 		}
 		parseIsoDate(ref.asOf);
-		if (analysisIds.has(ref.id)) {
+		if (analysesById.has(ref.id)) {
 			throw new Error(`Referência de análise duplicada na proposta: ${ref.id}.`);
 		}
-		analysisIds.add(ref.id);
+		analysesById.set(ref.id, ref);
 	}
 
 	const findings: AnalysisFinding[] = [];
-	const allocatesVariableIncome = proposal.items.some(
-		(item) => item.part === "variableIncome" && item.direction === "allocate",
-	);
-	if (allocatesVariableIncome) {
+	for (const item of proposal.items) {
+		if (item.part !== "variableIncome" || item.direction !== "allocate") {
+			continue;
+		}
 		const hasCorrelationTest = proposal.analyses.some(
 			(ref) =>
 				ref.method.id === methodIds.correlationTest &&
-				(ref.status === "complete" || ref.status === "partial"),
+				(ref.status === "complete" || ref.status === "partial") &&
+				ref.subjects.includes(item.assetId),
 		);
 		const hasWaiver = proposal.justifications.some(
 			(justification) =>
-				justification.code === "r3-waived" && justification.reason.trim().length > 0,
+				justification.code === "r3-waived" &&
+				justification.reason.trim().length > 0 &&
+				justification.subject === item.assetId,
 		);
 		if (!hasCorrelationTest && !hasWaiver) {
 			findings.push({
 				code: "missing_r3_correlation_test",
 				severity: "blocked",
-				message: "Revisão necessária: proposta de renda variável sem teste de correlação (R3).",
+				subject: item.assetId,
+				message: `Revisão necessária: alocação em renda variável (${item.ticker}) sem teste de correlação (R3) para o ativo.`,
 			});
 		}
 	}
@@ -139,14 +165,22 @@ export function evaluateProposal(proposal: Proposal, current: StrategyVersion): 
 		if (!claim.text.trim()) {
 			throw new Error("Informe o texto da afirmação.");
 		}
-		if (claim.analysisId !== null && analysisIds.has(claim.analysisId)) {
+		const referencedAnalysis =
+			claim.analysisId === null ? undefined : analysesById.get(claim.analysisId);
+		if (
+			referencedAnalysis !== undefined &&
+			(referencedAnalysis.status === "complete" || referencedAnalysis.status === "partial")
+		) {
 			claims.push({ text: claim.text, verification: "verified" });
 		} else {
 			claims.push({ text: claim.text, verification: "unverified-opinion" });
 			findings.push({
 				code: "unverified_claim",
 				severity: "warning",
-				message: `Opinião não verificada: afirmação sem referência a análise calculada (${claim.text}).`,
+				message:
+					referencedAnalysis?.status === "inconclusive"
+						? `Opinião não verificada: análise ${referencedAnalysis.id} inconclusiva (${claim.text}).`
+						: `Opinião não verificada: afirmação sem referência a análise calculada (${claim.text}).`,
 			});
 		}
 	}

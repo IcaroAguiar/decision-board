@@ -2,17 +2,26 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
 	type AnalysisRef,
+	addMonths,
 	authorizeMovementRecording,
 	classifyAnalysesByStrategy,
+	correlationTestSubjects,
+	createMonthlySeries,
 	createStrategy,
 	evaluateProposal,
+	known,
+	type MonthlySeries,
 	methodIds,
+	missing,
 	type OperationPlanItem,
 	type Proposal,
 	recordDecision,
 	reviseStrategy,
+	runCorrelationTest,
+	type SourceRef,
 	type StrategyPreferences,
 	type StrategyVersion,
+	toAnalysisRef,
 	versionLabel,
 } from "../index.js";
 
@@ -70,6 +79,7 @@ function makeRef(overrides: Partial<AnalysisRef> = {}): AnalysisRef {
 		asOf: "2026-02-01",
 		status: "complete",
 		strategyVersion: "estrategia-principal@1",
+		subjects: [],
 		...overrides,
 	};
 }
@@ -97,6 +107,23 @@ function makeProposal(overrides: Partial<Proposal> = {}): Proposal {
 		claims: [],
 		...overrides,
 	};
+}
+
+const syntheticSource: SourceRef = {
+	id: "b3-synthetic",
+	label: "Série sintética determinística",
+	asOf: "2026-02-01",
+	official: false,
+};
+
+function buildSyntheticSeries(endMonth: string, values: readonly number[]): MonthlySeries {
+	const startMonth = addMonths(endMonth, 1 - values.length);
+	return createMonthlySeries(
+		values.map((value, monthIndex) => ({
+			month: addMonths(startMonth, monthIndex),
+			value: known(value, "observed", syntheticSource),
+		})),
+	);
 }
 
 test("R12: cria estratégia v1, versiona apenas alterações reais e classifica análises", () => {
@@ -187,7 +214,7 @@ test("R12: valida invariantes de alvos, faixas, dia de recebimento, valores e vi
 	assert.throws(() => reviseStrategy(current, next, "2026-01-31"), /anterior/);
 });
 
-test("R11: proposta de renda variável exige R3 completo/parcial ou justificativa com motivo", () => {
+test("R11: proposta de renda variável exige R3 cobrindo cada ativo alocado ou dispensa por ativo", () => {
 	const strategy = buildStrategy();
 	const person = { kind: "person", confirmedInSession: true } as const;
 
@@ -198,14 +225,15 @@ test("R11: proposta de renda variável exige R3 completo/parcial ou justificativ
 		{
 			code: "missing_r3_correlation_test",
 			severity: "blocked",
-			message: "Revisão necessária: proposta de renda variável sem teste de correlação (R3).",
+			subject: "asset-fii-1",
+			message:
+				"Revisão necessária: alocação em renda variável (XPLG11) sem teste de correlação (R3) para o ativo.",
 		},
 	]);
 	assert.throws(
 		() =>
 			recordDecision({
 				proposal: withoutR3,
-				evaluation: blockedEval,
 				outcome: "approved",
 				reason: "Tentativa sem R3",
 				decidedAt: "2026-02-05",
@@ -222,6 +250,7 @@ test("R11: proposta de renda variável exige R3 completo/parcial ou justificativ
 				id: "ana-r3-inc",
 				method: { id: methodIds.correlationTest, version: "1.0.0" },
 				status: "inconclusive",
+				subjects: [],
 			}),
 		],
 	});
@@ -239,26 +268,260 @@ test("R11: proposta de renda variável exige R3 completo/parcial ou justificativ
 				id: "ana-r3-partial",
 				method: { id: methodIds.correlationTest, version: "1.1.0" },
 				status: "partial",
+				subjects: ["asset-fii-1"],
 			}),
 		],
 	});
 	assert.equal(evaluateProposal(withPartialR3, strategy).approvable, true);
 
+	const r3ForAnotherAsset = makeProposal({
+		items: [makeItem({ assetId: "asset-c", ticker: "HGLG11" })],
+		analyses: [
+			makeRef(),
+			makeRef({
+				id: "ana-r3-b",
+				method: { id: methodIds.correlationTest, version: "1.0.0" },
+				status: "complete",
+				subjects: ["asset-b"],
+			}),
+		],
+	});
+	const r3AnotherEval = evaluateProposal(r3ForAnotherAsset, strategy);
+	assert.equal(r3AnotherEval.approvable, false);
+	assert.deepEqual(
+		r3AnotherEval.findings
+			.filter((finding) => finding.code === "missing_r3_correlation_test")
+			.map((finding) => finding.subject),
+		["asset-c"],
+	);
+
+	const mixedItems = makeProposal({
+		items: [
+			makeItem({ assetId: "asset-b", ticker: "XPLG11" }),
+			makeItem({ assetId: "asset-c", ticker: "HGLG11" }),
+		],
+		analyses: [
+			makeRef(),
+			makeRef({
+				id: "ana-r3-b",
+				method: { id: methodIds.correlationTest, version: "1.0.0" },
+				status: "complete",
+				subjects: ["asset-b"],
+			}),
+		],
+	});
+	const mixedEval = evaluateProposal(mixedItems, strategy);
+	assert.equal(mixedEval.approvable, false);
+	assert.deepEqual(
+		mixedEval.findings
+			.filter((finding) => finding.code === "missing_r3_correlation_test")
+			.map((finding) => ({ severity: finding.severity, subject: finding.subject })),
+		[{ severity: "blocked", subject: "asset-c" }],
+	);
+
+	const twoUncovered = makeProposal({
+		items: [
+			makeItem({ assetId: "asset-b", ticker: "XPLG11" }),
+			makeItem({ assetId: "asset-c", ticker: "HGLG11" }),
+		],
+	});
+	const twoUncoveredEval = evaluateProposal(twoUncovered, strategy);
+	assert.equal(twoUncoveredEval.approvable, false);
+	assert.deepEqual(
+		twoUncoveredEval.findings
+			.filter((finding) => finding.code === "missing_r3_correlation_test")
+			.map((finding) => finding.subject),
+		["asset-b", "asset-c"],
+	);
+
 	const withBlankWaiver = makeProposal({
-		justifications: [{ code: "r3-waived", reason: "   " }],
+		justifications: [{ code: "r3-waived", reason: "   ", subject: "asset-fii-1" }],
 	});
 	assert.equal(evaluateProposal(withBlankWaiver, strategy).approvable, false);
 
+	const withNullSubjectWaiver = makeProposal({
+		justifications: [
+			{
+				code: "r3-waived",
+				reason: "Série histórica indisponível; posição pequena.",
+				subject: null,
+			},
+		],
+	});
+	assert.equal(evaluateProposal(withNullSubjectWaiver, strategy).approvable, false);
+
+	const withOtherSubjectWaiver = makeProposal({
+		items: [makeItem({ assetId: "asset-c", ticker: "HGLG11" })],
+		justifications: [
+			{
+				code: "r3-waived",
+				reason: "Série histórica indisponível; posição pequena.",
+				subject: "asset-b",
+			},
+		],
+	});
+	const otherWaiverEval = evaluateProposal(withOtherSubjectWaiver, strategy);
+	assert.equal(otherWaiverEval.approvable, false);
+	assert.deepEqual(
+		otherWaiverEval.findings.map((finding) => finding.subject),
+		["asset-c"],
+	);
+
 	const withValidWaiver = makeProposal({
 		justifications: [
-			{ code: "r3-waived", reason: "Série histórica indisponível; posição pequena." },
+			{
+				code: "r3-waived",
+				reason: "Série histórica indisponível; posição pequena.",
+				subject: "asset-fii-1",
+			},
 		],
 	});
 	const waivedEval = evaluateProposal(withValidWaiver, strategy);
 	assert.equal(waivedEval.approvable, true);
 });
 
-test("R11: verifica afirmações contra análises e sinaliza estratégia anterior e redução", () => {
+test("R11: integra runCorrelationTest real e correlationTestSubjects em cenários completo, parcial e inconclusivo", () => {
+	const strategy = buildStrategy();
+	const endMonth = "2026-01";
+	const holdingReturns = buildSyntheticSeries(endMonth, [0.02, -0.01, 0.03, -0.015, 0.025, 0.01]);
+	const candidateBReturns = buildSyntheticSeries(
+		endMonth,
+		[-0.01, 0.02, -0.015, 0.03, -0.01, 0.015],
+	);
+	const candidateCShortReturns = buildSyntheticSeries(endMonth, [0.01, -0.02, 0.025]);
+	const candidateCFullReturns = buildSyntheticSeries(
+		endMonth,
+		[0.015, 0.005, -0.02, 0.025, 0.01, -0.005],
+	);
+
+	const partialR3Result = runCorrelationTest({
+		asOf: "2026-02-01",
+		endMonth,
+		strategyVersion: versionLabel(strategy),
+		holdings: [
+			{
+				key: "asset-holding",
+				value: known(10_000, "observed", syntheticSource),
+				returns: holdingReturns,
+			},
+		],
+		candidates: [
+			{ key: "asset-b", returns: candidateBReturns },
+			{ key: "asset-c", returns: candidateCShortReturns },
+		],
+		contribution: known(1_000, "informed", syntheticSource),
+		assumptions: { windows: [6], rollingWindow: 3, worstMonths: 2 },
+	});
+	assert.equal(partialR3Result.status, "partial");
+	assert.deepEqual(correlationTestSubjects(partialR3Result), ["asset-b"]);
+
+	const partialR3Ref = toAnalysisRef(
+		"ana-r3-real-partial",
+		partialR3Result,
+		correlationTestSubjects(partialR3Result),
+	);
+	assert.deepEqual(partialR3Ref.subjects, ["asset-b"]);
+
+	const mixedWithRealPartial = makeProposal({
+		items: [
+			makeItem({ assetId: "asset-b", ticker: "XPLG11" }),
+			makeItem({ assetId: "asset-c", ticker: "HGLG11" }),
+		],
+		analyses: [makeRef(), partialR3Ref],
+	});
+	const mixedEval = evaluateProposal(mixedWithRealPartial, strategy);
+	assert.equal(mixedEval.approvable, false);
+	assert.deepEqual(
+		mixedEval.findings
+			.filter((finding) => finding.code === "missing_r3_correlation_test")
+			.map((finding) => finding.subject),
+		["asset-c"],
+	);
+
+	const onlyCoveredEval = evaluateProposal(
+		makeProposal({
+			items: [makeItem({ assetId: "asset-b", ticker: "XPLG11" })],
+			analyses: [makeRef(), partialR3Ref],
+		}),
+		strategy,
+	);
+	assert.equal(onlyCoveredEval.approvable, true);
+
+	const completeR3Result = runCorrelationTest({
+		asOf: "2026-02-01",
+		endMonth,
+		strategyVersion: versionLabel(strategy),
+		holdings: [
+			{
+				key: "asset-holding",
+				value: known(10_000, "observed", syntheticSource),
+				returns: holdingReturns,
+			},
+		],
+		candidates: [
+			{ key: "asset-b", returns: candidateBReturns },
+			{ key: "asset-c", returns: candidateCFullReturns },
+		],
+		contribution: known(1_000, "informed", syntheticSource),
+		assumptions: { windows: [6], rollingWindow: 3, worstMonths: 2 },
+	});
+	assert.equal(completeR3Result.status, "complete");
+	assert.deepEqual(correlationTestSubjects(completeR3Result), ["asset-b", "asset-c"]);
+	const completeR3Ref = toAnalysisRef(
+		"ana-r3-real-complete",
+		completeR3Result,
+		correlationTestSubjects(completeR3Result),
+	);
+	assert.equal(
+		evaluateProposal(
+			makeProposal({
+				items: [
+					makeItem({ assetId: "asset-b", ticker: "XPLG11" }),
+					makeItem({ assetId: "asset-c", ticker: "HGLG11" }),
+				],
+				analyses: [makeRef(), completeR3Ref],
+			}),
+			strategy,
+		).approvable,
+		true,
+	);
+
+	const inconclusiveR3Result = runCorrelationTest({
+		asOf: "2026-02-01",
+		endMonth,
+		strategyVersion: versionLabel(strategy),
+		holdings: [
+			{
+				key: "asset-holding",
+				value: known(10_000, "observed", syntheticSource),
+				returns: holdingReturns,
+			},
+		],
+		candidates: [{ key: "asset-c", returns: candidateCShortReturns }],
+		contribution: missing("Aporte ainda não informado"),
+		assumptions: { windows: [6], rollingWindow: 3, worstMonths: 2 },
+	});
+	assert.equal(inconclusiveR3Result.status, "inconclusive");
+	assert.deepEqual(correlationTestSubjects(inconclusiveR3Result), []);
+	const inconclusiveR3Ref = toAnalysisRef(
+		"ana-r3-real-inc",
+		inconclusiveR3Result,
+		correlationTestSubjects(inconclusiveR3Result),
+	);
+	assert.deepEqual(inconclusiveR3Ref.subjects, []);
+	assert.equal(
+		evaluateProposal(
+			makeProposal({
+				items: [makeItem({ assetId: "asset-c", ticker: "HGLG11" })],
+				analyses: [makeRef(), inconclusiveR3Ref],
+			}),
+			strategy,
+		).approvable,
+		false,
+	);
+});
+
+test("R11: verifica afirmações apenas contra análises completas/parciais e sinaliza estratégia anterior e redução", () => {
 	const v1 = buildStrategy("2026-01-01");
 	const nextPrefs = buildPreferences();
 	nextPrefs.monthlyCash.contribution = 3_000;
@@ -278,9 +541,24 @@ test("R11: verifica afirmações contra análises e sinaliza estratégia anterio
 				referencePrice: 62,
 			}),
 		],
-		analyses: [makeRef({ id: "ana-v1", strategyVersion: "estrategia-principal@1" })],
+		analyses: [
+			makeRef({ id: "ana-v1", strategyVersion: "estrategia-principal@1" }),
+			makeRef({
+				id: "ana-partial",
+				status: "partial",
+				strategyVersion: "estrategia-principal@2",
+			}),
+			makeRef({
+				id: "ana-inc",
+				status: "inconclusive",
+				strategyVersion: "estrategia-principal@2",
+				subjects: [],
+			}),
+		],
 		claims: [
 			{ text: "Desvio da Meta calculado no R7.", analysisId: "ana-v1" },
+			{ text: "Cobertura parcial calculada no R8.", analysisId: "ana-partial" },
+			{ text: "Correlação favorável segundo análise inconclusiva.", analysisId: "ana-inc" },
 			{ text: "Retorno esperado de 14% ao ano.", analysisId: null },
 			{ text: "Correlação reduzida segundo simulação externa.", analysisId: "ana-inexistente" },
 		],
@@ -290,6 +568,11 @@ test("R11: verifica afirmações contra análises e sinaliza estratégia anterio
 	assert.equal(evaluation.approvable, true);
 	assert.deepEqual(evaluation.claims, [
 		{ text: "Desvio da Meta calculado no R7.", verification: "verified" },
+		{ text: "Cobertura parcial calculada no R8.", verification: "verified" },
+		{
+			text: "Correlação favorável segundo análise inconclusiva.",
+			verification: "unverified-opinion",
+		},
 		{ text: "Retorno esperado de 14% ao ano.", verification: "unverified-opinion" },
 		{
 			text: "Correlação reduzida segundo simulação externa.",
@@ -310,7 +593,7 @@ test("R11: verifica afirmações contra análises e sinaliza estratégia anterio
 	);
 	assert.equal(
 		evaluation.findings.filter((finding) => finding.code === "unverified_claim").length,
-		2,
+		3,
 	);
 });
 
@@ -351,10 +634,10 @@ test("R11: valida itens da proposta e regras de registro, plano e autorização 
 				id: "ana-r3",
 				method: { id: methodIds.correlationTest, version: "2.1.0" },
 				status: "complete",
+				subjects: ["asset-fii-1"],
 			}),
 		],
 	});
-	const evaluation = evaluateProposal(proposal, strategy);
 
 	for (const unauthorizedActor of [
 		{ kind: "scheduled-routine" } as const,
@@ -365,7 +648,6 @@ test("R11: valida itens da proposta e regras de registro, plano e autorização 
 			() =>
 				recordDecision({
 					proposal,
-					evaluation,
 					outcome: "approved",
 					reason: "Aprovado após revisão",
 					decidedAt: "2026-02-10",
@@ -381,7 +663,6 @@ test("R11: valida itens da proposta e regras de registro, plano e autorização 
 		() =>
 			recordDecision({
 				proposal,
-				evaluation,
 				outcome: "approved",
 				reason: "   ",
 				decidedAt: "2026-02-10",
@@ -395,24 +676,37 @@ test("R11: valida itens da proposta e regras de registro, plano e autorização 
 		items: [makeItem({ part: "reserve", assetClass: "cdb", ticker: "CDB-LIQ" })],
 		analyses: [],
 	});
-	const noAnalysisEval = evaluateProposal(noAnalysisProposal, strategy);
+	for (const outcome of ["approved", "adjusted", "rejected", "postponed"] as const) {
+		assert.throws(
+			() =>
+				recordDecision({
+					proposal: noAnalysisProposal,
+					outcome,
+					reason: "Sem análise associada",
+					decidedAt: "2026-02-10",
+					strategy,
+					actor: confirmedPerson,
+				}),
+			/ao menos uma análise/,
+		);
+	}
+
+	const blockedProposal = makeProposal();
 	assert.throws(
 		() =>
 			recordDecision({
-				proposal: noAnalysisProposal,
-				evaluation: noAnalysisEval,
+				proposal: blockedProposal,
 				outcome: "adjusted",
-				reason: "Sem análise associada",
+				reason: "Tentativa de ajuste em proposta bloqueada",
 				decidedAt: "2026-02-10",
 				strategy,
 				actor: confirmedPerson,
 			}),
-		/ao menos uma análise/,
+		/bloqueada/,
 	);
 
 	const approved = recordDecision({
 		proposal,
-		evaluation,
 		outcome: "approved",
 		reason: "Alinhado aos alvos da estratégia e com R3 verificado.",
 		decidedAt: "2026-02-10",
@@ -443,9 +737,19 @@ test("R11: valida itens da proposta e regras de registro, plano e autorização 
 		note: "Executado pela pessoa fora do Decision Board; conferido na próxima importação da B3.",
 	});
 
+	const adjusted = recordDecision({
+		proposal,
+		outcome: "adjusted",
+		reason: "Ajustado mantendo R3 e R7 válidos.",
+		decidedAt: "2026-02-10",
+		strategy,
+		actor: confirmedPerson,
+	});
+	assert.equal(adjusted.outcome, "adjusted");
+	assert.equal(adjusted.operationPlan?.status, "awaiting-execution");
+
 	const rejected = recordDecision({
-		proposal: makeProposal(),
-		evaluation: evaluateProposal(makeProposal(), strategy),
+		proposal: blockedProposal,
 		outcome: "rejected",
 		reason: "Aguardar teste de correlação antes de decidir.",
 		decidedAt: "2026-02-10",
@@ -453,6 +757,19 @@ test("R11: valida itens da proposta e regras de registro, plano e autorização 
 		actor: confirmedPerson,
 	});
 	assert.equal(rejected.operationPlan, null);
+	assert.equal(rejected.analyses.length, 1);
+
+	const postponed = recordDecision({
+		proposal: blockedProposal,
+		outcome: "postponed",
+		reason: "Adiado para o próximo aporte após obter série histórica.",
+		decidedAt: "2026-02-10",
+		strategy,
+		actor: confirmedPerson,
+	});
+	assert.equal(postponed.outcome, "postponed");
+	assert.equal(postponed.operationPlan, null);
+	assert.equal(postponed.analyses.length, 1);
 });
 
 test("guarda de linguagem: nenhuma mensagem usa termos prescritivos ou 'venda' fora da nota fixa", () => {
@@ -475,9 +792,17 @@ test("guarda de linguagem: nenhuma mensagem usa termos prescritivos ou 'venda' f
 			}),
 		],
 		analyses: [
-			makeRef({ id: "ana-old", status: "inconclusive", strategyVersion: "estrategia-principal@1" }),
+			makeRef({
+				id: "ana-old",
+				status: "inconclusive",
+				strategyVersion: "estrategia-principal@1",
+				subjects: [],
+			}),
 		],
-		claims: [{ text: "Afirmação sem cálculo.", analysisId: null }],
+		claims: [
+			{ text: "Afirmação sem cálculo.", analysisId: null },
+			{ text: "Afirmação apoiada em análise inconclusiva.", analysisId: "ana-old" },
+		],
 	});
 	const evaluation = evaluateProposal(proposal, v2);
 
@@ -488,12 +813,12 @@ test("guarda de linguagem: nenhuma mensagem usa termos prescritivos ou 'venda' f
 				id: "ana-r3",
 				method: { id: methodIds.correlationTest, version: "1.0.0" },
 				status: "complete",
+				subjects: ["asset-fii-1"],
 			}),
 		],
 	});
 	const approvedRecord = recordDecision({
 		proposal: safeProposal,
-		evaluation: evaluateProposal(safeProposal, v2),
 		outcome: "approved",
 		reason: "Aprovado conforme análise R3 e R7.",
 		decidedAt: "2026-02-10",
