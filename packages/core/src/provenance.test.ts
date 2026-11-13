@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { assessFreshness, known, missing, type SourceRef, sumWithCoverage } from "./index.js";
+import {
+	assessFreshness,
+	collectEvidence,
+	known,
+	missing,
+	type SourceRef,
+	sumWithCoverage,
+	weightsWithCoverage,
+} from "./index.js";
 
 const source: SourceRef = {
 	id: "synthetic-source",
@@ -126,4 +134,64 @@ test("rejects future sources, invalid asOf and invalid age limits", () => {
 	for (const age of [-1, Number.NaN, Number.POSITIVE_INFINITY]) {
 		assert.throws(() => assessFreshness(missing("Sem fonte"), "2026-03-02", age), /idade máxima/);
 	}
+});
+
+test("collects deduplicated sources and reasons with non-official disclosure", () => {
+	const official = { ...source, id: "official", official: true };
+	assert.deepEqual(
+		collectEvidence([
+			known(1, "observed", source),
+			known("texto", "observed", source),
+			missing("Sem A"),
+			missing("Sem A"),
+			missing("Sem B"),
+			known(2, "observed", official),
+		]),
+		{
+			sources: [source, official],
+			notVerified: ["Fonte não oficial: Fonte sintética", "Sem A", "Sem B"],
+			hasMissing: true,
+		},
+	);
+	assert.deepEqual(collectEvidence([]), { sources: [], notVerified: [], hasMissing: false });
+});
+
+test("normalizes known weights and preserves missing coverage", () => {
+	const items = [
+		{ key: "a", value: known(2, "informed", source) },
+		{ key: "b", value: known(6, "informed", source) },
+	];
+	assert.deepEqual(weightsWithCoverage(items), {
+		weights: { a: 0.25, b: 0.75 },
+		coverage: "complete",
+		missingKeys: [],
+	});
+	assert.deepEqual(weightsWithCoverage([...items, { key: "c", value: missing("Sem C") }]), {
+		weights: { a: 0.25, b: 0.75 },
+		coverage: "partial",
+		missingKeys: ["c"],
+	});
+	assert.deepEqual(weightsWithCoverage([{ key: "c", value: missing("Sem C") }]), {
+		weights: {},
+		coverage: "empty",
+		missingKeys: ["c"],
+	});
+	assert.deepEqual(weightsWithCoverage([{ key: "zero", value: known(0, "informed", source) }]), {
+		weights: {},
+		coverage: "empty",
+		missingKeys: [],
+	});
+	assert.throws(
+		() => weightsWithCoverage([{ key: "a", value: known(-1, "informed", source) }]),
+		/negativos/,
+	);
+	assert.throws(
+		() => weightsWithCoverage([{ key: "a", value: known(NaN, "informed", source) }]),
+		/finito/,
+	);
+	assert.throws(() => weightsWithCoverage([...items, ...items]), /únicas/);
+	assert.deepEqual(
+		weightsWithCoverage([{ key: "__proto__", value: known(1, "informed", source) }]).weights,
+		Object.fromEntries([["__proto__", 1]]),
+	);
 });

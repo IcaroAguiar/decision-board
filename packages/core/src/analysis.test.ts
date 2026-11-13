@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { type AnalysisResult, createAnalysisResult, type SourceRef } from "./index.js";
+import {
+	type AnalysisResult,
+	createAnalysisResult,
+	methodIds,
+	type SourceRef,
+	toAnalysisRef,
+} from "./index.js";
 
 const source: SourceRef = {
 	id: "synthetic-source",
@@ -9,8 +15,9 @@ const source: SourceRef = {
 	official: false,
 };
 const complete: AnalysisResult<{ value: number }, { total: number }> = {
-	method: { id: "synthetic-scenario", version: "1.0.0" },
+	method: { id: methodIds.fixedIncomeSimulation, version: "1.0.0" },
 	status: "complete",
+	strategyVersion: null,
 	asOf: "2026-03-03",
 	inputs: { value: 2 },
 	assumptions: { scenario: "sintético", factor: 2, simulated: true },
@@ -28,13 +35,15 @@ test("round-trips a complete analysis with all reproducibility metadata", () => 
 test("requires null output if and only if the analysis is inconclusive", () => {
 	assert.throws(
 		() =>
+			// @ts-expect-error Inconclusive output must be null, also enforced at runtime.
 			createAnalysisResult({ ...complete, status: "inconclusive", notVerified: ["Fonte ausente"] }),
 		/saída nula/,
 	);
 	assert.throws(() => createAnalysisResult({ ...complete, output: null }), /saída nula/);
 	assert.throws(
 		() =>
-			createAnalysisResult({
+			// @ts-expect-error Partial output must be non-null.
+			createAnalysisResult<{ value: number }, { total: number }>({
 				...complete,
 				status: "partial",
 				output: null,
@@ -99,11 +108,19 @@ test("deduplicates sources by id, preserving first occurrence and input arrays",
 
 test("rejects empty method identity, invalid analysis dates and invalid source dates", () => {
 	assert.throws(
-		() => createAnalysisResult({ ...complete, method: { id: " ", version: "1" } }),
+		() =>
+			createAnalysisResult({
+				...complete,
+				method: {
+					// @ts-expect-error Method ids belong to the shared catalog.
+					id: " ",
+					version: "1",
+				},
+			}),
 		/método/,
 	);
 	assert.throws(
-		() => createAnalysisResult({ ...complete, method: { id: "scenario", version: "" } }),
+		() => createAnalysisResult({ ...complete, method: { id: methodIds.rateRisk, version: "" } }),
 		/método/,
 	);
 	assert.throws(() => createAnalysisResult({ ...complete, asOf: "2026-02-30" }), /Data inválida/);
@@ -111,4 +128,43 @@ test("rejects empty method identity, invalid analysis dates and invalid source d
 		() => createAnalysisResult({ ...complete, sources: [{ ...source, asOf: "2026-02-30" }] }),
 		/Data inválida/,
 	);
+});
+
+test("blocks complete status when a finding is blocked", () => {
+	const findings = [
+		{ code: "MISSING_ANALYSIS", severity: "blocked", message: "Revisão necessária." },
+	] satisfies AnalysisResult<null, null>["findings"];
+	assert.throws(() => createAnalysisResult({ ...complete, findings }), /bloqueio/);
+	assert.equal(
+		createAnalysisResult({ ...complete, findings, status: "partial" }).status,
+		"partial",
+	);
+});
+
+test("narrows output by status and preserves typed assumptions", () => {
+	const result = createAnalysisResult({ ...complete, assumptions: { path: [0.1, 0.2] } });
+	if (result.status !== "inconclusive") assert.equal(result.output.total, 4);
+	assert.deepEqual(result.assumptions.path, [0.1, 0.2]);
+});
+
+test("exports stable method identities and caller-assigned analysis references", () => {
+	assert.deepEqual(methodIds, {
+		fixedIncomeSimulation: "r1.fixed-income-simulation",
+		rateRisk: "r2.rate-risk",
+		correlationTest: "r3.correlation-test",
+		allocationVsTarget: "r7.allocation-vs-target",
+		goalTracking: "r8.goal-tracking",
+	});
+	assert.deepEqual(
+		toAnalysisRef("synthetic-analysis", { ...complete, strategyVersion: "strategy-2" }),
+		{
+			id: "synthetic-analysis",
+			method: { id: "r1.fixed-income-simulation", version: "1.0.0" },
+			asOf: "2026-03-03",
+			status: "complete",
+			strategyVersion: "strategy-2",
+		},
+	);
+	assert.equal(toAnalysisRef("synthetic-analysis", complete).strategyVersion, null);
+	assert.throws(() => toAnalysisRef(" ", complete), /identificador/);
 });

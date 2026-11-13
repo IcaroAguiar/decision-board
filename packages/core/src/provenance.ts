@@ -43,7 +43,7 @@ export function sumWithCoverage(items: Datum<number>[]): {
 			if (!Number.isFinite(item.value)) {
 				throw new Error("O valor conhecido deve ser finito.");
 			}
-			// Soma float64 sem arredondamento monetário; comparações admitem erro relativo de 1e-12.
+			// Soma float64 sem arredondamento; compare resultados com approxEqual de units.ts.
 			total += item.value;
 			if (!Number.isFinite(total)) {
 				throw new Error("O total excede o intervalo numérico finito.");
@@ -73,4 +73,56 @@ export function assessFreshness<T>(
 	if (datum.status === "missing") return { state: "missing", ageDays: null };
 	const ageDays = calendarDaysBetween(datum.source.asOf, asOf);
 	return { state: ageDays > maxAgeDays ? "stale" : "fresh", ageDays };
+}
+
+export function collectEvidence(datums: Datum<unknown>[]): {
+	sources: SourceRef[];
+	notVerified: string[];
+	hasMissing: boolean;
+} {
+	const sources = new Map<string, SourceRef>();
+	const reasons = new Set<string>();
+	const notVerified: string[] = [];
+	let hasMissing = false;
+	for (const datum of datums) {
+		if (datum.status === "missing") {
+			hasMissing = true;
+			if (!reasons.has(datum.reason)) {
+				reasons.add(datum.reason);
+				notVerified.push(datum.reason);
+			}
+		} else if (!sources.has(datum.source.id)) {
+			sources.set(datum.source.id, datum.source);
+			if (!datum.source.official) notVerified.push(`Fonte não oficial: ${datum.source.label}`);
+		}
+	}
+	return { sources: [...sources.values()], notVerified, hasMissing };
+}
+
+/** Normaliza sobre o total conhecido; total zero não define pesos e tem cobertura vazia. */
+export function weightsWithCoverage(items: { key: string; value: Datum<number> }[]): {
+	weights: Record<string, number>;
+	coverage: "complete" | "partial" | "empty";
+	missingKeys: string[];
+} {
+	const keys = new Set<string>();
+	const missingKeys: string[] = [];
+	const entries: [string, number][] = [];
+	for (const item of items) {
+		if (keys.has(item.key)) throw new Error("As chaves dos pesos devem ser únicas.");
+		keys.add(item.key);
+		if (item.value.status === "missing") missingKeys.push(item.key);
+		else {
+			if (item.value.value < 0) throw new Error("Os valores dos pesos não podem ser negativos.");
+			entries.push([item.key, item.value.value]);
+		}
+	}
+	const { total, coverage } = sumWithCoverage(items.map((item) => item.value));
+	return {
+		weights: Object.fromEntries(
+			total === 0 ? [] : entries.map(([key, value]) => [key, value / total]),
+		),
+		coverage: total === 0 ? "empty" : coverage,
+		missingKeys,
+	};
 }

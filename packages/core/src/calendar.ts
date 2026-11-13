@@ -21,22 +21,48 @@ export function calendarDaysBetween(start: string, end: string): number {
 }
 
 export interface BusinessCalendar {
+	adjustToBusinessDay(date: string, direction: "following" | "preceding"): string;
 	isBusinessDay(date: string): boolean;
 	businessDaysBetween(start: string, end: string): number;
 	addBusinessDays(date: string, n: number): string;
 }
 
-export function createBusinessCalendar(holidays: string[]): BusinessCalendar {
+export function createBusinessCalendar({
+	holidays,
+	coveredFrom,
+	coveredUntil,
+}: {
+	holidays: readonly string[];
+	coveredFrom: string;
+	coveredUntil: string;
+}): BusinessCalendar {
+	calendarDaysBetween(coveredFrom, coveredUntil);
+	function assertCovered(date: string): void {
+		parseIsoDate(date);
+		if (date < coveredFrom || date > coveredUntil) {
+			throw new Error(`O calendário de feriados não cobre a data ${date}.`);
+		}
+	}
 	const holidaySet = new Set(holidays.map(parseIsoDate));
 	function isBusinessDay(date: string): boolean {
+		assertCovered(date);
 		const day = dateInUtc(date).getUTCDay();
 		return day !== 0 && day !== 6 && !holidaySet.has(date);
 	}
 
 	return {
 		isBusinessDay,
+		adjustToBusinessDay(date, direction) {
+			let result = date;
+			while (!isBusinessDay(result)) {
+				result = shiftDate(result, direction === "following" ? 1 : -1);
+			}
+			return result;
+		},
 		businessDaysBetween(start, end) {
 			calendarDaysBetween(start, end);
+			assertCovered(start);
+			assertCovered(end);
 			let count = 0;
 			// Convenção DU da ANBIMA/B3: [início, fim), incluindo o início útil.
 			for (let date = start; date < end; date = nextDate(date)) {
@@ -45,7 +71,7 @@ export function createBusinessCalendar(holidays: string[]): BusinessCalendar {
 			return count;
 		},
 		addBusinessDays(date, n) {
-			parseIsoDate(date);
+			assertCovered(date);
 			if (!Number.isSafeInteger(n) || n < 0) {
 				throw new Error("A quantidade de dias úteis deve ser um inteiro não negativo seguro.");
 			}
@@ -67,6 +93,10 @@ function dateInUtc(value: string): Date {
 }
 
 function nextDate(value: string): string {
-	const next = new Date(dateInUtc(value).getTime() + millisecondsPerDay);
+	return shiftDate(value, 1);
+}
+
+function shiftDate(value: string, days: number): string {
+	const next = new Date(dateInUtc(value).getTime() + days * millisecondsPerDay);
 	return parseIsoDate(next.toISOString().slice(0, 10));
 }

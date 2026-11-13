@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { calendarDaysBetween, createBusinessCalendar, parseIsoDate } from "./index.js";
 
-const calendar = createBusinessCalendar(["2026-03-04"]);
+const calendar = createBusinessCalendar({
+	holidays: ["2026-03-04"],
+	coveredFrom: "2026-01-01",
+	coveredUntil: "2026-12-31",
+});
 
 test("validates strict calendar dates and leap years", () => {
 	assert.equal(parseIsoDate("2028-02-29"), "2028-02-29");
@@ -41,8 +45,23 @@ test("identifies weekends and injected holidays only", () => {
 	assert.equal(calendar.isBusinessDay("2026-03-07"), false);
 	assert.equal(calendar.isBusinessDay("2026-03-08"), false);
 	assert.equal(calendar.isBusinessDay("2026-03-05"), true);
-	assert.equal(createBusinessCalendar([]).isBusinessDay("2026-03-04"), true);
-	assert.throws(() => createBusinessCalendar(["2026-02-30"]), /Data inválida/);
+	assert.equal(
+		createBusinessCalendar({
+			holidays: [],
+			coveredFrom: "2026-01-01",
+			coveredUntil: "2026-12-31",
+		}).isBusinessDay("2026-03-04"),
+		true,
+	);
+	assert.throws(
+		() =>
+			createBusinessCalendar({
+				holidays: ["2026-02-30"],
+				coveredFrom: "2026-01-01",
+				coveredUntil: "2026-12-31",
+			}),
+		/Data inválida/,
+	);
 	assert.throws(() => calendar.isBusinessDay("2026-02-30"), /Data inválida/);
 });
 
@@ -56,4 +75,53 @@ test("adds business days after the starting date, skipping weekends and holidays
 	for (const n of [-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
 		assert.throws(() => calendar.addBusinessDays("2026-03-02", n), /inteiro/);
 	}
+});
+
+test("rejects every query outside inclusive holiday coverage", () => {
+	const bounded = createBusinessCalendar({
+		holidays: [],
+		coveredFrom: "2026-03-02",
+		coveredUntil: "2026-03-06",
+	});
+	assert.equal(bounded.isBusinessDay("2026-03-02"), true);
+	assert.equal(bounded.isBusinessDay("2026-03-06"), true);
+	for (const date of ["2026-03-01", "2026-03-07"]) {
+		assert.throws(() => bounded.isBusinessDay(date), /calendário de feriados não cobre/);
+		assert.throws(() => bounded.addBusinessDays(date, 1), /calendário de feriados não cobre/);
+		assert.throws(
+			() => bounded.businessDaysBetween(date, date),
+			/calendário de feriados não cobre/,
+		);
+	}
+	assert.throws(() => bounded.businessDaysBetween("2026-03-02", "2026-03-07"), /não cobre/);
+	assert.throws(() => bounded.addBusinessDays("2026-03-06", 1), /não cobre/);
+	assert.throws(() => bounded.adjustToBusinessDay("2026-03-07", "preceding"), /não cobre/);
+	assert.throws(
+		() =>
+			createBusinessCalendar({
+				holidays: [],
+				coveredFrom: "2026-03-06",
+				coveredUntil: "2026-03-02",
+			}),
+		/anterior/,
+	);
+});
+
+test("adjusts in both directions across weekend and synthetic holidays", () => {
+	const calendar = createBusinessCalendar({
+		holidays: ["2026-03-06", "2026-03-09"],
+		coveredFrom: "2026-03-01",
+		coveredUntil: "2026-03-31",
+	});
+	assert.equal(calendar.adjustToBusinessDay("2026-03-07", "following"), "2026-03-10");
+	assert.equal(calendar.adjustToBusinessDay("2026-03-08", "preceding"), "2026-03-05");
+	assert.equal(calendar.adjustToBusinessDay("2026-03-10", "following"), "2026-03-10");
+	assert.equal(calendar.adjustToBusinessDay("2026-03-05", "preceding"), "2026-03-05");
+	const bounded = createBusinessCalendar({
+		holidays: [],
+		coveredFrom: "2026-03-07",
+		coveredUntil: "2026-03-08",
+	});
+	assert.throws(() => bounded.adjustToBusinessDay("2026-03-07", "following"), /não cobre/);
+	assert.throws(() => bounded.adjustToBusinessDay("2026-03-08", "preceding"), /não cobre/);
 });

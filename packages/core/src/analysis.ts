@@ -1,8 +1,17 @@
 import { parseIsoDate } from "./calendar.js";
 import type { SourceRef } from "./provenance.js";
 
+export const methodIds = {
+	fixedIncomeSimulation: "r1.fixed-income-simulation",
+	rateRisk: "r2.rate-risk",
+	correlationTest: "r3.correlation-test",
+	allocationVsTarget: "r7.allocation-vs-target",
+	goalTracking: "r8.goal-tracking",
+} as const;
+export type MethodId = (typeof methodIds)[keyof typeof methodIds];
+
 export interface MethodRef {
-	id: string;
+	id: MethodId;
 	version: string;
 }
 
@@ -16,21 +25,27 @@ export interface AnalysisFinding {
 	subject?: string;
 }
 
-export interface AnalysisResult<TInput, TOutput> {
+interface AnalysisCommon<TInput, TAssumptions> {
 	method: MethodRef;
-	status: AnalysisStatus;
+	strategyVersion: string | null;
 	asOf: string;
 	inputs: TInput;
-	assumptions: Record<string, string | number | boolean>;
+	assumptions: TAssumptions;
 	sources: SourceRef[];
 	notVerified: string[];
 	findings: AnalysisFinding[];
-	output: TOutput | null;
 }
 
-export function createAnalysisResult<TInput, TOutput>(
-	result: AnalysisResult<TInput, TOutput>,
-): AnalysisResult<TInput, TOutput> {
+export type AnalysisResult<
+	TInput,
+	TOutput,
+	TAssumptions = Record<string, unknown>,
+> = AnalysisCommon<TInput, TAssumptions> &
+	({ status: "complete" | "partial"; output: TOutput } | { status: "inconclusive"; output: null });
+
+export function createAnalysisResult<TInput, TOutput, TAssumptions = Record<string, unknown>>(
+	result: AnalysisResult<TInput, TOutput, TAssumptions>,
+): AnalysisResult<TInput, TOutput, TAssumptions> {
 	if (!result.method.id.trim() || !result.method.version.trim()) {
 		throw new Error("Informe o identificador e a versão do método.");
 	}
@@ -45,10 +60,38 @@ export function createAnalysisResult<TInput, TOutput>(
 	) {
 		throw new Error("Revisão necessária: explique por que a análise é parcial ou inconclusiva.");
 	}
+	if (
+		result.status === "complete" &&
+		result.findings.some((finding) => finding.severity === "blocked")
+	) {
+		throw new Error("Uma análise com bloqueio não pode ser completa.");
+	}
 	const sources = new Map<string, SourceRef>();
 	for (const source of result.sources) {
 		parseIsoDate(source.asOf);
 		if (!sources.has(source.id)) sources.set(source.id, source);
 	}
 	return { ...result, sources: [...sources.values()] };
+}
+
+export interface AnalysisRef {
+	id: string;
+	method: MethodRef;
+	asOf: string;
+	status: AnalysisStatus;
+	strategyVersion: string | null;
+}
+
+export function toAnalysisRef<TInput, TOutput, TAssumptions>(
+	id: string,
+	result: AnalysisResult<TInput, TOutput, TAssumptions>,
+): AnalysisRef {
+	if (!id.trim()) throw new Error("Informe o identificador da análise.");
+	return {
+		id,
+		method: result.method,
+		asOf: result.asOf,
+		status: result.status,
+		strategyVersion: result.strategyVersion,
+	};
 }
