@@ -15,9 +15,9 @@ O produto começa para uso pessoal e poderá receber outras pessoas com suas
 próprias carteiras, estratégias e configurações de IA. A integração inicial de
 IA utiliza uma chave da Anthropic fornecida pelo usuário.
 
-O Decision Board é um aplicativo independente, com possibilidade de
-integração futura com o Ascend Finance. Backend, dados e autorização terão fronteiras próprias;
-uma integração posterior deverá explicitar quais informações compartilha.
+O Decision Board é um aplicativo independente. Backend, dados e autorização
+têm fronteiras próprias; uma integração futura com outro sistema deverá
+explicitar quais informações compartilha.
 
 A IA ajuda a construir a estratégia, acompanha a carteira, pesquisa novas
 possibilidades e apresenta propostas fundamentadas. Essas propostas podem

@@ -13,13 +13,11 @@ precisa ser confirmada com arquivos reais (fase F1).
    por arquivo e o caixa declarado, o Decision Board não depende da Pluggy, e essa
    restrição deixa de valer para ele (decisão do usuário em 10/11/2026).
 2. **O Decision Board não usa a Pluggy.** As posições vêm da B3, e o caixa é
-   declarado pela pessoa. Uma integração futura com o Finance seria
-   produto a produto, sem a Pluggy no Decision Board.
-3. **O Decision Board trata só de investimentos.** Gastos, contas e cartões pertencem
-   ao Ascend Finance.
+   declarado pela pessoa.
+3. **O Decision Board trata só de investimentos.** Gastos, contas e cartões
+   ficam fora do escopo.
 4. **O caixa para aporte é declarado pela pessoa no Decision Board.** A B3 não informa
-   esse valor, e o Decision Board não depende do Finance nem da Pluggy para obtê-lo.
-   A integração com o Finance é uma opção futura.
+   esse valor, e o Decision Board não depende de outro sistema para obtê-lo.
 5. **O Decision Board nunca envia ordens.** Ele monta um plano de operação; a pessoa
    executa na corretora, e a importação seguinte da B3 confere o que foi feito.
    Isso mantém a regra do `AGENTS.md` contra APIs de ordens.
@@ -32,9 +30,9 @@ precisa ser confirmada com arquivos reais (fase F1).
 | Negociações e custo de aquisição | Arquivos de negociação e movimentação da B3 (desde 01/11/2019) | Cadastro manual para compras anteriores ou fora da B3 | Observado; custo anterior a 2019 é informado |
 | Proventos recebidos | Movimentação da B3 (dividendo, JCP, rendimento) | Cadastro manual | Observado |
 | Proventos a receber | Sem fonte oficial gratuita confirmada | Estimativa pelo histórico | Estimado |
-| Cofrinhos, caixinhas e contas remuneradas | Cadastro manual com taxa, condição e vigência | Finance, no futuro | Informado |
+| Cofrinhos, caixinhas e contas remuneradas | Cadastro manual com taxa, condição e vigência | — | Informado |
 | Fundos abertos, previdência e cripto | Cadastro manual | — | Informado |
-| Caixa para aporte | Declaração mensal no Decision Board | Finance, no futuro | Informado, com data |
+| Caixa para aporte | Declaração mensal no Decision Board | — | Informado, com data |
 | Preços, taxas, índices e séries | Fontes públicas, coletadas pelo servidor | Provedor opcional configurado no ambiente | Observado, com fonte e data |
 
 A B3 consolida as posições de todas as corretoras e custodiantes num só
@@ -244,8 +242,7 @@ Como fonte de investimentos, a experiência do autor em 10/11/2026 mostrou:
 - o cofrinho de um banco digital ausente;
 - uma corretora sem visibilidade.
 
-A B3 cobre o mesmo patrimônio com dado oficial e consolidado. A Pluggy
-continua sendo assunto do Ascend Finance, para contas, cartões e transações.
+A B3 cobre o mesmo patrimônio com dado oficial e consolidado.
 
 ## Fases
 
