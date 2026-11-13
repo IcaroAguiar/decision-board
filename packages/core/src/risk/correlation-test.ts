@@ -365,7 +365,8 @@ function rankWorstPortfolioMonths(
 function buildCandidateWorstMonths(
 	portfolioWorstMonths: readonly PortfolioWorstMonth[],
 	candidateKey: string,
-	candidateByMonth: ReadonlyMap<YearMonth, Datum<number>>,
+	alignedMonths: readonly YearMonth[],
+	alignedCandidateReturns: readonly number[],
 ): {
 	worstMonths: WorstMonthPerformance[];
 	missingReasons: string[];
@@ -374,19 +375,17 @@ function buildCandidateWorstMonths(
 	const missingReasons: string[] = [];
 
 	for (const entry of portfolioWorstMonths) {
-		const datum = candidateByMonth.get(entry.month);
-		if (datum?.status === "known") {
+		const monthIndex = alignedMonths.indexOf(entry.month);
+		const candidateReturn = monthIndex >= 0 ? alignedCandidateReturns[monthIndex] : undefined;
+		if (candidateReturn !== undefined) {
 			worstMonths.push({
 				month: entry.month,
 				portfolioReturn: entry.portfolioReturn,
-				candidateReturn: datum.value,
+				candidateReturn,
 			});
 			continue;
 		}
-		const reason =
-			datum?.status === "missing"
-				? `Retorno de ${candidateKey} ausente em ${entry.month}: ${datum.reason}`
-				: `Histórico de ${candidateKey} indisponível em ${entry.month}.`;
+		const reason = `Histórico de ${candidateKey} indisponível em ${entry.month}.`;
 		missingReasons.push(reason);
 		worstMonths.push({
 			month: entry.month,
@@ -409,9 +408,8 @@ function hasAnyComputableMetric(candidate: CandidateCorrelationOutput): boolean 
 			windowResult.riskContributionsBefore !== null ||
 			windowResult.riskContributionsAfter !== null,
 	);
-	return (
-		hasWindowMetric || candidate.rollingCorrelation !== null || candidate.worstMonths.length > 0
-	);
+	const hasWorstMonthMetric = candidate.worstMonths.some((entry) => entry.candidateReturn !== null);
+	return hasWindowMetric || candidate.rollingCorrelation !== null || hasWorstMonthMetric;
 }
 
 export function runCorrelationTest(
@@ -696,15 +694,11 @@ export function runCorrelationTest(
 			});
 		}
 
-		const candidateByMonth = new Map(
-			createMonthlySeries(candidate.returns)
-				.filter((point) => point.month <= input.endMonth)
-				.map((point) => [point.month, point.value]),
-		);
 		const { worstMonths, missingReasons } = buildCandidateWorstMonths(
 			portfolioWorstMonths,
 			candidate.key,
-			candidateByMonth,
+			fullAligned.months,
+			fullCandidate,
 		);
 		if (missingReasons.length > 0) {
 			anyPartial = true;

@@ -734,3 +734,177 @@ test("ignores known zero-balance holdings without history and preserves computab
 	assert.equal(withZeroResult.output.beforeWeights.ZERADO11, 0);
 	assertNoPrescriptiveWording(withZeroResult.notVerified, withZeroResult.findings);
 });
+
+test("returns inconclusive when 58-month portfolio is tested against empty or non-overlapping candidate histories, and partial in mixed batch preserving valid candidate numbers", () => {
+	const endMonth = "2026-10";
+	const rand = createLcg(9191);
+	const rPortfolio = Array.from({ length: 58 }, () => 0.004 + (rand() - 0.5) * 0.08);
+	const validReturns = makeExactCorrelatedReturns(rPortfolio, -0.55, 0.025, 9292);
+	const oldNonOverlappingEnd = addMonths(endMonth, -58);
+	const oldCandidateReturns = Array.from({ length: 58 }, () => 0.005 + (rand() - 0.5) * 0.07);
+
+	const portfolioHoldings = [
+		{
+			key: "PORT11",
+			value: known(100_000, "observed", officialSource),
+			returns: toSeries(endMonth, rPortfolio),
+		},
+	];
+	const contribution = known(25_000, "informed", officialSource);
+
+	// 1. Candidato vazio com carteira de 58 meses -> inconclusivo (nenhuma métrica computável)
+	const emptyCandidateResult = runCorrelationTest({
+		asOf: "2026-10-31",
+		endMonth,
+		strategyVersion: "v1",
+		holdings: portfolioHoldings,
+		candidates: [{ key: "VAZIO11", returns: createMonthlySeries([]) }],
+		contribution,
+	});
+	assert.equal(emptyCandidateResult.status, "inconclusive");
+	assert.equal(emptyCandidateResult.output, null);
+	assert.ok(
+		emptyCandidateResult.findings.some(
+			(finding) => finding.code === "NO_COMPUTABLE_METRICS" && finding.severity === "blocked",
+		),
+	);
+	assertNoPrescriptiveWording(emptyCandidateResult.notVerified, emptyCandidateResult.findings);
+
+	// 2. Históricos sem sobreposição com a carteira de 58 meses -> inconclusivo
+	const nonOverlappingResult = runCorrelationTest({
+		asOf: "2026-10-31",
+		endMonth,
+		strategyVersion: "v1",
+		holdings: portfolioHoldings,
+		candidates: [{ key: "ANTIGO11", returns: toSeries(oldNonOverlappingEnd, oldCandidateReturns) }],
+		contribution,
+	});
+	assert.equal(nonOverlappingResult.status, "inconclusive");
+	assert.equal(nonOverlappingResult.output, null);
+	assert.ok(
+		nonOverlappingResult.findings.some(
+			(finding) => finding.code === "NO_COMPUTABLE_METRICS" && finding.severity === "blocked",
+		),
+	);
+	assertNoPrescriptiveWording(nonOverlappingResult.notVerified, nonOverlappingResult.findings);
+
+	// 3. Lote misto (um válido + um vazio) -> parcial, e o candidato válido preserva todos os números
+	const soloValidResult = runCorrelationTest({
+		asOf: "2026-10-31",
+		endMonth,
+		strategyVersion: "v1",
+		holdings: portfolioHoldings,
+		candidates: [{ key: "HEDGE11", returns: toSeries(endMonth, validReturns) }],
+		contribution,
+	});
+	if (soloValidResult.status === "inconclusive") assert.fail("Esperado resultado completo.");
+	const soloValidCandidate = soloValidResult.output.candidates[0];
+	assert.ok(soloValidCandidate);
+
+	const mixedResult = runCorrelationTest({
+		asOf: "2026-10-31",
+		endMonth,
+		strategyVersion: "v1",
+		holdings: portfolioHoldings,
+		candidates: [
+			{ key: "HEDGE11", returns: toSeries(endMonth, validReturns) },
+			{ key: "VAZIO11", returns: createMonthlySeries([]) },
+		],
+		contribution,
+	});
+	assert.equal(mixedResult.status, "partial");
+	const mixedValidCandidate = mixedResult.output.candidates[0];
+	const mixedEmptyCandidate = mixedResult.output.candidates[1];
+	assert.ok(mixedValidCandidate && mixedEmptyCandidate);
+
+	assert.deepEqual(mixedValidCandidate, soloValidCandidate);
+	assert.equal(mixedValidCandidate.classification, "reduz risco");
+	assert.equal(mixedValidCandidate.longestCompleteWindow, 58);
+	assert.ok(mixedValidCandidate.rollingCorrelation !== null);
+	assert.equal(mixedValidCandidate.rollingCorrelation.observations, 35);
+
+	assert.equal(mixedEmptyCandidate.classification, "inconclusivo");
+	assert.equal(mixedEmptyCandidate.longestCompleteWindow, null);
+	assert.equal(mixedEmptyCandidate.rollingCorrelation, null);
+	assert.ok(mixedEmptyCandidate.windows.every((windowResult) => windowResult.correlation === null));
+	assert.ok(mixedEmptyCandidate.worstMonths.every((entry) => entry.candidateReturn === null));
+	assertNoPrescriptiveWording(mixedResult.notVerified, mixedResult.findings);
+});
+
+test("handles an explicitly missing Datum inside candidate history on a portfolio worst month via alignSeries", () => {
+	const endMonth = "2026-10";
+	const rand = createLcg(9393);
+	const rPortfolio = Array.from({ length: 58 }, () => 0.004 + (rand() - 0.5) * 0.04);
+	// Define o pior mês da carteira dentro dos primeiros 28 meses (fora da janela de 30 meses).
+	const worstIndex = 10;
+	const worstMonth = addMonths(endMonth, worstIndex - (rPortfolio.length - 1));
+	rPortfolio[worstIndex] = -0.35;
+
+	const rawCandidateReturns = makeExactCorrelatedReturns(rPortfolio, -0.5, 0.03, 9494);
+	const startMonth = addMonths(endMonth, 1 - rPortfolio.length);
+	const missingReason = "Pregão sem negociação para o ativo no mês";
+	const candidateSeries = createMonthlySeries(
+		rawCandidateReturns.map((value, index) => {
+			const month = addMonths(startMonth, index);
+			return {
+				month,
+				value:
+					index === worstIndex ? missing(missingReason) : known(value, "observed", officialSource),
+			};
+		}),
+	);
+
+	const result = runCorrelationTest({
+		asOf: "2026-10-31",
+		endMonth,
+		strategyVersion: null,
+		holdings: [
+			{
+				key: "PORT11",
+				value: known(100_000, "observed", officialSource),
+				returns: toSeries(endMonth, rPortfolio),
+			},
+		],
+		candidates: [{ key: "GAP11", returns: candidateSeries }],
+		contribution: known(20_000, "informed", officialSource),
+		assumptions: { windows: [30, 58], rollingWindow: 24, worstMonths: 5 },
+	});
+
+	assert.equal(result.status, "partial");
+	const candidate = result.output.candidates[0];
+	assert.ok(candidate);
+	assert.equal(candidate.longestCompleteWindow, 30);
+
+	const win30 = candidate.windows.find((w) => w.window === 30);
+	const win58 = candidate.windows.find((w) => w.window === 58);
+	assert.ok(win30 && win30.status === "complete");
+	assert.ok(win58 && win58.status === "partial");
+	assert.equal(win58.overlap, 57);
+
+	const worstEntry = candidate.worstMonths[0];
+	assert.ok(worstEntry);
+	assert.equal(worstEntry.month, worstMonth);
+	assert.equal(worstEntry.portfolioReturn, -0.35);
+	assert.equal(worstEntry.candidateReturn, null);
+	assert.ok(worstEntry.reason.includes("GAP11"));
+	assert.ok(worstEntry.reason.includes(worstMonth));
+
+	const otherWorstEntries = candidate.worstMonths.slice(1);
+	assert.equal(otherWorstEntries.length, 4);
+	for (const entry of otherWorstEntries) {
+		assert.equal(typeof entry.candidateReturn, "number");
+	}
+
+	assert.ok(result.notVerified.includes(missingReason));
+	assert.ok(result.notVerified.some((note) => note.includes(worstMonth) && note.includes("GAP11")));
+	assert.ok(
+		result.findings.some(
+			(finding) =>
+				finding.code === "MISSING_WORST_MONTH_CANDIDATE_RETURN" &&
+				finding.subject === "GAP11" &&
+				finding.severity === "warning" &&
+				finding.message.includes(worstMonth),
+		),
+	);
+	assertNoPrescriptiveWording(result.notVerified, result.findings);
+});
