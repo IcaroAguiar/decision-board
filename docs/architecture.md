@@ -1,7 +1,10 @@
 # Arquitetura do Decision Board
 
 **Atualização:** 2026-11-13. **Estado:** contrato vigente para implementar a
-visão do [plano do produto](product-plan.md).
+visão do [plano do produto](product-plan.md). As fronteiras, a stack e o motor
+analítico estão decididos. As fichas de análise e o layout dos arquivos da B3
+ainda são propostas: as fichas aguardam revisão, e o layout depende da fase F1,
+com arquivos reais.
 
 Este documento substitui a arquitetura da visão anterior, que continua no
 histórico do Git. As decisões de produto estão no plano do produto; as fontes
@@ -94,7 +97,7 @@ argumento, inclusive a data de referência.
 | `packages/types` | Tipos e enums compartilhados entre API, web e pacotes | Conter lógica |
 | `packages/market-data` | Adaptadores das fontes públicas (BCB, Tesouro Transparente, ANBIMA, CVM) e dos provedores opcionais | Ser chamado pelo core ou pelos relatórios |
 | `packages/reports` | Exportação em Markdown e JSON a partir do mesmo resultado gravado, com `schemaVersion` | Buscar dados de mercado ou recalcular |
-| `packages/strategies` | Avaliadores de limites usados pelas análises de alocação | Definir perfis fixos de investidor |
+| `packages/strategies` | Avaliadores de limites usados pelas análises de alocação (hoje ainda exporta os cinco perfis da visão anterior) | Definir perfis fixos de investidor |
 | `apps/api` | Persistência, autenticação, importação, jobs e orquestração | Calcular análises fora do core |
 | `apps/web` | Telas aprovadas no design | Calcular análises ou decidir permissões |
 
@@ -110,17 +113,27 @@ O motor fica em `packages/core` e se organiza por análise:
 | Contratos | Base de todos | Valor com natureza, fonte e data; soma com cobertura; idade do dado; calendário de dias úteis; envelope de resultado |
 | Renda fixa | R1, R2 | Taxas, indexadores, vencimentos, caminho do CDI, tabelas de IR e custódia |
 | Risco | R3 | Séries mensais de retorno total e pesos da carteira |
-| Alocação | R7, R8 | Posições por parte da carteira, alvos e faixas da estratégia, caixa declarado |
-| Decisões | R11, R12 | Proposta, análises que a sustentam, estratégia versionada |
+| Alocação | R7, R8 | Posições por parte da carteira, alvos e faixas da estratégia, caixa declarado; o R8 recebe a projeção congelada, calculada com o R1 |
+| Decisões | R11, R12 | Proposta, referências às análises que a sustentam, estratégia versionada |
+| Cenários (previsto, P4) | Otimização, backtests, estresse, Monte Carlo e sensibilidade | Métodos e hipóteses registrados, semente e configuração de cada simulação, dados disponíveis em cada data |
 
 Os requisitos R4, R5, R6, R9 (reconciliação) e R10 dependem de fontes que
 ainda serão confirmadas e entram depois.
+
+No R11, o core decide só o que é regra pura: por exemplo, se uma proposta de
+renda variável tem um resultado do R3 que a sustente. A API garante o resto,
+como impedir que uma rotina agendada registre movimentação.
+
+Os backtests da fase P4 exigem dados com disponibilidade temporal: cada série
+precisa dizer o que se sabia em cada data, e não apenas o valor revisto de
+hoje. A fase P2 prepara esse dado.
 
 ### 6.1. Envelope de resultado
 
 Todo método devolve o mesmo envelope:
 
-- método e versão;
+- método, identificado no catálogo de métodos, e versão;
+- versão da estratégia sob a qual a análise rodou, quando houver;
 - estado: completo, parcial ou inconclusivo;
 - data de referência;
 - entradas e premissas usadas;
@@ -129,18 +142,26 @@ Todo método devolve o mesmo envelope:
 - achados (informativo, alerta ou bloqueio), com mensagem em português;
 - a saída, que é nula quando o resultado é inconclusivo.
 
-Um resultado parcial ou inconclusivo sempre explica o motivo.
+Um resultado parcial ou inconclusivo sempre explica o motivo. Outras partes do
+sistema citam um resultado por uma referência (identificador, método, data,
+estado e versão da estratégia), e é por ela que uma decisão aponta as
+análises que a sustentam.
 
 ### 6.2. Política numérica
 
 O motor usa `number` (ponto flutuante de 64 bits) e documenta a tolerância de
 cada método nos testes de aceite. Valores monetários gravados no banco usam
-`Decimal`, e a conversão acontece na fronteira da API.
+`Decimal`, e a conversão acontece na fronteira da API. Taxas e percentuais são
+frações decimais (0,1375 representa 13,75%), e o motor só arredonda na
+apresentação. Os cálculos de carteira herdados da visão anterior
+(`portfolio.ts`) ainda usam pontos percentuais e arredondam valores; serão
+migrados para a convenção nova.
 
 As datas são datas de calendário ISO (`AAAA-MM-DD`), tratadas em UTC. Os dias
 úteis seguem a convenção de intervalo semiaberto: conta-se o dia inicial e não
-se conta o final. Os feriados chegam ao motor como lista; o motor não os
-conhece por conta própria.
+se conta o final. Os feriados chegam ao motor como lista, junto com o
+período que essa lista cobre; o motor não os conhece por conta própria e
+recusa datas fora desse período.
 
 ### 6.3. Aceite
 
