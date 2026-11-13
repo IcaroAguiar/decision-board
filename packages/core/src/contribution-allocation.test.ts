@@ -1,358 +1,233 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { ContributionCandidateMetric } from "./index.js";
 import {
-	type ContributionCandidateInput,
-	type ContributionCandidateMetric,
+	type PartContributionCandidate,
+	type PartContributionInput,
+	type SimulationAuditFinding,
 	simulateContributionAllocation,
 } from "./index.js";
 
-const assetIds = {
-	brick: "asset-brick",
-	other: "asset-other",
-	paper: "asset-paper",
-} as const;
-
-function metricRefs(metrics: ContributionCandidateMetric[]) {
-	return metrics.map((metric) => ({
-		label: `${metric} source`,
-		metric,
-	}));
-}
-
-function candidate(
-	overrides: Partial<ContributionCandidateInput> &
-		Pick<ContributionCandidateInput, "assetId" | "ticker">,
-): ContributionCandidateInput {
+const metrics: ContributionCandidateMetric[] = [
+	"price",
+	"part",
+	"lotSize",
+	"dailyLiquidity",
+	"concentration",
+];
+function candidate(overrides: Partial<PartContributionCandidate> = {}): PartContributionCandidate {
 	return {
+		assetId: "synthetic-goal",
+		ticker: "SYN1",
 		currentPrice: 100,
-		metricSourceRefs: metricRefs(["price"]),
-		riskCategory: "paper",
+		part: "goal",
+		assetClass: "synthetic",
+		institution: "synthetic",
+		metricSourceRefs: metrics.map(
+			(metric) =>
+				({
+					metric,
+					label: "Fonte sintética",
+				}) satisfies PartContributionCandidate["metricSourceRefs"][number],
+		),
 		...overrides,
 	};
 }
-
-function auditCodes(result: ReturnType<typeof simulateContributionAllocation>) {
-	return result.auditFindings.map((finding) => finding.code);
-}
-
-test("allocates whole lots without exceeding contribution amount", () => {
-	const result = simulateContributionAllocation({
-		allowedAssetIds: [assetIds.paper, assetIds.brick],
-		candidates: [
-			candidate({
-				assetId: assetIds.paper,
-				currentPrice: 230,
-				metricSourceRefs: metricRefs(["price", "targetWeightPercent"]),
-				targetWeightPercent: 50,
-				ticker: "CYCR11",
-			}),
-			candidate({
-				assetId: assetIds.brick,
-				currentPrice: 140,
-				metricSourceRefs: metricRefs(["price", "targetWeightPercent"]),
-				riskCategory: "brick",
-				targetWeightPercent: 50,
-				ticker: "HGLG11",
-			}),
-		],
-		contributionAmount: 1000,
+function fixture(overrides: Partial<PartContributionInput> = {}): PartContributionInput {
+	return {
 		positions: [],
-	});
+		contributionAmount: 1000,
+		allowedAssetIds: ["synthetic-goal", "synthetic-equities"],
+		candidates: [candidate()],
+		minOperationValue: 0,
+		partTargets: {
+			reserve: { target: 0, band: { min: 0, max: 0 } },
+			goal: { target: 1, band: { min: 0, max: 1 } },
+			equities: { target: 0, band: { min: 0, max: 1 } },
+		},
+		...overrides,
+	};
+}
+const codes = (result: ReturnType<typeof simulateContributionAllocation>) =>
+	result.auditFindings.map((finding) => finding.code);
 
-	assert.equal(result.investedAmount + result.remainingCash, result.contributionAmount);
-	assert.equal(result.investedAmount, 880);
-	assert.equal(result.remainingCash, 120);
-	assert.deepEqual(
-		result.planItems.map((order) => [order.ticker, order.quantity]),
-		[
-			["CYCR11", 2],
-			["HGLG11", 3],
-		],
+test("whole lots preserve the contribution budget", () => {
+	const result = simulateContributionAllocation(
+		fixture({ candidates: [candidate({ currentPrice: 140, lotSize: 3 })] }),
 	);
+	assert.deepEqual(
+		result.planItems.map((item) => [item.quantity, item.estimatedValue]),
+		[[6, 840]],
+	);
+	assert.equal(result.investedAmount, 840);
+	assert.equal(result.remainingCash, 160);
+	assert.equal(result.investedAmount + result.remainingCash, 1000);
 });
-
-test("chooses candidate that reduces target weight gap", () => {
-	const result = simulateContributionAllocation({
-		allowedAssetIds: [assetIds.paper, assetIds.brick],
-		candidates: [
-			candidate({
-				assetId: assetIds.paper,
-				metricSourceRefs: metricRefs(["price", "targetWeightPercent"]),
-				targetWeightPercent: 50,
-				ticker: "CYCR11",
-			}),
-			candidate({
-				assetId: assetIds.brick,
-				metricSourceRefs: metricRefs(["price", "targetWeightPercent"]),
-				riskCategory: "brick",
-				targetWeightPercent: 50,
-				ticker: "HGLG11",
-			}),
-		],
+test("chooses the candidate reducing the part target gap", () => {
+	const input = fixture({
 		contributionAmount: 100,
 		positions: [
 			{
-				assetId: assetIds.paper,
-				currentPrice: 90,
-				quantity: 10,
-				riskCategory: "paper",
-				ticker: "CYCR11",
+				assetId: "synthetic-goal",
+				part: "goal",
+				value: 900,
+				assetClass: "synthetic",
+				institution: "synthetic",
 			},
 			{
-				assetId: assetIds.brick,
-				currentPrice: 100,
-				quantity: 1,
-				riskCategory: "brick",
-				ticker: "HGLG11",
+				assetId: "synthetic-equities",
+				part: "equities",
+				value: 100,
+				assetClass: "synthetic",
+				institution: "synthetic",
 			},
 		],
+		candidates: [
+			candidate(),
+			candidate({ assetId: "synthetic-equities", ticker: "SYN2", part: "equities" }),
+		],
 	});
-
+	input.partTargets.goal.target = 0.5;
+	input.partTargets.equities.target = 0.5;
+	const result = simulateContributionAllocation(input);
 	assert.deepEqual(
-		result.planItems.map((order) => order.ticker),
-		["HGLG11"],
+		result.planItems.map((item) => [item.assetId, item.quantity]),
+		[["synthetic-equities", 1]],
 	);
 });
-
-test("blocks candidates outside allowed investment universe", () => {
-	const result = simulateContributionAllocation({
-		allowedAssetIds: [assetIds.paper],
-		candidates: [
-			candidate({
-				assetId: assetIds.other,
-				ticker: "VINO11",
-			}),
-		],
-		contributionAmount: 100,
-		positions: [],
-	});
-
+test("blocks assets outside the allowed universe", () => {
+	const result = simulateContributionAllocation(fixture({ allowedAssetIds: [] }));
 	assert.deepEqual(result.planItems, []);
-	assert.ok(auditCodes(result).includes("candidate_outside_universe"));
+	assert.ok(codes(result).includes("candidate_outside_universe"));
 });
-
-test("requires metric source references for decision metrics", () => {
-	const blocked = simulateContributionAllocation({
-		allowedAssetIds: [assetIds.paper],
-		candidates: [
-			candidate({
-				assetId: assetIds.paper,
-				metricSourceRefs: [],
-				ticker: "CYCR11",
+test("requires sources for each metric used in a decision", () => {
+	for (const metric of ["price", "part", "lotSize", "dailyLiquidity", "concentration"]) {
+		const result = simulateContributionAllocation(
+			fixture({
+				minDailyLiquidity: 1,
+				maxConcentration: 0.5,
+				candidates: [
+					candidate({
+						lotSize: 1,
+						dailyLiquidity: 100,
+						concentration: 0.1,
+						metricSourceRefs: candidate().metricSourceRefs.filter(
+							(source) => source.metric !== metric,
+						),
+					}),
+				],
 			}),
-		],
-		contributionAmount: 100,
-		positions: [],
-	});
-
-	assert.deepEqual(blocked.planItems, []);
-	assert.ok(auditCodes(blocked).includes("missing_metric_source"));
-
-	const eligible = simulateContributionAllocation({
-		allowedAssetIds: [assetIds.paper],
-		candidates: [
-			candidate({
-				assetId: assetIds.paper,
-				ticker: "CYCR11",
-			}),
-		],
-		contributionAmount: 100,
-		positions: [],
-	});
-
-	assert.equal(eligible.planItems[0]?.ticker, "CYCR11");
+		);
+		assert.deepEqual(result.planItems, []);
+		assert.ok(
+			result.auditFindings.some(
+				(finding) => finding.code === "missing_metric_source" && finding.metric === metric,
+			),
+		);
+	}
+	assert.equal(simulateContributionAllocation(fixture()).planItems[0]?.quantity, 10);
 });
-
-test("blocks price liquidity and concentration violations", () => {
-	const result = simulateContributionAllocation({
-		allowedAssetIds: [assetIds.paper, assetIds.brick, assetIds.other],
-		candidates: [
-			candidate({
-				assetId: assetIds.paper,
-				currentPrice: 120,
-				dailyLiquidity: 2000,
-				maxPrice: 100,
-				metricSourceRefs: metricRefs(["price", "dailyLiquidity", "concentrationPercent"]),
-				concentrationPercent: 10,
-				ticker: "CYCR11",
+test("blocks price, liquidity and concentration violations", () => {
+	for (const [overrides, code] of [
+		[{ maxPrice: 99 }, "price_above_limit"],
+		[{ dailyLiquidity: 10 }, "liquidity_below_minimum"],
+		[{ concentration: 0.8 }, "concentration_above_limit"],
+	] satisfies [Partial<PartContributionCandidate>, SimulationAuditFinding["code"]][]) {
+		const result = simulateContributionAllocation(
+			fixture({
+				minDailyLiquidity: 1000,
+				maxConcentration: 0.5,
+				candidates: [candidate({ dailyLiquidity: 2000, concentration: 0.1, ...overrides })],
 			}),
-			candidate({
-				assetId: assetIds.brick,
-				dailyLiquidity: 10,
-				metricSourceRefs: metricRefs(["price", "dailyLiquidity", "concentrationPercent"]),
-				concentrationPercent: 10,
-				riskCategory: "brick",
-				ticker: "HGLG11",
-			}),
-			candidate({
-				assetId: assetIds.other,
-				dailyLiquidity: 2000,
-				metricSourceRefs: metricRefs(["price", "dailyLiquidity", "concentrationPercent"]),
-				concentrationPercent: 80,
-				ticker: "VINO11",
-			}),
-		],
-		constraints: {
-			maxConcentrationPercent: 50,
-			minDailyLiquidity: 1000,
-		},
-		contributionAmount: 1000,
-		positions: [],
-	});
-
-	assert.deepEqual(result.planItems, []);
-	assert.ok(auditCodes(result).includes("price_above_limit"));
-	assert.ok(auditCodes(result).includes("liquidity_below_minimum"));
-	assert.ok(auditCodes(result).includes("concentration_above_limit"));
+		);
+		assert.deepEqual(result.planItems, []);
+		assert.ok(codes(result).includes(code));
+	}
 });
-
-test("records allocation limit reached when next lot would violate limits", () => {
-	const result = simulateContributionAllocation({
-		allowedAssetIds: [assetIds.paper],
-		candidates: [
-			candidate({
-				assetId: assetIds.paper,
-				currentPrice: 600,
-				metricSourceRefs: metricRefs(["price", "targetWeightPercent"]),
-				targetWeightPercent: 100,
-				ticker: "CYCR11",
-			}),
-		],
-		constraints: {
-			maxSingleAssetPercent: 50,
-		},
-		contributionAmount: 1000,
-		positions: [],
-	});
-
-	assert.deepEqual(result.planItems, []);
-	assert.ok(auditCodes(result).includes("allocation_limit_reached"));
+test("records allocation limits for each concentration dimension", () => {
+	for (const concentrationLimits of [
+		{ perAsset: 0.25 },
+		{ perClass: 0.25 },
+		{ perInstitution: 0.25 },
+	]) {
+		const result = simulateContributionAllocation(fixture({ concentrationLimits }));
+		assert.equal(result.investedAmount, 200);
+		assert.equal(result.remainingCash, 800);
+		assert.ok(codes(result).includes("allocation_limit_reached"));
+	}
 });
-
-test("includes existing and remaining cash in post allocation cash bucket", () => {
-	const result = simulateContributionAllocation({
-		allowedAssetIds: [assetIds.paper],
-		candidates: [
-			candidate({
-				assetId: assetIds.paper,
-				currentPrice: 80,
-				metricSourceRefs: metricRefs(["price", "targetWeightPercent"]),
-				targetWeightPercent: 100,
-				ticker: "CYCR11",
-			}),
-		],
-		cashAccounts: [
-			{
-				balance: 200,
-				id: "cash-account",
-				name: "Reserva",
-				type: "CDB",
-			},
-		],
-		contributionAmount: 100,
-		positions: [],
-	});
-
+test("post-allocation includes reserve holdings and unallocated contribution cash", () => {
+	const result = simulateContributionAllocation(
+		fixture({
+			contributionAmount: 100,
+			positions: [
+				{
+					assetId: "synthetic-reserve",
+					part: "reserve",
+					value: 200,
+					assetClass: "cash",
+					institution: "synthetic",
+				},
+			],
+			candidates: [candidate({ currentPrice: 80 })],
+		}),
+	);
 	assert.equal(result.remainingCash, 20);
-	assert.equal(result.postAllocation.byRiskCategory.cash, 73.33);
-	assert.equal(result.postAllocation.bySegment.cash, 73.33);
+	assert.equal(result.postAllocation.totalValue, 300);
+	assert.equal(result.postAllocation.byPart.reserve, 2 / 3);
+	assert.equal(result.postAllocation.byPart.goal, 80 / 300);
+	assert.equal(result.postAllocation.cash, 20 / 300);
+	assert.equal(result.postAllocation.bySegment.cash, 20 / 300);
 });
-
-test("rejects invalid numeric inputs", () => {
+test("rejects invalid numeric inputs and decimal fractions outside their domain", () => {
+	for (const contributionAmount of [-1, NaN, Infinity])
+		assert.throws(
+			() => simulateContributionAllocation(fixture({ contributionAmount })),
+			/contributionAmount/,
+		);
+	for (const overrides of [
+		{ currentPrice: 0 },
+		{ currentPrice: NaN },
+		{ lotSize: 1.5 },
+		{ lotSize: 0 },
+		{ priority: -1 },
+		{ maxPrice: Infinity },
+		{ dailyLiquidity: -1 },
+		{ concentration: 1.1 },
+		{ estimatedMonthlyDividendPerUnit: -1 },
+	])
+		assert.throws(() =>
+			simulateContributionAllocation(fixture({ candidates: [candidate(overrides)] })),
+		);
 	assert.throws(
-		() =>
-			simulateContributionAllocation({
-				allowedAssetIds: [assetIds.paper],
-				candidates: [candidate({ assetId: assetIds.paper, ticker: "CYCR11" })],
-				contributionAmount: 0,
-				positions: [],
-			}),
-		/contributionAmount/,
+		() => simulateContributionAllocation(fixture({ minOperationValue: -1 })),
+		/minOperationValue/,
 	);
-
-	assert.throws(
-		() =>
-			simulateContributionAllocation({
-				allowedAssetIds: [assetIds.paper],
-				candidates: [
-					candidate({
-						assetId: assetIds.paper,
-						currentPrice: 0,
-						ticker: "CYCR11",
-					}),
-				],
-				contributionAmount: 100,
-				positions: [],
-			}),
-		/currentPrice/,
-	);
-
-	assert.throws(
-		() =>
-			simulateContributionAllocation({
-				allowedAssetIds: [assetIds.paper],
-				candidates: [
-					candidate({
-						assetId: assetIds.paper,
-						metricSourceRefs: metricRefs(["price", "targetWeightPercent"]),
-						targetWeightPercent: 101,
-						ticker: "CYCR11",
-					}),
-				],
-				contributionAmount: 100,
-				positions: [],
-			}),
-		/targetWeightPercent/,
-	);
-
-	assert.throws(
-		() =>
-			simulateContributionAllocation({
-				allowedAssetIds: [assetIds.paper],
-				candidates: [
-					candidate({
-						assetId: assetIds.paper,
-						lotSize: 1.5,
-						metricSourceRefs: metricRefs(["price", "lotSize"]),
-						ticker: "CYCR11",
-					}),
-				],
-				contributionAmount: 100,
-				positions: [],
-			}),
-		/lotSize/,
+	const input = fixture();
+	input.partTargets.goal.target = 50;
+	assert.throws(() => simulateContributionAllocation(input), /fração/);
+	assert.deepEqual(
+		simulateContributionAllocation(fixture({ contributionAmount: 0 })).planItems,
+		[],
 	);
 });
-
-test("missing constrained liquidity or concentration blocks with an explanation", () => {
-	const result = simulateContributionAllocation({
-		positions: [],
-		contributionAmount: 100,
-		allowedAssetIds: [assetIds.paper],
-		candidates: [
-			candidate({
-				assetId: assetIds.paper,
-				ticker: "SYN1",
-				metricSourceRefs: metricRefs(["price", "dailyLiquidity", "concentrationPercent"]),
-			}),
-		],
-		constraints: { minDailyLiquidity: 0, maxConcentrationPercent: 100 },
-	});
+test("missing constrained metrics remain blocked even with source references", () => {
+	const result = simulateContributionAllocation(
+		fixture({ minDailyLiquidity: 0, maxConcentration: 1 }),
+	);
 	assert.deepEqual(result.planItems, []);
-	assert.equal(result.auditFindings.filter((f) => f.code === "missing_metric").length, 2);
-	assert.ok(result.auditFindings.some((f) => f.message.includes("liquidez ausente")));
-	assert.ok(result.auditFindings.every((f) => !/compr|vend|recomend/i.test(f.message)));
+	assert.deepEqual(
+		result.auditFindings
+			.filter((finding) => finding.code === "missing_metric")
+			.map((finding) => finding.metric),
+		["dailyLiquidity", "concentration"],
+	);
 });
-
 test("fractional prices are not rounded while allocating", () => {
-	const result = simulateContributionAllocation({
-		positions: [],
-		contributionAmount: 1,
-		allowedAssetIds: [assetIds.paper],
-		candidates: [candidate({ assetId: assetIds.paper, ticker: "SYN1", currentPrice: 0.333 })],
-	});
+	const result = simulateContributionAllocation(
+		fixture({ contributionAmount: 1, candidates: [candidate({ currentPrice: 0.333 })] }),
+	);
 	assert.equal(result.planItems[0]?.quantity, 3);
 	assert.equal(result.planItems[0]?.estimatedValue, 0.9990000000000001);
 	assert.ok(result.investedAmount <= 1);
-	assert.deepEqual(result.planItems[0]?.metricSourceRefs, metricRefs(["price"]));
 });
