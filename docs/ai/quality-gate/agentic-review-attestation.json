@@ -1,17 +1,17 @@
 {
   "schemaVersion": 1,
-  "reviewer": "gpt-6.1-sol (revisão independente, calls 64ad46d7ecda/888c89276f3e/072ef1850c94; sinais: claude-sonnet-5-5 b7ed4365c751)",
-  "reviewedAt": "2026-11-14T06:14:02Z",
+  "reviewer": "claude-sonnet-5-5 e gpt-6.1-sol (revisões independentes das camadas #49 a #53; sinais: b7ed4365c751)",
+  "reviewedAt": "2026-11-13T21:36:42Z",
   "verdict": "approved_with_risk",
   "deterministicSignalsReviewed": true,
-  "reviewedFingerprint": "af172713fde4bc807fbc1ea3e99ba157ae0ebce67d261864358899b09030390e",
+  "reviewedFingerprint": "a585f9a649e29fe1f6aacd7c70d7fbf7c3739d97b05c5f6bb3750dbdaec8e6f4",
   "reviewedDeterministicSignals": {
-    "blocking": 65,
-    "high": 1,
-    "medium": 127
+    "blocking": 62,
+    "high": 0,
+    "medium": 125
   },
   "scope": [
-    "packages/core/src/decisions: R11 salvaguardas e R12 estratégia versionada"
+    "pilha completa #49 a #53 contra main: arquitetura, contratos e R1, R2, R3, R7, R8, R11, R12 em packages/core"
   ],
-  "residualRisk": "Regras puras do domínio; a confirmação real da sessão continua na API."
+  "residualRisk": "Atestação do push que leva a pilha ao main; cada camada tem a própria atestação no PR. Riscos residuais são os listados em cada camada."
 }
