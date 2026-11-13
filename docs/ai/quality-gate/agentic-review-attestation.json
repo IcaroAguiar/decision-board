@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "reviewer": "claude-sonnet-5-5 (revisão independente, calls 9046e81311c9/a416163c584d/22826ed7da4c; sinais: b7ed4365c751)",
-  "reviewedAt": "2026-11-13T21:20:45Z",
+  "reviewedAt": "2026-11-13T21:36:06Z",
   "verdict": "approved_with_risk",
   "deterministicSignalsReviewed": true,
   "reviewedFingerprint": "edd7a2aa7a962b9b4d0edc240bd581b183d99cf150926616b6188de3991b9b33",
