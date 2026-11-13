@@ -1,17 +1,18 @@
 {
   "schemaVersion": 1,
-  "reviewer": "gpt-6.1-sol (revisão independente, calls cde21de8f701/c8862d3188c8/96ebda89f9a5; lacuna de retorno: gpt-6.1-sol 8f3e87b15d15; sinais: claude-sonnet-5-5 b7ed4365c751)",
-  "reviewedAt": "2026-11-14T06:13:34Z",
+  "reviewer": "claude-sonnet-5-5 (revisão independente, calls 9046e81311c9/a416163c584d/22826ed7da4c; sinais: b7ed4365c751)",
+  "reviewedAt": "2026-11-13T21:20:45Z",
   "verdict": "approved_with_risk",
   "deterministicSignalsReviewed": true,
-  "reviewedFingerprint": "74dcaa62c824d38ad5d332e41fa32d8cdc299ec06bb42029e8ca04ea53f51ab9",
+  "reviewedFingerprint": "edd7a2aa7a962b9b4d0edc240bd581b183d99cf150926616b6188de3991b9b33",
   "reviewedDeterministicSignals": {
-    "blocking": 45,
-    "high": 1,
-    "medium": 77
+    "blocking": 12,
+    "high": 0,
+    "medium": 32
   },
   "scope": [
-    "packages/core/src/risk: R3 teste de correlação"
+    "packages/core/src/allocation e contribution-allocation: R7 e R8",
+    "CONTEXT.md"
   ],
-  "residualRisk": "Tolerâncias de variância nula nomeadas e documentadas; correlation-test.ts é grande, sem defeito apontado."
+  "residualRisk": "Causas e métricas já tipadas por uniões. Adiados: preço e lote como Datum (R10), piso de materialidade do aviso de aporte, deduplicação de avisos por ativo."
 }
