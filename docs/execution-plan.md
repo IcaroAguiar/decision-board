@@ -1,5 +1,10 @@
 # Documento de Execução — Checklist Operacional e Plano por Fases/PRs
 
+> **Retomada em 2026-10-24:** a nova visão e a sequência proposta estão no
+> [plano do produto](product-plan.md). Este documento preserva o roadmap anterior
+> como histórico. Seus checklists não comprovam o estado atual do código nem
+> autorizam retomar a implementação sem o alinhamento previsto em P0.
+
 **Versão:** 0.1.0
 **Data:** 2026-05-11
 **Projeto:** Portfolio Decision Dashboard

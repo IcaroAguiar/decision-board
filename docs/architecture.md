@@ -5,6 +5,11 @@
 **Status:** Plano arquitetural para MVP open source
 **Nome provisório:** Portfolio Decision Dashboard
 
+> Documento da visão anterior. O [plano do produto](product-plan.md)
+> registra a redefinição do produto e as análises avançadas no escopo inicial.
+> A conciliação arquitetural de P0 permanece pendente; este documento não
+> representa a arquitetura aprovada para implementar a nova visão.
+
 ## 1. Resumo executivo
 
 O projeto é uma aplicação web open source, self-hostable e multiusuário para acompanhamento de carteira, planejamento de aportes recorrentes, aplicação de estratégias de alocação e geração de relatórios estruturados para análise externa, especialmente por IA.
