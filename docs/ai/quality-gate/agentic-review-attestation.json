@@ -1,18 +1,17 @@
 {
   "schemaVersion": 1,
-  "reviewer": "claude-sonnet-5-5 (revisão independente, calls 9046e81311c9/a416163c584d/22826ed7da4c; resíduo do orçamento: gpt-6.1-sol 8f3e87b15d15; sinais: b7ed4365c751)",
-  "reviewedAt": "2026-11-14T06:13:50Z",
+  "reviewer": "gpt-6.1-sol (revisão independente, calls 64ad46d7ecda/888c89276f3e; sinais: claude-sonnet-5-5 b7ed4365c751)",
+  "reviewedAt": "2026-11-13T21:21:04Z",
   "verdict": "approved_with_risk",
   "deterministicSignalsReviewed": true,
-  "reviewedFingerprint": "b06fdc695fe8646582123cfc5c0664fd868f3f6f08ae6a2ebfaa0c3f4eb70c8e",
+  "reviewedFingerprint": "e2fcac346187e34e8e8e8e6be65069f6997bc29385d604a01671e6aae71ec2fd",
   "reviewedDeterministicSignals": {
-    "blocking": 57,
-    "high": 1,
-    "medium": 106
+    "blocking": 8,
+    "high": 0,
+    "medium": 27
   },
   "scope": [
-    "packages/core/src/allocation e contribution-allocation: R7 e R8",
-    "CONTEXT.md"
+    "packages/core/src/decisions: R11 salvaguardas e R12 estratégia versionada"
   ],
-  "residualRisk": "Causas e métricas já tipadas por uniões. Adiados: preço e lote como Datum (R10), piso de materialidade do aviso de aporte, deduplicação de avisos por ativo."
+  "residualRisk": "Regras puras do domínio; a confirmação real da sessão continua na API."
 }
