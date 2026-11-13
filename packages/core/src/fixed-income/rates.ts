@@ -1,5 +1,8 @@
 import { type BusinessCalendar, calendarDaysBetween, parseIsoDate } from "../calendar.js";
 
+/** Base anual da capitalização por dias úteis (convenção ANBIMA/B3). */
+export const businessDaysPerYear = 252;
+
 export interface RateStep {
 	effectiveFrom: string;
 	annualRate: number;
@@ -25,7 +28,7 @@ export function nonNegative(value: number): number {
 }
 export function annualFactor(rate: number): number {
 	if (finite(rate) <= -1) throw new Error("A taxa anual deve ser maior que -1.");
-	return (1 + rate) ** (1 / 252);
+	return (1 + rate) ** (1 / businessDaysPerYear);
 }
 
 export function createRatePath(steps: readonly RateStep[]) {

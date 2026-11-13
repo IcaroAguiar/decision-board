@@ -1,7 +1,7 @@
 import { type AnalysisFinding, createAnalysisResult, methodIds } from "../analysis.js";
 import { type BusinessCalendar, parseIsoDate } from "../calendar.js";
 import { collectEvidence, type Datum } from "../provenance.js";
-import { annualFactor, finite, nonNegative } from "./rates.js";
+import { annualFactor, businessDaysPerYear, finite, nonNegative } from "./rates.js";
 
 export interface ZeroCouponBond {
 	id: string;
@@ -24,7 +24,7 @@ export function zeroCouponPrice(face: number, annualYield: number, businessDays:
 	annualFactor(annualYield);
 	if (!Number.isSafeInteger(businessDays) || businessDays < 0)
 		throw new Error("O prazo em DU deve ser um inteiro não negativo.");
-	return finite(face / (1 + annualYield) ** (businessDays / 252));
+	return finite(face / (1 + annualYield) ** (businessDays / businessDaysPerYear));
 }
 export interface RateRiskOutput {
 	nature: "estimated";
@@ -127,7 +127,7 @@ export function analyzeRateRisk(input: RateRiskInput, calendar: BusinessCalendar
 		});
 	const price = zeroCouponPrice(bond.face, bond.annualYield, businessDays);
 	if (price <= 0) throw new Error("O PU deve ser positivo para calcular a variação relativa.");
-	const modifiedDuration = finite(businessDays / 252 / (1 + bond.annualYield));
+	const modifiedDuration = finite(businessDays / businessDaysPerYear / (1 + bond.annualYield));
 	const durationRelativeChange = finite(-modifiedDuration * shock);
 	const repricedPrice = zeroCouponPrice(bond.face, bond.annualYield + shock, businessDays);
 	const repricingPriceChange = finite(repricedPrice - price);

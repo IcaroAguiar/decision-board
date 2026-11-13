@@ -1,6 +1,9 @@
 import { finite } from "./rates.js";
 import { prepareRedemption, type RedemptionInput } from "./taxation.js";
 
+/** Bisseção de [0, 5] até 1e-10 leva cerca de 36 passos; o teto só detecta não convergência. */
+const maxBisectionIterations = 256;
+
 export class SolverFailure extends Error {}
 
 export interface SolverOptions {
@@ -38,7 +41,7 @@ export function bisectIncreasing(
 		throw new SolverFailure("O empate não está contido no intervalo informado.");
 	if (target === lowValue) return left;
 	if (target === highValue) return right;
-	for (let i = 0; i < 256; i += 1) {
+	for (let i = 0; i < maxBisectionIterations; i += 1) {
 		const mid = (left + right) / 2;
 		if (right - left <= tolerance) return mid;
 		if (mid === left || mid === right)

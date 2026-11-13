@@ -2,6 +2,7 @@ import { calendarDaysBetween, parseIsoDate } from "../calendar.js";
 import {
 	type AccrualRate,
 	businessDates,
+	businessDaysPerYear,
 	compound,
 	createRatePath,
 	dailyGrowthFactor,
@@ -129,7 +130,8 @@ export function prepareRedemption(input: Omit<RedemptionInput, "rate">) {
 			(date, opening, closing) => {
 				custody = finite(
 					custody +
-						(Math.max(0, opening - input.custody.exemptBalance) * input.custody.annualRate) / 252,
+						(Math.max(0, opening - input.custody.exemptBalance) * input.custody.annualRate) /
+							businessDaysPerYear,
 				);
 				evolution.push({ businessDate: date, gross: closing, custodyAccrued: custody });
 			},
