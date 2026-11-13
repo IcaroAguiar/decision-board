@@ -3,24 +3,23 @@ import type {
 	PortfolioPositionInput,
 	RiskCategory,
 } from "@decision-board/types";
-import { calculatePortfolioSummary, calculatePositionValue } from "./portfolio.js";
+import type { PortfolioPart } from "./units.js";
 
 export type ContributionCandidateMetric =
 	| "price"
 	| "lotSize"
 	| "targetWeightPercent"
 	| "riskCategory"
+	| "part"
 	| "segment"
 	| "dailyLiquidity"
 	| "concentrationPercent";
-
 export interface MetricSourceRef {
 	metric: ContributionCandidateMetric;
 	label: string;
 	url?: string;
 	capturedAt?: string;
 }
-
 export interface ContributionCandidateInput {
 	assetId: string;
 	ticker: string;
@@ -36,7 +35,6 @@ export interface ContributionCandidateInput {
 	estimatedMonthlyDividendPerUnit?: number;
 	metricSourceRefs: MetricSourceRef[];
 }
-
 export interface ContributionAllocationConstraints {
 	maxSingleAssetPercent?: number;
 	maxSegmentPercent?: number;
@@ -44,7 +42,6 @@ export interface ContributionAllocationConstraints {
 	minDailyLiquidity?: number;
 	maxConcentrationPercent?: number;
 }
-
 export interface ContributionAllocationInput {
 	positions: PortfolioPositionInput[];
 	cashAccounts?: PortfolioCashAccountInput[];
@@ -53,663 +50,447 @@ export interface ContributionAllocationInput {
 	candidates: ContributionCandidateInput[];
 	constraints?: ContributionAllocationConstraints;
 }
-
-export interface SimulatedContributionOrder {
+export interface AllocationHolding {
+	assetId: string;
+	part: PortfolioPart;
+	value: number;
+	assetClass: string;
+	institution: string;
+	segment?: string;
+}
+export interface PartContributionCandidate
+	extends Omit<
+		ContributionCandidateInput,
+		"riskCategory" | "targetWeightPercent" | "concentrationPercent"
+	> {
+	part: PortfolioPart;
+	assetClass: string;
+	institution: string;
+	concentration?: number;
+}
+export interface AllocationTarget {
+	target: number;
+	band: { min: number; max: number };
+}
+export interface PartContributionInput {
+	positions: AllocationHolding[];
+	contributionAmount: number;
+	allowedAssetIds: string[];
+	candidates: PartContributionCandidate[];
+	partTargets: Record<PortfolioPart, AllocationTarget>;
+	classTargets?: Record<string, AllocationTarget>;
+	concentrationLimits?: { perAsset?: number; perClass?: number; perInstitution?: number };
+	minDailyLiquidity?: number;
+	maxConcentration?: number;
+	minOperationValue: number;
+}
+export interface SimulatedContributionPlanItem {
 	assetId: string;
 	ticker: string;
 	quantity: number;
-	limitPrice: number;
+	referencePrice: number;
 	estimatedValue: number;
 	estimatedMonthlyDividend?: number;
 	metricSourceRefs: MetricSourceRef[];
 }
-
-export type SimulationAuditSeverity = "info" | "warning" | "blocked";
-
 export interface SimulationAuditFinding {
 	code:
 		| "candidate_outside_universe"
 		| "missing_metric_source"
+		| "missing_metric"
 		| "price_above_limit"
 		| "liquidity_below_minimum"
 		| "concentration_above_limit"
 		| "allocation_limit_reached"
 		| "cash_unallocated";
-	severity: SimulationAuditSeverity;
+	severity: "info" | "warning" | "blocked";
 	ticker?: string;
 	metric?: ContributionCandidateMetric;
 	message: string;
 }
-
 export interface AuditableContributionSimulation {
 	contributionAmount: number;
 	investedAmount: number;
 	remainingCash: number;
-	orders: SimulatedContributionOrder[];
+	planItems: SimulatedContributionPlanItem[];
 	auditFindings: SimulationAuditFinding[];
 	postAllocation: {
 		totalValue: number;
 		byAsset: Record<string, number>;
+		byPart: Partial<Record<PortfolioPart, number>>;
 		byRiskCategory: Record<RiskCategory, number>;
 		bySegment: Record<string, number>;
 	};
 }
-
-interface CandidateState {
-	candidate: ContributionCandidateInput;
-	blocked: boolean;
-	blockReasons: SimulationAuditFinding[];
+interface Bucket {
+	key: string;
+	value: number;
+}
+interface Candidate {
+	input: Omit<ContributionCandidateInput, "riskCategory">;
+	buckets: string[];
+	targets: Bucket[];
+	required: ContributionCandidateMetric[];
+	concentration: number | undefined;
 	quantity: number;
-	investedAmount: number;
+	invested: number;
+}
+interface EngineInput {
+	contribution: number;
+	allowed: string[];
+	values: Map<string, number>;
+	total: number;
+	candidates: Candidate[];
+	targets: Bucket[];
+	limits: Bucket[];
+	minLiquidity: number | undefined;
+	maxConcentration: number | undefined;
+	minimum: number;
+	legacy: boolean;
 }
 
-interface CandidateScore {
-	state: CandidateState;
-	targetGapImprovement: number;
-	priority: number;
-	lotValue: number;
+const assetKey = (id: string) => `asset:${id}`;
+const partKey = (part: PortfolioPart) => `part:${part}`;
+const classKey = (label: string) => `class:${label}`;
+const institutionKey = (label: string) => `institution:${label}`;
+const segmentKey = (label: string | undefined) => `segment:${label?.trim() || "unclassified"}`;
+function add(values: Map<string, number>, key: string, value: number) {
+	values.set(key, (values.get(key) ?? 0) + value);
 }
-
-interface CurrentValues {
-	byAsset: Map<string, number>;
-	byRiskCategory: Map<RiskCategory, number>;
-	bySegment: Map<string, number>;
+function nonNegative(value: number, field: string) {
+	if (!Number.isFinite(value) || value < 0)
+		throw new Error(`${field}: informe um número finito não negativo.`);
 }
-
-const MONEY_SCALE = 100;
-const PERCENT_SCALE = 100;
-const DEFAULT_LOT_SIZE = 1;
-const DEFAULT_PRIORITY = 1000;
-const CASH_SEGMENT = "cash";
-const UNCLASSIFIED_SEGMENT = "unclassified";
-const RISK_CATEGORIES: RiskCategory[] = ["brick", "paper", "hybrid", "cash", "other"];
-
-export function simulateContributionAllocation(
-	input: ContributionAllocationInput,
-): AuditableContributionSimulation {
-	assertFinitePositive(input.contributionAmount, "contributionAmount");
-	assertAllowedAssetIds(input.allowedAssetIds);
-	validateConstraints(input.constraints);
-
-	const allowedAssetIds = new Set(input.allowedAssetIds);
-	const baseSummary = calculatePortfolioSummary(input.positions, input.cashAccounts ?? []);
-	const finalPortfolioValue = roundMoney(baseSummary.totalValue + input.contributionAmount);
-	const currentValues = buildCurrentValues(input.positions, input.cashAccounts ?? []);
-	const states = input.candidates.map((candidate) =>
-		createCandidateState(candidate, input.constraints, allowedAssetIds),
-	);
-	const auditFindings = states.flatMap((state) => state.blockReasons);
-	const allocationFindingKeys = new Set<string>();
-
-	let remainingCash = roundMoney(input.contributionAmount);
-
-	while (remainingCash > 0) {
-		const next = chooseNextCandidate(
-			states,
-			currentValues,
-			finalPortfolioValue,
-			remainingCash,
-			input.constraints,
-			auditFindings,
-			allocationFindingKeys,
-		);
-		if (!next) {
-			break;
+function fraction(value: number, field: string) {
+	nonNegative(value, field);
+	if (value > 1) throw new Error(`${field}: use fração decimal entre 0 e 1.`);
+}
+export function validateAllocationTarget(target: AllocationTarget) {
+	fraction(target.target, "target");
+	fraction(target.band.min, "band.min");
+	fraction(target.band.max, "band.max");
+	if (target.band.min > target.target || target.target > target.band.max)
+		throw new Error("O alvo deve estar dentro da faixa.");
+}
+function normalize(input: ContributionAllocationInput | PartContributionInput): EngineInput {
+	const values = new Map<string, number>();
+	const targets: Bucket[] = [];
+	const limits: Bucket[] = [];
+	const candidates: Candidate[] = [];
+	let total = 0;
+	const isPart = "partTargets" in input;
+	if (isPart) {
+		nonNegative(input.minOperationValue, "minOperationValue");
+		for (const [part, target] of Object.entries(input.partTargets)) {
+			validateAllocationTarget(target);
+			targets.push({ key: `part:${part}`, value: target.target });
 		}
-
-		const lotSize = normalizedLotSize(next.candidate);
-		const lotValue = roundMoney(lotSize * next.candidate.currentPrice);
-
-		next.quantity += lotSize;
-		next.investedAmount = roundMoney(next.investedAmount + lotValue);
-		remainingCash = roundMoney(remainingCash - lotValue);
-		addCandidateValue(currentValues, next.candidate, lotValue);
-	}
-
-	const orders = states
-		.filter((state) => state.quantity > 0)
-		.sort(compareCandidateState)
-		.map(toOrder);
-
-	const investedAmount = roundMoney(input.contributionAmount - remainingCash);
-	if (remainingCash > 0) {
-		auditFindings.push({
-			code: "cash_unallocated",
-			severity: "info",
-			message: `${formatMoney(remainingCash)} stayed unallocated because no valid whole-lot simulation remained.`,
-		});
-	}
-
-	const postAllocationValues = cloneCurrentValues(currentValues);
-	if (remainingCash > 0) {
-		addCashValue(postAllocationValues, remainingCash);
-	}
-
-	return {
-		contributionAmount: roundMoney(input.contributionAmount),
-		investedAmount,
-		remainingCash,
-		orders,
-		auditFindings,
-		postAllocation: {
-			totalValue: finalPortfolioValue,
-			byAsset: toPercentRecord(postAllocationValues.byAsset, finalPortfolioValue),
-			byRiskCategory: toRiskPercentRecord(postAllocationValues.byRiskCategory, finalPortfolioValue),
-			bySegment: toPercentRecord(postAllocationValues.bySegment, finalPortfolioValue),
-		},
-	};
-}
-
-function createCandidateState(
-	candidate: ContributionCandidateInput,
-	constraints: ContributionAllocationConstraints | undefined,
-	allowedAssetIds: Set<string>,
-): CandidateState {
-	validateCandidate(candidate);
-
-	const blockReasons = getCandidateBlockReasons(candidate, constraints, allowedAssetIds);
-
-	return {
-		candidate,
-		blocked: blockReasons.length > 0,
-		blockReasons,
-		quantity: 0,
-		investedAmount: 0,
-	};
-}
-
-function getCandidateBlockReasons(
-	candidate: ContributionCandidateInput,
-	constraints: ContributionAllocationConstraints | undefined,
-	allowedAssetIds: Set<string>,
-): SimulationAuditFinding[] {
-	const findings: SimulationAuditFinding[] = [];
-
-	if (!allowedAssetIds.has(candidate.assetId)) {
-		findings.push({
-			code: "candidate_outside_universe",
-			severity: "blocked",
-			ticker: candidate.ticker,
-			message: `${candidate.ticker} is outside the allowed investment universe for this simulation.`,
-		});
-	}
-
-	for (const metric of requiredMetrics(candidate, constraints)) {
-		if (!hasMetricSource(candidate, metric)) {
-			findings.push({
-				code: "missing_metric_source",
-				severity: "blocked",
-				ticker: candidate.ticker,
-				metric,
-				message: `${candidate.ticker} is missing source evidence for ${metric}.`,
+		if (Math.abs(targets.reduce((sum, t) => sum + t.value, 0) - 1) > 1e-12)
+			throw new Error("Os alvos das partes devem somar 1.");
+		for (const [label, target] of Object.entries(input.classTargets ?? {})) {
+			validateAllocationTarget(target);
+			targets.push({ key: classKey(label), value: target.target });
+		}
+		for (const p of input.positions) {
+			nonNegative(p.value, "position.value");
+			total += p.value;
+			for (const key of [
+				assetKey(p.assetId),
+				partKey(p.part),
+				classKey(p.assetClass),
+				institutionKey(p.institution),
+				segmentKey(p.segment),
+			])
+				add(values, key, p.value);
+		}
+		for (const c of input.candidates) {
+			candidates.push({
+				input: c,
+				buckets: [
+					assetKey(c.assetId),
+					partKey(c.part),
+					classKey(c.assetClass),
+					institutionKey(c.institution),
+					segmentKey(c.segment),
+				],
+				targets: targets.filter(
+					(t) => t.key === partKey(c.part) || t.key === classKey(c.assetClass),
+				),
+				required: ["price", "part"],
+				concentration: c.concentration,
+				quantity: 0,
+				invested: 0,
 			});
 		}
-	}
-
-	if (candidate.maxPrice !== undefined && candidate.currentPrice > candidate.maxPrice) {
-		findings.push({
-			code: "price_above_limit",
-			severity: "blocked",
-			ticker: candidate.ticker,
-			message: `${candidate.ticker} price ${formatMoney(candidate.currentPrice)} is above simulation limit ${formatMoney(candidate.maxPrice)}.`,
-		});
-	}
-
-	if (
-		constraints?.minDailyLiquidity !== undefined &&
-		(candidate.dailyLiquidity ?? 0) < constraints.minDailyLiquidity
-	) {
-		findings.push({
-			code: "liquidity_below_minimum",
-			severity: "blocked",
-			ticker: candidate.ticker,
-			message: `${candidate.ticker} liquidity is below the simulation minimum.`,
-		});
-	}
-
-	if (
-		constraints?.maxConcentrationPercent !== undefined &&
-		(candidate.concentrationPercent ?? 0) > constraints.maxConcentrationPercent
-	) {
-		findings.push({
-			code: "concentration_above_limit",
-			severity: "blocked",
-			ticker: candidate.ticker,
-			message: `${candidate.ticker} concentration is above the simulation limit.`,
-		});
-	}
-
-	return findings;
-}
-
-function chooseNextCandidate(
-	states: CandidateState[],
-	currentValues: CurrentValues,
-	finalPortfolioValue: number,
-	remainingCash: number,
-	constraints: ContributionAllocationConstraints | undefined,
-	auditFindings: SimulationAuditFinding[],
-	allocationFindingKeys: Set<string>,
-): CandidateState | undefined {
-	const options = states
-		.filter((state) => !state.blocked)
-		.map((state) =>
-			scoreCandidate(
-				state,
-				currentValues,
-				finalPortfolioValue,
-				remainingCash,
-				constraints,
-				auditFindings,
-				allocationFindingKeys,
-			),
-		)
-		.filter((option): option is CandidateScore => option !== undefined)
-		.sort(compareCandidateScore);
-
-	return options[0]?.state;
-}
-
-function scoreCandidate(
-	state: CandidateState,
-	currentValues: CurrentValues,
-	finalPortfolioValue: number,
-	remainingCash: number,
-	constraints: ContributionAllocationConstraints | undefined,
-	auditFindings: SimulationAuditFinding[],
-	allocationFindingKeys: Set<string>,
-): CandidateScore | undefined {
-	const candidate = state.candidate;
-	const lotSize = normalizedLotSize(candidate);
-	const lotValue = roundMoney(lotSize * candidate.currentPrice);
-
-	if (lotValue <= 0 || lotValue > remainingCash) {
-		return undefined;
-	}
-
-	const allocationFinding = getAllocationLimitFinding(
-		candidate,
-		currentValues,
-		lotValue,
-		finalPortfolioValue,
-		constraints,
-	);
-	if (allocationFinding) {
-		recordAllocationFinding(allocationFinding, auditFindings, allocationFindingKeys);
-		return undefined;
-	}
-
-	const currentAssetValue = currentValues.byAsset.get(candidate.assetId) ?? 0;
-	const currentPercent = percentOf(currentAssetValue, finalPortfolioValue);
-	const nextPercent = percentOf(roundMoney(currentAssetValue + lotValue), finalPortfolioValue);
-	const target = candidate.targetWeightPercent;
-	const targetGapImprovement =
-		target === undefined ? 0 : Math.abs(target - currentPercent) - Math.abs(target - nextPercent);
-
-	if (target !== undefined && targetGapImprovement < 0) {
-		return undefined;
-	}
-
-	return {
-		state,
-		targetGapImprovement,
-		priority: candidate.priority ?? DEFAULT_PRIORITY,
-		lotValue,
-	};
-}
-
-function getAllocationLimitFinding(
-	candidate: ContributionCandidateInput,
-	currentValues: CurrentValues,
-	lotValue: number,
-	finalPortfolioValue: number,
-	constraints: ContributionAllocationConstraints | undefined,
-): SimulationAuditFinding | undefined {
-	if (!constraints) {
-		return undefined;
-	}
-
-	const assetValue = roundMoney((currentValues.byAsset.get(candidate.assetId) ?? 0) + lotValue);
-	if (
-		constraints.maxSingleAssetPercent !== undefined &&
-		percentOf(assetValue, finalPortfolioValue) > constraints.maxSingleAssetPercent
-	) {
-		return allocationLimitFinding(candidate, "single asset");
-	}
-
-	const riskValue = roundMoney(
-		(currentValues.byRiskCategory.get(candidate.riskCategory) ?? 0) + lotValue,
-	);
-	const maxRiskPercent = constraints.maxRiskCategoryPercent?.[candidate.riskCategory];
-	if (maxRiskPercent !== undefined && percentOf(riskValue, finalPortfolioValue) > maxRiskPercent) {
-		return allocationLimitFinding(candidate, "risk category");
-	}
-
-	const segment = normalizedSegment(candidate.segment);
-	const segmentValue = roundMoney((currentValues.bySegment.get(segment) ?? 0) + lotValue);
-	if (
-		constraints.maxSegmentPercent !== undefined &&
-		percentOf(segmentValue, finalPortfolioValue) > constraints.maxSegmentPercent
-	) {
-		return allocationLimitFinding(candidate, "segment");
-	}
-
-	return undefined;
-}
-
-function allocationLimitFinding(
-	candidate: ContributionCandidateInput,
-	limitLabel: string,
-): SimulationAuditFinding {
-	return {
-		code: "allocation_limit_reached",
-		severity: "blocked",
-		ticker: candidate.ticker,
-		message: `${candidate.ticker} cannot receive another simulated lot without violating the ${limitLabel} limit.`,
-	};
-}
-
-function recordAllocationFinding(
-	finding: SimulationAuditFinding,
-	auditFindings: SimulationAuditFinding[],
-	allocationFindingKeys: Set<string>,
-): void {
-	const key = `${finding.code}:${finding.ticker}:${finding.message}`;
-	if (allocationFindingKeys.has(key)) {
-		return;
-	}
-
-	allocationFindingKeys.add(key);
-	auditFindings.push(finding);
-}
-
-function requiredMetrics(
-	candidate: ContributionCandidateInput,
-	constraints: ContributionAllocationConstraints | undefined,
-): ContributionCandidateMetric[] {
-	const metrics: ContributionCandidateMetric[] = ["price"];
-
-	if (candidate.lotSize !== undefined) {
-		metrics.push("lotSize");
-	}
-	if (candidate.targetWeightPercent !== undefined) {
-		metrics.push("targetWeightPercent");
-	}
-	if (constraints?.maxRiskCategoryPercent !== undefined) {
-		metrics.push("riskCategory");
-	}
-	if (constraints?.maxSegmentPercent !== undefined && candidate.segment !== undefined) {
-		metrics.push("segment");
-	}
-	if (constraints?.minDailyLiquidity !== undefined) {
-		metrics.push("dailyLiquidity");
-	}
-	if (constraints?.maxConcentrationPercent !== undefined) {
-		metrics.push("concentrationPercent");
-	}
-
-	return metrics;
-}
-
-function hasMetricSource(
-	candidate: ContributionCandidateInput,
-	metric: ContributionCandidateMetric,
-): boolean {
-	return candidate.metricSourceRefs.some(
-		(sourceRef) => sourceRef.metric === metric && sourceRef.label.trim().length > 0,
-	);
-}
-
-function buildCurrentValues(
-	positions: PortfolioPositionInput[],
-	cashAccounts: PortfolioCashAccountInput[],
-): CurrentValues {
-	const values: CurrentValues = {
-		byAsset: new Map(),
-		byRiskCategory: new Map(),
-		bySegment: new Map(),
-	};
-
-	for (const position of positions) {
-		const value = calculatePositionValue(position);
-		values.byAsset.set(
-			position.assetId,
-			roundMoney((values.byAsset.get(position.assetId) ?? 0) + value),
-		);
-		values.byRiskCategory.set(
-			position.riskCategory,
-			roundMoney((values.byRiskCategory.get(position.riskCategory) ?? 0) + value),
-		);
-		const segment = normalizedSegment(position.segment);
-		values.bySegment.set(segment, roundMoney((values.bySegment.get(segment) ?? 0) + value));
-	}
-
-	const cashValue = roundMoney(
-		cashAccounts.reduce((total, account) => {
-			assertFiniteNonNegative(account.balance, "cashAccount.balance");
-			return total + account.balance;
-		}, 0),
-	);
-	if (cashValue > 0) {
-		addCashValue(values, cashValue);
-	}
-
-	return values;
-}
-
-function addCandidateValue(
-	values: CurrentValues,
-	candidate: ContributionCandidateInput,
-	lotValue: number,
-): void {
-	values.byAsset.set(
-		candidate.assetId,
-		roundMoney((values.byAsset.get(candidate.assetId) ?? 0) + lotValue),
-	);
-	values.byRiskCategory.set(
-		candidate.riskCategory,
-		roundMoney((values.byRiskCategory.get(candidate.riskCategory) ?? 0) + lotValue),
-	);
-	const segment = normalizedSegment(candidate.segment);
-	values.bySegment.set(segment, roundMoney((values.bySegment.get(segment) ?? 0) + lotValue));
-}
-
-function addCashValue(values: CurrentValues, cashValue: number): void {
-	values.byRiskCategory.set(
-		"cash",
-		roundMoney((values.byRiskCategory.get("cash") ?? 0) + cashValue),
-	);
-	values.bySegment.set(
-		CASH_SEGMENT,
-		roundMoney((values.bySegment.get(CASH_SEGMENT) ?? 0) + cashValue),
-	);
-}
-
-function cloneCurrentValues(values: CurrentValues): CurrentValues {
-	return {
-		byAsset: new Map(values.byAsset),
-		byRiskCategory: new Map(values.byRiskCategory),
-		bySegment: new Map(values.bySegment),
-	};
-}
-
-function toOrder(state: CandidateState): SimulatedContributionOrder {
-	const estimatedMonthlyDividend =
-		state.candidate.estimatedMonthlyDividendPerUnit === undefined
-			? undefined
-			: roundMoney(state.quantity * state.candidate.estimatedMonthlyDividendPerUnit);
-
-	return {
-		assetId: state.candidate.assetId,
-		ticker: state.candidate.ticker,
-		quantity: state.quantity,
-		limitPrice: state.candidate.maxPrice ?? state.candidate.currentPrice,
-		estimatedValue: state.investedAmount,
-		estimatedMonthlyDividend,
-		metricSourceRefs: state.candidate.metricSourceRefs,
-	};
-}
-
-function toPercentRecord(values: Map<string, number>, totalValue: number): Record<string, number> {
-	return Object.fromEntries(
-		[...values.entries()]
-			.sort(([left], [right]) => left.localeCompare(right))
-			.map(([label, value]) => [label, percentOf(value, totalValue)]),
-	);
-}
-
-function toRiskPercentRecord(
-	values: Map<RiskCategory, number>,
-	totalValue: number,
-): Record<RiskCategory, number> {
-	return Object.fromEntries(
-		RISK_CATEGORIES.map((category) => [category, percentOf(values.get(category) ?? 0, totalValue)]),
-	) as Record<RiskCategory, number>;
-}
-
-function normalizedLotSize(candidate: ContributionCandidateInput): number {
-	const lotSize = candidate.lotSize ?? DEFAULT_LOT_SIZE;
-	if (!Number.isInteger(lotSize) || lotSize <= 0) {
-		throw new Error(`${candidate.ticker}.lotSize must be a positive integer`);
-	}
-
-	return lotSize;
-}
-
-function normalizedSegment(segment: string | undefined): string {
-	const normalized = segment?.trim();
-	return normalized ? normalized : UNCLASSIFIED_SEGMENT;
-}
-
-function percentOf(value: number, totalValue: number): number {
-	if (totalValue <= 0) {
-		return 0;
-	}
-
-	return roundPercent((value / totalValue) * PERCENT_SCALE);
-}
-
-function roundMoney(value: number): number {
-	return Math.round((value + Number.EPSILON) * MONEY_SCALE) / MONEY_SCALE;
-}
-
-function roundPercent(value: number): number {
-	return Math.round((value + Number.EPSILON) * PERCENT_SCALE) / PERCENT_SCALE;
-}
-
-function validateCandidate(candidate: ContributionCandidateInput): void {
-	assertFinitePositive(candidate.currentPrice, `${candidate.ticker}.currentPrice`);
-	assertOptionalFinitePositive(candidate.maxPrice, `${candidate.ticker}.maxPrice`);
-	assertOptionalPercent(candidate.targetWeightPercent, `${candidate.ticker}.targetWeightPercent`);
-	assertOptionalFiniteNonNegative(candidate.dailyLiquidity, `${candidate.ticker}.dailyLiquidity`);
-	assertOptionalPercent(candidate.concentrationPercent, `${candidate.ticker}.concentrationPercent`);
-	assertOptionalFiniteNonNegative(
-		candidate.estimatedMonthlyDividendPerUnit,
-		`${candidate.ticker}.estimatedMonthlyDividendPerUnit`,
-	);
-	normalizedLotSize(candidate);
-}
-
-function validateConstraints(constraints: ContributionAllocationConstraints | undefined): void {
-	if (!constraints) {
-		return;
-	}
-
-	assertOptionalPercent(constraints.maxSingleAssetPercent, "constraints.maxSingleAssetPercent");
-	assertOptionalPercent(constraints.maxSegmentPercent, "constraints.maxSegmentPercent");
-	assertOptionalFiniteNonNegative(constraints.minDailyLiquidity, "constraints.minDailyLiquidity");
-	assertOptionalPercent(constraints.maxConcentrationPercent, "constraints.maxConcentrationPercent");
-
-	if (constraints.maxRiskCategoryPercent) {
-		for (const [category, value] of Object.entries(constraints.maxRiskCategoryPercent)) {
-			assertOptionalPercent(value, `constraints.maxRiskCategoryPercent.${category}`);
+		const all = [...input.positions, ...input.candidates];
+		for (const [field, prefix, labels] of [
+			[input.concentrationLimits?.perAsset, "asset", all.map((p) => p.assetId)],
+			[input.concentrationLimits?.perClass, "class", all.map((p) => p.assetClass)],
+			[input.concentrationLimits?.perInstitution, "institution", all.map((p) => p.institution)],
+		] satisfies [number | undefined, string, string[]][]) {
+			if (field !== undefined) {
+				fraction(field, prefix);
+				for (const label of new Set(labels))
+					limits.push({ key: `${prefix}:${label}`, value: field });
+			}
+		}
+	} else {
+		for (const p of input.positions) {
+			nonNegative(p.quantity, "quantity");
+			nonNegative(p.currentPrice, "currentPrice");
+			const value = p.quantity * p.currentPrice;
+			total += value;
+			for (const key of [assetKey(p.assetId), `risk:${p.riskCategory}`, segmentKey(p.segment)])
+				add(values, key, value);
+		}
+		for (const c of input.cashAccounts ?? []) {
+			nonNegative(c.balance, "balance");
+			total += c.balance;
+			add(values, "risk:cash", c.balance);
+			add(values, "segment:cash", c.balance);
+		}
+		for (const c of input.candidates) {
+			const ct =
+				c.targetWeightPercent === undefined
+					? []
+					: [{ key: assetKey(c.assetId), value: c.targetWeightPercent / 100 }];
+			candidates.push({
+				input: c,
+				buckets: [assetKey(c.assetId), `risk:${c.riskCategory}`, segmentKey(c.segment)],
+				targets: ct,
+				required: ["price"],
+				concentration:
+					c.concentrationPercent === undefined ? undefined : c.concentrationPercent / 100,
+				quantity: 0,
+				invested: 0,
+			});
+			const constraints = input.constraints;
+			for (const [key, value] of [
+				[assetKey(c.assetId), constraints?.maxSingleAssetPercent],
+				[segmentKey(c.segment), constraints?.maxSegmentPercent],
+				[`risk:${c.riskCategory}`, constraints?.maxRiskCategoryPercent?.[c.riskCategory]],
+			] satisfies [string, number | undefined][]) {
+				if (value !== undefined) {
+					fraction(value / 100, key);
+					limits.push({ key, value: value / 100 });
+				}
+			}
+			if (c.targetWeightPercent !== undefined) {
+				fraction(c.targetWeightPercent / 100, "targetWeightPercent");
+				candidates.at(-1)?.required.push("targetWeightPercent");
+			}
+			if (constraints?.maxRiskCategoryPercent) candidates.at(-1)?.required.push("riskCategory");
+			if (constraints?.maxSegmentPercent !== undefined) candidates.at(-1)?.required.push("segment");
 		}
 	}
+	const minLiquidity = isPart ? input.minDailyLiquidity : input.constraints?.minDailyLiquidity;
+	const maxConcentration = isPart
+		? input.maxConcentration
+		: input.constraints?.maxConcentrationPercent === undefined
+			? undefined
+			: input.constraints.maxConcentrationPercent / 100;
+	if (minLiquidity !== undefined) nonNegative(minLiquidity, "minDailyLiquidity");
+	if (maxConcentration !== undefined) fraction(maxConcentration, "maxConcentration");
+	return {
+		contribution: input.contributionAmount,
+		allowed: input.allowedAssetIds,
+		values,
+		total,
+		candidates,
+		targets,
+		limits,
+		minLiquidity,
+		maxConcentration,
+		minimum: isPart ? input.minOperationValue : 0,
+		legacy: !isPart,
+	};
 }
 
-function assertAllowedAssetIds(allowedAssetIds: string[]): void {
-	if (!Array.isArray(allowedAssetIds) || allowedAssetIds.length === 0) {
-		throw new Error("allowedAssetIds must contain at least one asset id");
+/** Um único alocador de lotes; pontos percentuais legados são convertidos só na fronteira. */
+export function simulateContributionAllocation(
+	input: ContributionAllocationInput | PartContributionInput,
+): AuditableContributionSimulation {
+	const e = normalize(input);
+	nonNegative(e.contribution, "contributionAmount");
+	if (e.legacy && e.contribution === 0)
+		throw new Error("contributionAmount: informe um valor positivo.");
+	if (new Set(e.allowed).size !== e.allowed.length || e.allowed.some((id) => !id.trim()))
+		throw new Error("Universo permitido inválido.");
+	if (new Set(e.candidates.map((c) => c.input.assetId)).size !== e.candidates.length)
+		throw new Error("Candidatos duplicados.");
+	const finalTotal = e.total + e.contribution;
+	if (!Number.isFinite(finalTotal)) throw new Error("Total fora do intervalo finito.");
+	const findings: SimulationAuditFinding[] = [];
+	const eligible = e.candidates.filter((c) => {
+		const x = c.input;
+		const start = findings.length;
+		const block = (
+			code: SimulationAuditFinding["code"],
+			message: string,
+			metric?: ContributionCandidateMetric,
+		) =>
+			findings.push({
+				code,
+				severity: "blocked",
+				ticker: x.ticker,
+				message: `${x.ticker}: ${message}`,
+				metric,
+			});
+		nonNegative(x.currentPrice, "currentPrice");
+		if (x.currentPrice === 0) throw new Error("currentPrice: informe um valor positivo.");
+		if (!Number.isSafeInteger(x.lotSize ?? 1) || (x.lotSize ?? 1) <= 0)
+			throw new Error("lotSize: informe um inteiro positivo.");
+		if (x.priority !== undefined) nonNegative(x.priority, "priority");
+		if (x.maxPrice !== undefined) nonNegative(x.maxPrice, "maxPrice");
+		if (x.estimatedMonthlyDividendPerUnit !== undefined)
+			nonNegative(x.estimatedMonthlyDividendPerUnit, "estimatedMonthlyDividendPerUnit");
+		if (x.dailyLiquidity !== undefined) nonNegative(x.dailyLiquidity, "dailyLiquidity");
+		if (c.concentration !== undefined) fraction(c.concentration, "concentration");
+		if (!e.allowed.includes(x.assetId))
+			block("candidate_outside_universe", "fora do universo permitido nesta simulação.");
+		const required = [...c.required];
+		if (x.lotSize !== undefined) required.push("lotSize");
+		if (e.minLiquidity !== undefined) required.push("dailyLiquidity");
+		if (e.maxConcentration !== undefined) required.push("concentrationPercent");
+		for (const metric of required)
+			if (!x.metricSourceRefs.some((s) => s.metric === metric && s.label.trim()))
+				block("missing_metric_source", `fonte ausente para ${metric}.`, metric);
+		if (x.maxPrice !== undefined && x.currentPrice > x.maxPrice)
+			block("price_above_limit", "preço acima do limite da simulação.");
+		if (e.minLiquidity !== undefined) {
+			if (x.dailyLiquidity === undefined)
+				block("missing_metric", "liquidez ausente; revisão necessária.", "dailyLiquidity");
+			else if (x.dailyLiquidity < e.minLiquidity)
+				block("liquidity_below_minimum", "liquidez abaixo do mínimo da simulação.");
+		}
+		if (e.maxConcentration !== undefined) {
+			if (c.concentration === undefined)
+				block(
+					"missing_metric",
+					"concentração ausente; revisão necessária.",
+					"concentrationPercent",
+				);
+			else if (c.concentration > e.maxConcentration)
+				block("concentration_above_limit", "concentração acima do limite da simulação.");
+		}
+		return findings.length === start;
+	});
+	let remainingCash = e.contribution;
+	const limitRecorded = new Set<string>();
+	while (remainingCash > 0) {
+		const options = eligible
+			.flatMap((c) => {
+				const lot = c.input.lotSize ?? 1;
+				// O primeiro bloco reúne lotes inteiros suficientes para o mínimo por operação.
+				const quantity =
+					c.quantity === 0
+						? lot * Math.max(1, Math.ceil(e.minimum / (lot * c.input.currentPrice)))
+						: lot;
+				const value = quantity * c.input.currentPrice;
+				if (!Number.isSafeInteger(quantity) || value > remainingCash || value <= 0) return [];
+				if (
+					e.limits.some(
+						(l) =>
+							c.buckets.includes(l.key) &&
+							((e.values.get(l.key) ?? 0) + value) / finalTotal > l.value,
+					)
+				) {
+					if (!limitRecorded.has(c.input.assetId)) {
+						limitRecorded.add(c.input.assetId);
+						findings.push({
+							code: "allocation_limit_reached",
+							severity: "blocked",
+							ticker: c.input.ticker,
+							message: `${c.input.ticker}: limite de alocação impede outro lote simulado.`,
+						});
+					}
+					return [];
+				}
+				const improvement = c.targets.reduce((sum, t) => {
+					const current = (e.values.get(t.key) ?? 0) / finalTotal;
+					return (
+						sum + Math.abs(t.value - current) - Math.abs(t.value - current - value / finalTotal)
+					);
+				}, 0);
+				if (c.targets.length && improvement <= 0) return [];
+				return [{ c, quantity, value, improvement }];
+			})
+			.sort(
+				(a, b) =>
+					b.improvement - a.improvement ||
+					(a.c.input.priority ?? 1000) - (b.c.input.priority ?? 1000) ||
+					b.value - a.value ||
+					a.c.input.ticker.localeCompare(b.c.input.ticker) ||
+					a.c.input.assetId.localeCompare(b.c.input.assetId),
+			);
+		const next = options[0];
+		if (!next) break;
+		next.c.quantity += next.quantity;
+		next.c.invested += next.value;
+		const updated = remainingCash - next.value;
+		if (updated === remainingCash)
+			throw new Error("Lote abaixo da precisão numérica do orçamento.");
+		remainingCash = updated;
+		for (const key of next.c.buckets) add(e.values, key, next.value);
 	}
-}
-
-function assertOptionalFiniteNonNegative(value: number | undefined, field: string): void {
-	if (value === undefined) {
-		return;
-	}
-
-	assertFiniteNonNegative(value, field);
-}
-
-function assertFiniteNonNegative(value: number, field: string): void {
-	if (!Number.isFinite(value) || value < 0) {
-		throw new Error(`${field} must be a finite non-negative number`);
-	}
-}
-
-function assertOptionalFinitePositive(value: number | undefined, field: string): void {
-	if (value === undefined) {
-		return;
-	}
-
-	assertFinitePositive(value, field);
-}
-
-function assertFinitePositive(value: number, field: string): void {
-	if (!Number.isFinite(value) || value <= 0) {
-		throw new Error(`${field} must be a finite positive number`);
-	}
-}
-
-function assertOptionalPercent(value: number | undefined, field: string): void {
-	if (value === undefined) {
-		return;
-	}
-
-	if (!Number.isFinite(value) || value < 0 || value > 100) {
-		throw new Error(`${field} must be a finite percentage from 0 to 100`);
-	}
-}
-
-function compareCandidateScore(left: CandidateScore, right: CandidateScore): number {
-	const targetDifference = right.targetGapImprovement - left.targetGapImprovement;
-	if (targetDifference !== 0) {
-		return targetDifference;
-	}
-
-	const priorityDifference = left.priority - right.priority;
-	if (priorityDifference !== 0) {
-		return priorityDifference;
-	}
-
-	const lotValueDifference = right.lotValue - left.lotValue;
-	if (lotValueDifference !== 0) {
-		return lotValueDifference;
-	}
-
-	const tickerDifference = left.state.candidate.ticker.localeCompare(right.state.candidate.ticker);
-	if (tickerDifference !== 0) {
-		return tickerDifference;
-	}
-
-	return left.state.candidate.assetId.localeCompare(right.state.candidate.assetId);
-}
-
-function compareCandidateState(left: CandidateState, right: CandidateState): number {
-	const priorityDifference =
-		(left.candidate.priority ?? DEFAULT_PRIORITY) - (right.candidate.priority ?? DEFAULT_PRIORITY);
-	if (priorityDifference !== 0) {
-		return priorityDifference;
-	}
-
-	const tickerDifference = left.candidate.ticker.localeCompare(right.candidate.ticker);
-	if (tickerDifference !== 0) {
-		return tickerDifference;
-	}
-
-	return left.candidate.assetId.localeCompare(right.candidate.assetId);
-}
-
-function formatMoney(value: number): string {
-	return `BRL ${roundMoney(value).toFixed(2)}`;
+	if (remainingCash > 0)
+		findings.push({
+			code: "cash_unallocated",
+			severity: "info",
+			message: "Caixa não alocado: nenhum lote válido restante na simulação do plano de operação.",
+		});
+	add(e.values, "risk:cash", remainingCash);
+	add(e.values, "segment:cash", remainingCash);
+	const weight = (key: string) => (finalTotal === 0 ? 0 : (e.values.get(key) ?? 0) / finalTotal);
+	const record = (prefix: string) =>
+		Object.fromEntries(
+			[...e.values]
+				.filter(([key]) => key.startsWith(prefix))
+				.map(([key]) => [
+					key.slice(prefix.length),
+					e.legacy ? Math.round(weight(key) * 10000) / 100 : weight(key),
+				]),
+		);
+	return {
+		contributionAmount: e.contribution,
+		investedAmount: e.contribution - remainingCash,
+		remainingCash,
+		planItems: eligible
+			.filter((c) => c.quantity > 0)
+			.sort(
+				(a, b) =>
+					(a.input.priority ?? 1000) - (b.input.priority ?? 1000) ||
+					a.input.ticker.localeCompare(b.input.ticker),
+			)
+			.map((c) => ({
+				assetId: c.input.assetId,
+				ticker: c.input.ticker,
+				quantity: c.quantity,
+				referencePrice: c.input.currentPrice,
+				estimatedValue: c.invested,
+				estimatedMonthlyDividend:
+					c.input.estimatedMonthlyDividendPerUnit === undefined
+						? undefined
+						: c.quantity * c.input.estimatedMonthlyDividendPerUnit,
+				metricSourceRefs: c.input.metricSourceRefs,
+			})),
+		auditFindings: findings,
+		postAllocation: {
+			totalValue: finalTotal,
+			byAsset: record("asset:"),
+			bySegment: record("segment:"),
+			byPart: {
+				reserve: weight("part:reserve"),
+				goal: weight("part:goal"),
+				equities: weight("part:equities"),
+			},
+			byRiskCategory: {
+				brick: record("risk:").brick ?? 0,
+				paper: record("risk:").paper ?? 0,
+				hybrid: record("risk:").hybrid ?? 0,
+				cash: record("risk:").cash ?? 0,
+				other: record("risk:").other ?? 0,
+			},
+		},
+	} satisfies AuditableContributionSimulation;
 }

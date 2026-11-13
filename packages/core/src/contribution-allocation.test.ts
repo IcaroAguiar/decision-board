@@ -63,7 +63,7 @@ test("allocates whole lots without exceeding contribution amount", () => {
 	assert.equal(result.investedAmount, 880);
 	assert.equal(result.remainingCash, 120);
 	assert.deepEqual(
-		result.orders.map((order) => [order.ticker, order.quantity]),
+		result.planItems.map((order) => [order.ticker, order.quantity]),
 		[
 			["CYCR11", 2],
 			["HGLG11", 3],
@@ -109,7 +109,7 @@ test("chooses candidate that reduces target weight gap", () => {
 	});
 
 	assert.deepEqual(
-		result.orders.map((order) => order.ticker),
+		result.planItems.map((order) => order.ticker),
 		["HGLG11"],
 	);
 });
@@ -127,7 +127,7 @@ test("blocks candidates outside allowed investment universe", () => {
 		positions: [],
 	});
 
-	assert.deepEqual(result.orders, []);
+	assert.deepEqual(result.planItems, []);
 	assert.ok(auditCodes(result).includes("candidate_outside_universe"));
 });
 
@@ -145,7 +145,7 @@ test("requires metric source references for decision metrics", () => {
 		positions: [],
 	});
 
-	assert.deepEqual(blocked.orders, []);
+	assert.deepEqual(blocked.planItems, []);
 	assert.ok(auditCodes(blocked).includes("missing_metric_source"));
 
 	const eligible = simulateContributionAllocation({
@@ -160,7 +160,7 @@ test("requires metric source references for decision metrics", () => {
 		positions: [],
 	});
 
-	assert.equal(eligible.orders[0]?.ticker, "CYCR11");
+	assert.equal(eligible.planItems[0]?.ticker, "CYCR11");
 });
 
 test("blocks price liquidity and concentration violations", () => {
@@ -200,7 +200,7 @@ test("blocks price liquidity and concentration violations", () => {
 		positions: [],
 	});
 
-	assert.deepEqual(result.orders, []);
+	assert.deepEqual(result.planItems, []);
 	assert.ok(auditCodes(result).includes("price_above_limit"));
 	assert.ok(auditCodes(result).includes("liquidity_below_minimum"));
 	assert.ok(auditCodes(result).includes("concentration_above_limit"));
@@ -225,7 +225,7 @@ test("records allocation limit reached when next lot would violate limits", () =
 		positions: [],
 	});
 
-	assert.deepEqual(result.orders, []);
+	assert.deepEqual(result.planItems, []);
 	assert.ok(auditCodes(result).includes("allocation_limit_reached"));
 });
 
@@ -322,4 +322,37 @@ test("rejects invalid numeric inputs", () => {
 			}),
 		/lotSize/,
 	);
+});
+
+test("missing constrained liquidity or concentration blocks with an explanation", () => {
+	const result = simulateContributionAllocation({
+		positions: [],
+		contributionAmount: 100,
+		allowedAssetIds: [assetIds.paper],
+		candidates: [
+			candidate({
+				assetId: assetIds.paper,
+				ticker: "SYN1",
+				metricSourceRefs: metricRefs(["price", "dailyLiquidity", "concentrationPercent"]),
+			}),
+		],
+		constraints: { minDailyLiquidity: 0, maxConcentrationPercent: 100 },
+	});
+	assert.deepEqual(result.planItems, []);
+	assert.equal(result.auditFindings.filter((f) => f.code === "missing_metric").length, 2);
+	assert.ok(result.auditFindings.some((f) => f.message.includes("liquidez ausente")));
+	assert.ok(result.auditFindings.every((f) => !/compr|vend|recomend/i.test(f.message)));
+});
+
+test("fractional prices are not rounded while allocating", () => {
+	const result = simulateContributionAllocation({
+		positions: [],
+		contributionAmount: 1,
+		allowedAssetIds: [assetIds.paper],
+		candidates: [candidate({ assetId: assetIds.paper, ticker: "SYN1", currentPrice: 0.333 })],
+	});
+	assert.equal(result.planItems[0]?.quantity, 3);
+	assert.equal(result.planItems[0]?.estimatedValue, 0.9990000000000001);
+	assert.ok(result.investedAmount <= 1);
+	assert.deepEqual(result.planItems[0]?.metricSourceRefs, metricRefs(["price"]));
 });

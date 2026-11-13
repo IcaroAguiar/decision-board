@@ -1,3 +1,5 @@
+export * from "./allocation/allocation-vs-target.js";
+export * from "./allocation/goal-tracking.js";
 export * from "./analysis.js";
 export * from "./calendar.js";
 export * from "./contribution-allocation.js";
