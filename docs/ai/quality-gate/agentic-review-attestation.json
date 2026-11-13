@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "reviewer": "gpt-6.1-sol (revisão independente, calls 64ad46d7ecda/888c89276f3e; sinais: claude-sonnet-5-5 b7ed4365c751)",
-  "reviewedAt": "2026-11-13T21:21:04Z",
+  "reviewer": "gpt-6.1-sol (revisão independente, calls 64ad46d7ecda/888c89276f3e/072ef1850c94; sinais: claude-sonnet-5-5 b7ed4365c751)",
+  "reviewedAt": "2026-11-13T21:36:16Z",
   "verdict": "approved_with_risk",
   "deterministicSignalsReviewed": true,
-  "reviewedFingerprint": "e2fcac346187e34e8e8e8e6be65069f6997bc29385d604a01671e6aae71ec2fd",
+  "reviewedFingerprint": "6120cdfc3d18baa4793be77c290328a1bafc590dc2b099cb5f4deebd64783265",
   "reviewedDeterministicSignals": {
     "blocking": 8,
     "high": 0,
