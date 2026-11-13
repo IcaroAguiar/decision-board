@@ -145,7 +145,8 @@ Todo método devolve o mesmo envelope:
 
 Um resultado parcial ou inconclusivo sempre explica o motivo. Outras partes do
 sistema citam um resultado por uma referência (identificador, método, data,
-estado e versão da estratégia), e é por ela que uma decisão aponta as
+estado, versão da estratégia e os ativos para os quais ela produziu resultado
+utilizável), e é por ela que uma decisão aponta as
 análises que a sustentam.
 
 ### 6.2. Política numérica

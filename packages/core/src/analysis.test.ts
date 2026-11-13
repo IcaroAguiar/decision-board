@@ -178,7 +178,21 @@ test("exports stable method identities and caller-assigned analysis references",
 			asOf: "2026-03-03",
 			status: "complete",
 			strategyVersion: "strategy-2",
+			subjects: [],
 		},
+	);
+	assert.deepEqual(
+		toAnalysisRef("synthetic-analysis", complete, ["SYN2", "SYN1", "SYN2"]).subjects,
+		["SYN1", "SYN2"],
+	);
+	assert.throws(
+		() =>
+			toAnalysisRef(
+				"synthetic-analysis",
+				{ ...complete, status: "inconclusive", output: null, notVerified: ["Sem dados."] },
+				["SYN1"],
+			),
+		/inconclusiva/,
 	);
 	assert.equal(toAnalysisRef("synthetic-analysis", complete).strategyVersion, null);
 	assert.throws(() => toAnalysisRef(" ", complete), /identificador/);

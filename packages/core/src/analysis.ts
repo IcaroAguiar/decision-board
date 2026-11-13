@@ -89,19 +89,29 @@ export interface AnalysisRef {
 	asOf: string;
 	status: AnalysisStatus;
 	strategyVersion: string | null;
+	/** Ativos para os quais a análise produziu resultado utilizável; definidos por quem conhece a saída do método. */
+	subjects: readonly string[];
 }
 
 export function toAnalysisRef<TInput, TOutput, TAssumptions>(
 	id: string,
 	result: AnalysisResult<TInput, TOutput, TAssumptions>,
+	subjects: readonly string[] = [],
 ): AnalysisRef {
 	if (!id.trim()) throw new Error("Informe o identificador da análise.");
+	if (result.status === "inconclusive" && subjects.length > 0) {
+		throw new Error("Uma análise inconclusiva não cobre nenhum ativo.");
+	}
+	if (subjects.some((subject) => !subject.trim())) {
+		throw new Error("Informe ativos não vazios na cobertura da análise.");
+	}
 	return {
 		id,
 		method: result.method,
 		asOf: result.asOf,
 		status: result.status,
 		strategyVersion: result.strategyVersion,
+		subjects: Object.freeze([...new Set(subjects)].sort()),
 	};
 }
 
