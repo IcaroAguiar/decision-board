@@ -3,6 +3,7 @@ export * from "./allocation/goal-tracking.js";
 export * from "./analysis.js";
 export * from "./calendar.js";
 export * from "./contribution-allocation.js";
+export * from "./decisions/index.js";
 export * from "./fixed-income/index.js";
 export * from "./portfolio.js";
 export * from "./provenance.js";
