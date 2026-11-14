@@ -1,4 +1,9 @@
 {
-	"ignorePaths": [".github/workflows/quality-gate.yml", ".github/workflows/full-ci.yml", "docs/ai/quality-gate/**", "results.sarif"],
+	"ignorePaths": [
+		".github/workflows/quality-gate.yml",
+		".github/workflows/full-ci.yml",
+		"docs/ai/quality-gate/**",
+		"results.sarif"
+	],
 	"reviewFeedbackPath": "docs/ai/quality-gate/review-feedback.json"
 }
