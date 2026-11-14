@@ -1,18 +1,17 @@
 {
   "schemaVersion": 1,
-  "reviewer": "claude-sonnet-5-5 (revisão independente, calls 275f1decc08a/c1d8ef30fb31/4e6cffd13624; sinais: b7ed4365c751)",
-  "reviewedAt": "2026-11-13T21:35:23Z",
+  "reviewer": "claude-sonnet-5-5 (revisão independente, calls 793a98cc05cf/e0ffdf3d2642/97b4f931e223; correções IOF/Selic: gpt-6.1-sol 8f3e87b15d15; sinais: b7ed4365c751)",
+  "reviewedAt": "2026-11-14T06:13:00Z",
   "verdict": "approved_with_risk",
   "deterministicSignalsReviewed": true,
-  "reviewedFingerprint": "c2a8ee04ef2e6a27007f8321027fc3bebd1a1419e4518c2a3832e1fffaa20e7f",
+  "reviewedFingerprint": "fc2db10eed4b87a81bcc5693af0babecd9ad7bc9a07b3ef2bde18e223a727cda",
   "reviewedDeterministicSignals": {
-    "blocking": 17,
+    "blocking": 40,
     "high": 0,
-    "medium": 34
+    "medium": 65
   },
   "scope": [
-    "docs/architecture.md e AGENTS.md da visão nova",
-    "contratos de packages/core: calendar, provenance, series, units, analysis"
+    "packages/core/src/fixed-income: R1 simulação e R2 duração"
   ],
-  "residualRisk": "Sinais determinísticos são literais de uniões discriminadas verificadas pelo compilador e offsets de data ISO; o limite de mês foi nomeado. Adiados: idade em dias úteis, retrievedAt e desempenho do calendário (R9/P2)."
+  "residualRisk": "Base de 252 DU e teto da bisseção nomeados; demais sinais são tags de união. Adiados: falha isolada por solve na mesma linha, atribuição de fonte do calendário, deduplicação de avisos."
 }
