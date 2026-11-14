@@ -341,7 +341,12 @@ function allocateWholeLots(
 						? lot * Math.max(1, Math.ceil(engine.minimum / (lot * candidate.input.currentPrice)))
 						: lot;
 				const value = quantity * candidate.input.currentPrice;
-				if (!Number.isSafeInteger(quantity) || value > remainingCash || value <= 0) return [];
+				if (
+					!Number.isSafeInteger(quantity) ||
+					value <= 0 ||
+					(value > remainingCash && !approxEqual(value, remainingCash))
+				)
+					return [];
 				if (
 					engine.limits.some(
 						(limit) =>
@@ -401,7 +406,11 @@ function allocateWholeLots(
 		const updated = remainingCash - next.value;
 		if (updated === remainingCash)
 			throw new Error("Lote abaixo da precisão numérica do orçamento.");
-		remainingCash = updated;
+		// Lote que esgota o orçamento deixa só resíduo de ponto flutuante, não caixa.
+		remainingCash =
+			updated < 0 || approxEqual(updated, 0, { absolute: engine.contribution * 1e-12 })
+				? 0
+				: updated;
 		for (const key of next.candidate.buckets) add(engine.values, key, next.value);
 	}
 	return remainingCash;

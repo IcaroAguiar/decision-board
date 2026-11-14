@@ -298,3 +298,14 @@ test("concentration tolerates float noise at boundary but rejects the next lot",
 	);
 	assert.ok(Math.abs((result.postAllocation.byIssuer.issuer ?? 0) - 0.3) < 1e-12);
 });
+test("decimal prices that exactly exhaust the budget leave no phantom cash", () => {
+	const result = simulateContributionAllocation(
+		fixture({ contributionAmount: 0.3, candidates: [candidate({ currentPrice: 0.1 })] }),
+	);
+	assert.deepEqual(
+		result.planItems.map((item) => item.quantity),
+		[3],
+	);
+	assert.equal(result.remainingCash, 0);
+	assert.ok(!codes(result).includes("cash_unallocated"));
+});
