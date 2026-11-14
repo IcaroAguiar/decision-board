@@ -236,9 +236,10 @@ a concluída depois de implementar, verificar e revisar sua fronteira afetada.
 - [x] Consolidar a visão e distinguir decisões de propostas.
 - [x] Escrever sequência, dependências e evidências de aceite.
 - [x] Preparar briefing para o design do usuário.
-- [ ] Concluir P0 e alinhar o contrato arquitetural. Em 2026-11-13,
-  `docs/architecture.md` e `AGENTS.md` foram conciliados com a visão nova; o
-  `README.md` ainda descreve a visão anterior.
+- [ ] Concluir P0 e alinhar o contrato arquitetural. O alinhamento dos
+  documentos está feito: `docs/architecture.md` e `AGENTS.md` em 2026-11-13 e
+  o `README.md` em 2026-11-14. A API atual continua sendo a da visão anterior
+  até a P1.
 - [ ] Implementar e validar P1–P9.
 - [x] Definir o produto como aplicativo independente, com integração futura possível.
 - [x] Incluir análises avançadas no critério da primeira versão útil.

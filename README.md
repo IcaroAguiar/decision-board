@@ -1,25 +1,72 @@
 # Decision Board
 
-Decision Board is an open source, self-hostable portfolio dashboard for monthly contribution planning, strategy-based allocation review, and structured report generation.
+Decision Board is a hosted, multi-user investment-tracking app that can also be
+self-hosted. It helps a person decide what to do with the month's contribution
+and with the portfolio: AI proposals are scenarios backed by tested
+calculations, and an approved proposal becomes an operation plan that the
+person executes at their broker. The next import of B3 files checks what
+actually happened.
 
-It is not a broker, trading system, financial advisor, or automated recommendation engine. The application organizes user-owned data, applies explicit strategy rules, emits review alerts, and generates Markdown/JSON snapshots for human or external AI analysis.
+It covers investments only. It is not a broker, trading system, or financial
+advisor, and it never sends orders.
 
-## MVP Scope
+The product plan, execution units (P0–P9), and analysis requirements (R1–R12)
+live in [docs/product-plan.md](docs/product-plan.md) and
+[docs/analysis-requirements.md](docs/analysis-requirements.md). Module
+boundaries are in [docs/architecture.md](docs/architecture.md).
 
-- Multi-user authentication with Better Auth.
-- Manual portfolio, asset, position, cash account, and contribution planning workflows.
-- Deterministic strategy evaluation.
-- Manual market-data provider as the baseline, with optional provider adapters.
-- Markdown and JSON reports generated from the same snapshot source.
-- PostgreSQL-backed self-hosting with Docker Compose.
+## Principles
+
+- Every number in an analysis comes from versioned, tested code in
+  `packages/core`. The AI selects analyses and explains their results; it never
+  produces the numbers.
+- Every value carries its nature (informed, observed, or estimated), its
+  source, and its date. Missing data is reported as missing or partial, never
+  as zero.
+- Every analysis result keeps its method and version, inputs, assumptions,
+  sources, and what was not verified, so it can be reproduced.
+- Positions come from files the person downloads from the B3 Investor Area;
+  the monthly contribution cash is declared in the app. Manual entry is always
+  available, and external providers are optional adapters.
+
+## Current State
+
+| Area | State |
+| --- | --- |
+| Analytic engine (`packages/core`) | R1 fixed-income simulation, R2 mark-to-market and duration, R3 correlation test, R7 concentration and allocation versus target, R8 goal projection versus realized, R11 AI safeguards, and R12 preferences as versioned strategy, tested with synthetic data. |
+| API, web, reports, jobs | Still the previous vision's monthly contribution workspace, documented below. Execution unit P1 replaces it with B3 imports, the versioned strategy, and analyses stored from the engine. |
+| AI proposals, CLI, B3 import | Not started; see the product plan. |
+
+## Analytic Engine
+
+`@decision-board/core` is pure TypeScript: no React, NestJS, Prisma, HTTP
+providers, environment variables, or real clock. Callers pass explicit
+inputs: the reference date, the business calendar when a method counts business
+days, and a `Datum` with nature, source, and date for each piece of data with
+provenance. Each analysis returns an `AnalysisResult` whose status is `complete`,
+`partial`, or `inconclusive`, with method id and version, inputs, assumptions,
+sources, natures, findings, and what was not verified.
+
+| Module | Requirements |
+| --- | --- |
+| `calendar`, `provenance`, `series`, `units`, `analysis` | Shared contracts: business calendar with explicit coverage, sums and weights with coverage, monthly series alignment, decimal fractions, and the result envelope. |
+| `fixed-income/` | R1 net value per candidate and rate scenario (252 business days, regressive IOF and income tax, custody), break-even rates, and the fixed-rate turning point; R2 mark-to-market, duration, and repricing. See its [README](packages/core/src/fixed-income/README.md). |
+| `risk/` | R3 correlation, volatility, and risk contribution before and after a variable-income contribution, with rolling correlation and worst months. |
+| `allocation/`, `contribution-allocation` | R7 concentration and allocation versus target bands and limits; R8 goal projection versus realized; whole-lot contribution scenarios. |
+| `decisions/` | R11 AI safeguards (a claim counts as verified only when it cites a usable analysis of the method that supports it; otherwise it is flagged as an unverified opinion) and R12 preferences as a versioned strategy with a decision log. |
+
+Each method ships the synthetic acceptance cases of its requirement sheet with
+documented tolerances. The previous vision's portfolio functions
+(`calculatePortfolioSummary`, `calculateAllocation`, and related helpers) remain
+in `portfolio.ts` for the current API.
 
 ## Out Of Scope
 
-- Brokerage order execution.
-- B3, broker, bank, or authenticated financial portal scraping.
-- Automated third-party financial account login.
-- Tax/legal conclusions.
-- Guaranteed returns or prescriptive financial advice.
+- Spending, bank accounts, and credit cards.
+- Brokerage order execution or brokerage order APIs.
+- Automated login to B3, brokers, banks, or other financial accounts, and
+  scraping of authenticated financial portals.
+- Tax/legal conclusions, guaranteed returns, or prescriptive buy/sell advice.
 - Mandatory paid market-data providers.
 
 ## Local Setup
@@ -61,6 +108,12 @@ pnpm db:generate
 pnpm db:migrate
 pnpm db:status
 ```
+
+## Current API
+
+The sections below document the API, jobs, and reports that exist today. They
+belong to the previous vision's monthly contribution workspace and stay
+accurate until P1 replaces them.
 
 ## API Authentication
 
@@ -216,24 +269,6 @@ manual-review requirements, risk-checklist requirements, and report cadence. It
 uses typed alert code/severity contracts from `@decision-board/types` and does
 not generate automatic buy/sell instructions.
 
-## Core Calculations
-
-`@decision-board/core` exposes deterministic pure functions for portfolio math:
-
-```txt
-calculatePositionValue(position)
-calculatePortfolioSummary(positions, cashAccounts)
-calculateAllocation(positions, cashAccounts)
-calculateEstimatedDividends(positions, totalValue?)
-```
-
-The summary includes total value, positions value, cash value, asset/cash
-account counts, allocation by asset/risk category/segment, and estimated
-monthly/annual dividends when positions include `estimatedMonthlyDividend`.
-Core calculations round money and percentages deterministically, reject negative
-or non-finite numeric inputs, and do not depend on React, NestJS, Prisma,
-database state, or external market-data providers.
-
 ## Contribution Plans
 
 Authenticated users can create recurring monthly contribution plans per
@@ -328,3 +363,8 @@ are allowlisted before persistence.
 - User-owned resources must always be scoped by authenticated `userId`.
 - Manual market data must remain available even when optional providers fail.
 - Reports must not include secrets or unnecessary personal identifiers.
+- B3 imports keep only normalized rows: the original file and personal
+  identifiers (account, CPF, name) are discarded.
+- The user's AI provider key is stored encrypted and stays out of logs and
+  model context.
+- Tests and fixtures use synthetic data only.
