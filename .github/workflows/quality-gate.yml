@@ -1,7 +1,9 @@
 name: Agentic Quality Gate
 
 on:
-  pull_request: {}
+  # labeled: o rótulo run-full-ci dispara só o job full, sem repetir o quality-gate.
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
   push:
     branches: [main]
   workflow_dispatch:
@@ -16,8 +18,77 @@ permissions:
   contents: read
   pull-requests: read
 
+# Um commit novo no mesmo PR torna a rodada anterior inútil: cancelá-la poupa minutos da cota.
+concurrency:
+  group: quality-gate-${{ github.event.pull_request.number || github.sha }}-${{ github.event.action == 'labeled' && 'label' || 'code' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
+  # O único job de todo PR: lint, tipos, testes dos pacotes (sem banco) e varredura de segredos.
+  # Orçamento de trabalho de 5 minutos: se estourar, a correção é tirar peso do job, nunca aumentar o orçamento.
   quality-gate:
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'labeled'
+    # Runner hospedado: o repositório é público e não há runner próprio que o atenda.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - run: echo "GATE_STARTED=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.0.6 --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      # Os testes de apps/api precisam de PostgreSQL: rodam no job full.
+      - name: Package tests
+        run: corepack pnpm -r --if-present --filter './packages/*' test
+
+      - name: Gate script syntax check
+        run: |
+          node --check docs/ai/quality-gate/check-ratchet.mjs
+          node --check docs/ai/quality-gate/refresh-baseline.mjs
+          node --check docs/ai/quality-gate/vendor/collect-review-context.mjs
+
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: false
+
+      - name: Clean transient secret scan artifacts
+        run: rm -f results.sarif
+
+      - name: Work budget
+        run: |
+          elapsed=$(( $(date +%s) - GATE_STARTED ))
+          echo "quality-gate trabalhou ${elapsed}s (orçamento: 300s)"
+          [[ $elapsed -le 300 ]]
+
+  # Camada completa (PostgreSQL real, migrações, testes da API, cobertura, smoke, build, pacote de
+  # revisão agêntico e catraca): só a pedido (rótulo run-full-ci), no push à main ou pelo botão
+  # Run workflow.
+  full:
+    if: >-
+      github.event_name != 'pull_request'
+      || (!github.event.pull_request.draft
+        && contains(github.event.pull_request.labels.*.name, 'run-full-ci')
+        && (github.event.action != 'labeled' || github.event.label.name == 'run-full-ci'))
     runs-on: ubuntu-latest
     timeout-minutes: 20
     services:
@@ -56,12 +127,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Lint
-        run: pnpm lint
-
-      - name: Typecheck
-        run: pnpm typecheck
-
       - name: Database migrations
         run: pnpm db:deploy
 
@@ -76,21 +141,6 @@ jobs:
 
       - name: Build
         run: pnpm build
-
-      - name: Gate script syntax check
-        run: |
-          node --check docs/ai/quality-gate/check-ratchet.mjs
-          node --check docs/ai/quality-gate/refresh-baseline.mjs
-          node --check docs/ai/quality-gate/vendor/collect-review-context.mjs
-
-      - name: Secret scan
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_ENABLE_COMMENTS: false
-
-      - name: Clean transient secret scan artifacts
-        run: rm -f results.sarif
 
       - name: Agentic review packet
         env:
