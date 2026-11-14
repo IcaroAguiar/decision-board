@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
-  "reviewer": "claude-sonnet-5-5 (revisão independente, calls 9046e81311c9/a416163c584d/22826ed7da4c; sinais: b7ed4365c751)",
-  "reviewedAt": "2026-11-13T22:09:39Z",
+  "reviewer": "claude-sonnet-5-5 (revisão independente, calls 9046e81311c9/a416163c584d/22826ed7da4c; resíduo do orçamento: gpt-6.1-sol 8f3e87b15d15; sinais: b7ed4365c751)",
+  "reviewedAt": "2026-11-14T06:13:50Z",
   "verdict": "approved_with_risk",
   "deterministicSignalsReviewed": true,
-  "reviewedFingerprint": "f9d0e79213cc2c829870234f4b9e4fd9dd06cb0e2dbabd95090f886e1bdd30ae",
+  "reviewedFingerprint": "b06fdc695fe8646582123cfc5c0664fd868f3f6f08ae6a2ebfaa0c3f4eb70c8e",
   "reviewedDeterministicSignals": {
-    "blocking": 54,
-    "high": 0,
-    "medium": 104
+    "blocking": 57,
+    "high": 1,
+    "medium": 106
   },
   "scope": [
     "packages/core/src/allocation e contribution-allocation: R7 e R8",
