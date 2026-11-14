@@ -26,6 +26,30 @@ export const defaultRegressiveIncomeTaxTable: TaxTable = {
 		{ throughCalendarDays: null, rate: 0.15 },
 	],
 };
+/** Alíquota de IOF sobre o rendimento por dia corrido: índice 0 = 1 dia; a partir do fim da lista, zero. */
+export interface IofTable {
+	validFrom: string;
+	validUntil?: string;
+	ratesByCalendarDay: readonly number[];
+}
+/** Tabela regressiva do Decreto 6.306/2007 (anexo), de 96% no 1º dia a 3% no 29º; parametrizável. */
+export const defaultRegressiveIofTable: IofTable = {
+	validFrom: "2008-01-01",
+	ratesByCalendarDay: [
+		0.96, 0.93, 0.9, 0.86, 0.83, 0.8, 0.76, 0.73, 0.7, 0.66, 0.63, 0.6, 0.56, 0.53, 0.5, 0.46, 0.43,
+		0.4, 0.36, 0.33, 0.3, 0.26, 0.23, 0.2, 0.16, 0.13, 0.1, 0.06, 0.03,
+	],
+};
+export function iofRate(table: IofTable, heldCalendarDays: number, asOf: string): number {
+	assertValidity(table, asOf);
+	if (!Number.isSafeInteger(heldCalendarDays) || heldCalendarDays < 0) {
+		throw new Error("O prazo corrido deve ser um inteiro não negativo.");
+	}
+	for (const rate of table.ratesByCalendarDay) {
+		if (nonNegative(rate) > 1) throw new Error("Tabela de IOF inválida.");
+	}
+	return table.ratesByCalendarDay[Math.max(heldCalendarDays, 1) - 1] ?? 0;
+}
 export interface CustodyFee {
 	validFrom: string;
 	validUntil?: string;
@@ -86,6 +110,7 @@ export interface AccrualPoint {
 export interface RedemptionValue {
 	evolution: AccrualPoint[];
 	gross: number;
+	iof: number;
 	incomeTax: number;
 	custody: number;
 	net: number;
@@ -96,6 +121,8 @@ export interface RedemptionValue {
 export interface RedemptionInput extends GrowthInput {
 	asOf: string;
 	taxTable: TaxTable;
+	/** Padrão: `defaultRegressiveIofTable`. Incide também sobre produtos isentos de IR. */
+	iofTable?: IofTable;
 	taxExempt: boolean;
 	custody: CustodyFee;
 }
@@ -110,23 +137,38 @@ export function prepareRedemption(input: Omit<RedemptionInput, "rate">) {
 	nonNegative(input.custody.exemptBalance);
 	const held = calendarDaysBetween(input.from, input.to);
 	const taxRate = incomeTaxRate(input.taxTable, held, input.asOf);
+	const iofFraction = iofRate(input.iofTable ?? defaultRegressiveIofTable, held, input.asOf);
 	const dates = businessDates(input.calendar, input.from, input.to);
 	nonNegative(input.principal);
-	const path = createRatePath(input.scenario.steps);
-	let cdiFactors: number[] | undefined;
-	const cdiFactorAt = (index: number): number => {
-		cdiFactors ??= dates.map((date) => path.dailyFactor(date));
-		const factor = cdiFactors[index];
-		if (factor === undefined) throw new Error("Fator do CDI ausente para a data de capitalização.");
-		return factor;
+	const lazyFactors = (steps: readonly { effectiveFrom: string; annualRate: number }[]) => {
+		const path = createRatePath(steps);
+		let factors: number[] | undefined;
+		return (index: number): number => {
+			factors ??= dates.map((date) => path.dailyFactor(date));
+			const factor = factors[index];
+			if (factor === undefined)
+				throw new Error("Fator do indexador ausente para a data de capitalização.");
+			return factor;
+		};
 	};
+	const cdiFactorAt = lazyFactors(input.scenario.steps);
+	const selicFactorAt =
+		input.scenario.selicSteps === undefined ? cdiFactorAt : lazyFactors(input.scenario.selicSteps);
 	return (rate: AccrualRate): RedemptionValue => {
 		let custody = 0;
 		const evolution: AccrualPoint[] = [];
 		const balance = compound(
 			input.principal,
 			dates,
-			(index) => dailyGrowthFactor(rate, rate.kind === "prefixed" ? 1 : cdiFactorAt(index)),
+			(index) =>
+				dailyGrowthFactor(
+					rate,
+					rate.kind === "prefixed"
+						? 1
+						: rate.kind === "selic-like"
+							? selicFactorAt(index)
+							: cdiFactorAt(index),
+				),
 			(date, opening, closing) => {
 				custody = finite(
 					custody +
@@ -137,13 +179,17 @@ export function prepareRedemption(input: Omit<RedemptionInput, "rate">) {
 			},
 		);
 
-		const incomeTax = input.taxExempt ? 0 : Math.max(0, balance - input.principal) * taxRate;
+		const gain = Math.max(0, balance - input.principal);
+		// O IR incide sobre o rendimento já deduzido do IOF.
+		const iof = gain * iofFraction;
+		const incomeTax = input.taxExempt ? 0 : (gain - iof) * taxRate;
 		return {
 			evolution,
 			gross: balance,
+			iof,
 			incomeTax,
 			custody,
-			net: finite(balance - incomeTax - custody),
+			net: finite(balance - iof - incomeTax - custody),
 			businessDays: dates.length,
 			calendarDays: held,
 			nature: "estimated",

@@ -13,4 +13,10 @@ export type {
 	RedemptionValue,
 	TaxTable,
 } from "./taxation.js";
-export { defaultRegressiveIncomeTaxTable, incomeTaxRate, redemptionValue } from "./taxation.js";
+export {
+	defaultRegressiveIncomeTaxTable,
+	defaultRegressiveIofTable,
+	incomeTaxRate,
+	iofRate,
+	redemptionValue,
+} from "./taxation.js";

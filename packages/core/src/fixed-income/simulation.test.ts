@@ -245,3 +245,32 @@ test("both analysis envelopes snapshot full calendar provenance", () => {
 		assert.notEqual(result.assumptions.calendar.holidays, calendar.holidays);
 	}
 });
+test("Tesouro Selic without a Selic path is disclosed as a CDI proxy and stays partial", () => {
+	const selicCandidate = datum({
+		...candidate,
+		id: "selic",
+		rate: { kind: "selic-like" as const },
+	});
+	const proxy = simulateFixedIncome(
+		{ ...simulationInput(), candidates: [selicCandidate] },
+		calendar,
+	);
+	assert.equal(proxy.status, "partial");
+	assert.ok(
+		proxy.findings.some((f) => f.code === "SELIC_FROM_CDI_PATH" && f.subject === "selic/constant"),
+	);
+	const modeled = simulateFixedIncome(
+		{
+			...simulationInput(),
+			candidates: [selicCandidate],
+			scenarios: [
+				datum({ ...scenario, selicSteps: [{ effectiveFrom: "2026-01-01", annualRate: 0.121 }] }),
+			],
+		},
+		calendar,
+	);
+	assert.equal(modeled.status, "complete");
+	assert.ok(!modeled.findings.some((f) => f.code === "SELIC_FROM_CDI_PATH"));
+	const proxyNet = proxy.output?.[0]?.value.net ?? 0;
+	assert.ok((modeled.output?.[0]?.value.net ?? 0) > proxyNet);
+});

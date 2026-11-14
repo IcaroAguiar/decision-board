@@ -7,7 +7,9 @@ import {
 	analyzeRateRisk,
 	breakEvenCdi,
 	createRatePath,
+	defaultRegressiveIofTable,
 	incomeTaxRate,
+	iofRate,
 	type RateScenario,
 	redemptionValue,
 	simulateFixedIncome,
@@ -106,14 +108,54 @@ test("custody applies to daily opening excess only, below and at threshold exemp
 		assert.equal(redemptionValue({ ...base, principal, to: "2026-03-03", custody }).custody, 0);
 	const oneDay = redemptionValue({ ...base, principal: 1200, to: "2026-03-03", custody });
 	assert.equal(oneDay.custody, (200 * 0.02) / 252);
-	assert.ok(
-		approxEqual(
-			oneDay.net,
-			1200 * 1.1 ** (1 / 252) - (1200 * 1.1 ** (1 / 252) - 1200) * 0.225 - (200 * 0.02) / 252,
-		),
-	);
+	const oneDayGain = 1200 * 1.1 ** (1 / 252) - 1200;
+	// 1 dia corrido: IOF de 96% do ganho; IR sobre o ganho restante.
+	assert.ok(approxEqual(oneDay.net, 1200 + oneDayGain * 0.04 * (1 - 0.225) - (200 * 0.02) / 252));
 	const twoDays = redemptionValue({ ...base, principal: 1200, to: "2026-03-04", custody });
 	assert.ok(approxEqual(twoDays.custody, ((200 + 1200 * 1.1 ** (1 / 252) - 1000) * 0.02) / 252));
+});
+test("IOF applies before day 30, also to IR-exempt products, and IR uses the yield net of IOF", () => {
+	const at = (days: number) =>
+		new Date(Date.parse(base.from) + days * 86_400_000).toISOString().slice(0, 10);
+	for (const [days, iofFraction] of [
+		[1, 0.96],
+		[29, 0.03],
+		[30, 0],
+	] as const) {
+		const taxed = redemptionValue({ ...base, to: at(days) });
+		const gain = taxed.gross - 1000;
+		assert.ok(gain > 0);
+		assert.equal(iofRate(defaultRegressiveIofTable, days, base.asOf), iofFraction);
+		assert.ok(approxEqual(taxed.iof, gain * iofFraction));
+		assert.ok(approxEqual(taxed.incomeTax, gain * (1 - iofFraction) * 0.225));
+		assert.ok(approxEqual(taxed.net, 1000 + gain * (1 - iofFraction) * (1 - 0.225)));
+		const exempt = redemptionValue({ ...base, to: at(days), taxExempt: true });
+		assert.equal(exempt.incomeTax, 0);
+		assert.ok(approxEqual(exempt.iof, gain * iofFraction));
+	}
+	assert.throws(
+		() => iofRate({ validFrom: "2008-01-01", ratesByCalendarDay: [1.2] }, 1, base.asOf),
+		/IOF inválida/,
+	);
+});
+test("Tesouro Selic compounds on the scenario Selic path, separate from CDI", () => {
+	const input = { ...base, to: "2026-03-06" };
+	const withSelic: RateScenario = {
+		...scenario,
+		steps: [{ effectiveFrom: "2026-01-01", annualRate: 0.1 }],
+		selicSteps: [{ effectiveFrom: "2026-01-01", annualRate: 0.101 }],
+	};
+	// 02, 03 e 05 de março (04 é feriado sintético): 3 DU.
+	const selic = grow({ ...input, scenario: withSelic, rate: { kind: "selic-like" } });
+	assert.ok(approxEqual(selic, 1000 * 1.101 ** (3 / 252)));
+	const cdb = grow({
+		...input,
+		scenario: withSelic,
+		rate: { kind: "cdi-percentage", multiplier: 1 },
+	});
+	assert.ok(approxEqual(cdb, 1000 * 1.1 ** (3 / 252)));
+	const value = redemptionValue({ ...input, scenario: withSelic, rate: { kind: "selic-like" } });
+	assert.ok(approxEqual(value.gross, selic));
 });
 test("CDB versus prefixed break-even matches independently derived constant-CDI closed form", () => {
 	// 260 synthetic DU, 365 calendar days -> IR=17.5% for both products.

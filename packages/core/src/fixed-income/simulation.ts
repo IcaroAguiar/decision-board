@@ -3,7 +3,12 @@ import { type BusinessCalendar, parseIsoDate } from "../calendar.js";
 import { collectEvidence, type Datum } from "../provenance.js";
 import type { AccrualRate, RateScenario } from "./rates.js";
 import { breakEvenCdi, SolverFailure, type SolverOptions, turningPoint } from "./solvers.js";
-import { type CustodyFee, redemptionValue, type TaxTable } from "./taxation.js";
+import {
+	type CustodyFee,
+	defaultRegressiveIofTable,
+	redemptionValue,
+	type TaxTable,
+} from "./taxation.js";
 
 export interface FixedIncomeCandidate {
 	id: string;
@@ -85,11 +90,12 @@ export function simulateFixedIncome(input: FixedIncomeInput, calendar: BusinessC
 				holidays: [...calendar.holidays],
 			},
 			taxTable: input.taxTable,
+			iofTable: defaultRegressiveIofTable,
 			custody: input.candidates.map((candidate) =>
 				candidate.status === "known" ? candidate.value.custody : candidate,
 			),
 			accrual:
-				"252 DU; [início,fim); IR sobre ganho positivo; custódia simples sobre excedente diário inicial",
+				"252 DU; [início,fim); IOF regressivo e IR sobre ganho positivo, IR após o IOF; custódia simples sobre excedente diário inicial",
 			solverTolerance: input.solver?.tolerance ?? 1e-10,
 		},
 		sources: evidence.sources,
@@ -136,6 +142,12 @@ export function simulateFixedIncome(input: FixedIncomeInput, calendar: BusinessC
 					taxTable: input.taxTable.value,
 					custody: candidate.custody.value,
 				};
+				if (candidate.rate.kind === "selic-like" && scenario.value.selicSteps === undefined)
+					warning(
+						"SELIC_FROM_CDI_PATH",
+						`${candidate.id}/${scenario.value.id}`,
+						"Tesouro Selic estimado pelo caminho do CDI do cenário; a diferença entre Selic e CDI não foi modelada.",
+					);
 				const prefixed = { ...investment, rate: candidate.rate, taxExempt: candidate.taxExempt };
 				const value = redemptionValue(prefixed);
 				const breakEvens: SimulationRow["breakEvens"] = [];

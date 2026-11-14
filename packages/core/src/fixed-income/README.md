@@ -20,6 +20,13 @@ explicitamente taxa zero. Saídas numéricas são estimativas.
   padrão é nomeada e tem `validFrom`; não se presume que continue vigente no
   futuro. A tabela e a custódia são validadas na data da análise. Isenção é uma
   entrada explícita; regras futuras permanecem não verificadas.
+- IOF regressivo sobre o ganho positivo para resgates com menos de 30 dias
+  corridos, pela tabela do Decreto 6.306/2007 (96% no 1º dia a 3% no 29º,
+  zero a partir do 30º). Incide também sobre produtos isentos de IR, e o IR
+  incide sobre o ganho já deduzido do IOF. A tabela é parâmetro com vigência.
+- Tesouro Selic (`selic-like`) capitaliza pelo `selicSteps` do cenário. Sem
+  ele, usa o caminho do CDI como aproximação declarada: a linha recebe o aviso
+  `SELIC_FROM_CDI_PATH` e o resultado fica parcial.
 - Custódia simples diária: `max(saldo bruto inicial do DU - faixa isenta,0)
   * taxa anual / 252`. É acumulada e deduzida no resgate, depois do IR sobre o
   ganho bruto. Não reduz a base de IR nem o saldo que capitaliza. Produtos com

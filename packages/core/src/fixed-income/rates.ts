@@ -10,7 +10,10 @@ export interface RateStep {
 export interface RateScenario {
 	id: string;
 	kind: "focus-like" | "alternative" | "manual";
+	/** Caminho do CDI. */
 	steps: readonly RateStep[];
+	/** Caminho da Selic para o Tesouro Selic; ausente, o CDI serve de aproximação declarada. */
+	selicSteps?: readonly RateStep[];
 }
 export type AccrualRate =
 	| { kind: "cdi-percentage"; multiplier: number }
@@ -56,16 +59,17 @@ export function createRatePath(steps: readonly RateStep[]) {
 	return { annualRateOn, dailyFactor: (date: string) => annualFactor(annualRateOn(date)) };
 }
 
-export function dailyGrowthFactor(rate: AccrualRate, cdiFactor: number): number {
+/** `indexFactor` é o fator diário do indexador: Selic para `selic-like`, CDI para os demais. */
+export function dailyGrowthFactor(rate: AccrualRate, indexFactor: number): number {
 	switch (rate.kind) {
 		case "prefixed":
 			return annualFactor(rate.annualRate);
 		case "selic-like":
-			return cdiFactor;
+			return indexFactor;
 		case "cdi-percentage":
-			return finite(1 + nonNegative(rate.multiplier) * (cdiFactor - 1));
+			return finite(1 + nonNegative(rate.multiplier) * (indexFactor - 1));
 		case "cdi-spread":
-			return finite(cdiFactor * annualFactor(rate.annualSpread));
+			return finite(indexFactor * annualFactor(rate.annualSpread));
 		default: {
 			const exhaustive: never = rate;
 			return exhaustive;
@@ -112,9 +116,13 @@ export function compound(
 	return balance;
 }
 
+export function indexSteps(scenario: RateScenario, rate: AccrualRate): readonly RateStep[] {
+	return rate.kind === "selic-like" ? (scenario.selicSteps ?? scenario.steps) : scenario.steps;
+}
+
 export function grow(input: GrowthInput): number {
 	calendarDaysBetween(input.from, input.to);
-	const path = createRatePath(input.scenario.steps);
+	const path = createRatePath(indexSteps(input.scenario, input.rate));
 	const dates = businessDates(input.calendar, input.from, input.to);
 	return compound(input.principal, dates, (index) => {
 		const date = dates[index];
