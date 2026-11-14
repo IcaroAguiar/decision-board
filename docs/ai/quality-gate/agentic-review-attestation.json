@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
-  "reviewer": "claude-sonnet-5-5 (revisão independente, calls 793a98cc05cf/e0ffdf3d2642/97b4f931e223; sinais: b7ed4365c751)",
-  "reviewedAt": "2026-11-13T22:09:15Z",
+  "reviewer": "claude-sonnet-5-5 (revisão independente, calls 793a98cc05cf/e0ffdf3d2642/97b4f931e223; correções IOF/Selic: gpt-6.1-sol 8f3e87b15d15; sinais: b7ed4365c751)",
+  "reviewedAt": "2026-11-14T06:13:00Z",
   "verdict": "approved_with_risk",
   "deterministicSignalsReviewed": true,
-  "reviewedFingerprint": "5d41c5ef380e3898809fa7d2a19f0ecb41ee3ae507be9ccd484714b1b286fcdc",
+  "reviewedFingerprint": "fc2db10eed4b87a81bcc5693af0babecd9ad7bc9a07b3ef2bde18e223a727cda",
   "reviewedDeterministicSignals": {
-    "blocking": 38,
+    "blocking": 40,
     "high": 0,
-    "medium": 63
+    "medium": 65
   },
   "scope": [
     "packages/core/src/fixed-income: R1 simulação e R2 duração"
