@@ -40,9 +40,10 @@ boundaries are in [docs/architecture.md](docs/architecture.md).
 ## Analytic Engine
 
 `@decision-board/core` is pure TypeScript: no React, NestJS, Prisma, HTTP
-providers, environment variables, or real clock. Callers pass the reference
-date, the business calendar, and every input as a `Datum` with nature, source,
-and date. Each analysis returns an `AnalysisResult` whose status is `complete`,
+providers, environment variables, or real clock. Callers pass explicit
+inputs: the reference date, the business calendar when a method counts business
+days, and a `Datum` with nature, source, and date for each piece of data with
+provenance. Each analysis returns an `AnalysisResult` whose status is `complete`,
 `partial`, or `inconclusive`, with method id and version, inputs, assumptions,
 sources, natures, findings, and what was not verified.
 
@@ -52,7 +53,7 @@ sources, natures, findings, and what was not verified.
 | `fixed-income/` | R1 net value per candidate and rate scenario (252 business days, regressive IOF and income tax, custody), break-even rates, and the fixed-rate turning point; R2 mark-to-market, duration, and repricing. See its [README](packages/core/src/fixed-income/README.md). |
 | `risk/` | R3 correlation, volatility, and risk contribution before and after a variable-income contribution, with rolling correlation and worst months. |
 | `allocation/`, `contribution-allocation` | R7 concentration and allocation versus target bands and limits; R8 goal projection versus realized; whole-lot contribution scenarios. |
-| `decisions/` | R11 AI safeguards (each proposal claim tied to the analysis method that supports it) and R12 preferences as a versioned strategy with a decision log. |
+| `decisions/` | R11 AI safeguards (a claim counts as verified only when it cites a usable analysis of the method that supports it; otherwise it is flagged as an unverified opinion) and R12 preferences as a versioned strategy with a decision log. |
 
 Each method ships the synthetic acceptance cases of its requirement sheet with
 documented tolerances. The previous vision's portfolio functions
