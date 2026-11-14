@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
   "reviewer": "gpt-6.1-sol (revisão independente, calls 64ad46d7ecda/888c89276f3e/072ef1850c94; sinais: claude-sonnet-5-5 b7ed4365c751)",
-  "reviewedAt": "2026-11-13T22:10:00Z",
+  "reviewedAt": "2026-11-14T06:14:02Z",
   "verdict": "approved_with_risk",
   "deterministicSignalsReviewed": true,
-  "reviewedFingerprint": "a585f9a649e29fe1f6aacd7c70d7fbf7c3739d97b05c5f6bb3750dbdaec8e6f4",
+  "reviewedFingerprint": "af172713fde4bc807fbc1ea3e99ba157ae0ebce67d261864358899b09030390e",
   "reviewedDeterministicSignals": {
-    "blocking": 62,
-    "high": 0,
-    "medium": 125
+    "blocking": 65,
+    "high": 1,
+    "medium": 127
   },
   "scope": [
     "packages/core/src/decisions: R11 salvaguardas e R12 estratégia versionada"
