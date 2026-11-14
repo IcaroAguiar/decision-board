@@ -239,5 +239,6 @@ export * from "./analysis.js";
 export * from "./calendar.js";
 export * from "./fixed-income/index.js";
 export * from "./provenance.js";
+export * from "./risk/index.js";
 export * from "./series.js";
 export * from "./units.js";
