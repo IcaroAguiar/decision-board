@@ -1,45 +1,32 @@
 name: Agentic Quality Gate
 
 on:
-  pull_request: {}
-  push:
-    branches: [main]
-  workflow_dispatch:
-    inputs:
-      refresh_baseline:
-        description: Refresh baseline after a passing main/default-branch run
-        required: false
-        default: false
-        type: boolean
+  # Sem labeled: rótulo não reemite este check. A camada a pedido (run-full-ci) está em full-ci.yml;
+  # o rótulo run-ci em PR de fork vale na próxima rodada (novo commit ou reabrir o PR).
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
   contents: read
   pull-requests: read
 
+# Um commit novo no mesmo PR torna a rodada anterior inútil: cancelá-la poupa minutos da cota.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  # O único job de todo PR: lint, tipos, testes dos pacotes (sem banco) e varredura de segredos.
+  # Orçamento de trabalho de 5 minutos: se estourar, a correção é tirar peso do job, nunca aumentar o orçamento.
   quality-gate:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    services:
-      postgres:
-        image: postgres:17-alpine
-        env:
-          POSTGRES_DB: decision_board
-          POSTGRES_USER: decision_board
-          POSTGRES_PASSWORD: decision_board
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U decision_board -d decision_board"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    env:
-      DATABASE_URL: postgresql://decision_board:decision_board@localhost:5432/decision_board?schema=public
-      BETTER_AUTH_SECRET: ci-only-auth-key-at-least-32-characters
-      BETTER_AUTH_URL: http://localhost:3001
-      WEB_ORIGIN: http://localhost:5173
+    if: >-
+      !github.event.pull_request.draft
+      && (github.event.pull_request.head.repo.full_name == github.repository
+        || contains(github.event.pull_request.labels.*.name, 'run-ci'))
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_CI || '["ubuntu-latest"]') }}
+    timeout-minutes: 10
     steps:
+      - run: echo "GATE_STARTED=$(date +%s)" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -62,20 +49,9 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
-      - name: Database migrations
-        run: pnpm db:deploy
-
-      - name: Tests
-        run: pnpm test
-
-      - name: Coverage
-        run: pnpm coverage
-
-      - name: API smoke
-        run: pnpm smoke:api
-
-      - name: Build
-        run: pnpm build
+      # Os testes de apps/api precisam de PostgreSQL: rodam em full-ci.yml (job full).
+      - name: Package tests
+        run: corepack pnpm -r --if-present --filter './packages/*' test
 
       - name: Gate script syntax check
         run: |
@@ -92,32 +68,8 @@ jobs:
       - name: Clean transient secret scan artifacts
         run: rm -f results.sarif
 
-      - name: Agentic review packet
-        env:
-          AGENTIC_REVIEW_BASE: ${{ github.event_name == 'push' && github.event.before || format('origin/{0}', github.base_ref || 'main') }}
-        run: node docs/ai/quality-gate/vendor/collect-review-context.mjs --base "$AGENTIC_REVIEW_BASE" --json > docs/ai/quality-gate/agentic-review-packet.json
-
-      - name: Ratchet quality gate
-        env:
-          AGENTIC_REVIEW_BASE: ${{ github.event_name == 'push' && github.event.before || format('origin/{0}', github.base_ref || 'main') }}
-        run: node docs/ai/quality-gate/check-ratchet.mjs
-
-      - name: Refresh baseline artifact
-        if: github.event_name == 'workflow_dispatch' && inputs.refresh_baseline == true && github.ref == 'refs/heads/main'
-        run: node docs/ai/quality-gate/refresh-baseline.mjs
-
-      - name: Upload quality artifacts
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: agentic-quality-gate
-          path: |
-            docs/ai/quality-gate/baseline.json
-            docs/ai/quality-gate/*report*.json
-            docs/ai/quality-gate/*report*.md
-            docs/ai/quality-gate/quality-trend-entry.json
-            docs/ai/quality-gate/quality-trend.jsonl
-            docs/ai/quality-gate/auto-improvement-queue.json
-            docs/ai/quality-gate/agentic-review-packet.json
-            coverage/coverage-summary.json
-            coverage/lcov.info
+      - name: Work budget
+        run: |
+          elapsed=$(( $(date +%s) - GATE_STARTED ))
+          echo "quality-gate trabalhou ${elapsed}s (orçamento: 300s)"
+          [[ $elapsed -le 300 ]]

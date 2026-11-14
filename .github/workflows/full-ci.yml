@@ -1,0 +1,119 @@
+name: Full CI
+
+on:
+  # A pedido: rótulo run-full-ci no PR (também em cada commit novo de um PR já rotulado), push à main
+  # ou Run workflow. Fica fora do quality-gate.yml para que rótulo nenhum reemita o check por PR.
+  pull_request:
+    types: [labeled, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      refresh_baseline:
+        description: Refresh baseline after a passing main/default-branch run
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+# Rótulo alheio cai num grupo à parte: não cancela a rodada pedida por run-full-ci nem um commit novo.
+# Cada push à main tem o seu grupo (SHA): nenhum commit fica sem rodada completa.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}-${{ github.event.action == 'labeled' && github.event.label.name != 'run-full-ci' && 'other' || 'full' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # Camada completa (PostgreSQL real, migrações, testes da API, cobertura, smoke, build, pacote de
+  # revisão agêntico e catraca): só a pedido (rótulo run-full-ci), no push à main ou pelo botão
+  # Run workflow.
+  full:
+    if: >-
+      github.event_name != 'pull_request'
+      || (!github.event.pull_request.draft
+        && github.event.pull_request.head.repo.full_name == github.repository
+        && contains(github.event.pull_request.labels.*.name, 'run-full-ci')
+        && (github.event.action != 'labeled' || github.event.label.name == 'run-full-ci'))
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_CI || '["ubuntu-latest"]') }}
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: decision_board
+          POSTGRES_USER: decision_board
+          POSTGRES_PASSWORD: decision_board
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U decision_board -d decision_board"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://decision_board:decision_board@localhost:5432/decision_board?schema=public
+      BETTER_AUTH_SECRET: ci-only-auth-key-at-least-32-characters
+      BETTER_AUTH_URL: http://localhost:3001
+      WEB_ORIGIN: http://localhost:5173
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.0.6 --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Database migrations
+        run: pnpm db:deploy
+
+      - name: Tests
+        run: pnpm test
+
+      - name: Coverage
+        run: pnpm coverage
+
+      - name: API smoke
+        run: pnpm smoke:api
+
+      - name: Build
+        run: pnpm build
+
+      - name: Agentic review packet
+        env:
+          AGENTIC_REVIEW_BASE: ${{ github.event_name == 'push' && github.event.before || format('origin/{0}', github.base_ref || 'main') }}
+        run: node docs/ai/quality-gate/vendor/collect-review-context.mjs --base "$AGENTIC_REVIEW_BASE" --json > docs/ai/quality-gate/agentic-review-packet.json
+
+      - name: Ratchet quality gate
+        env:
+          AGENTIC_REVIEW_BASE: ${{ github.event_name == 'push' && github.event.before || format('origin/{0}', github.base_ref || 'main') }}
+        run: node docs/ai/quality-gate/check-ratchet.mjs
+
+      - name: Refresh baseline artifact
+        if: github.event_name == 'workflow_dispatch' && inputs.refresh_baseline == true && github.ref == 'refs/heads/main'
+        run: node docs/ai/quality-gate/refresh-baseline.mjs
+
+      - name: Upload quality artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: agentic-quality-gate
+          path: |
+            docs/ai/quality-gate/baseline.json
+            docs/ai/quality-gate/*report*.json
+            docs/ai/quality-gate/*report*.md
+            docs/ai/quality-gate/quality-trend-entry.json
+            docs/ai/quality-gate/quality-trend.jsonl
+            docs/ai/quality-gate/auto-improvement-queue.json
+            docs/ai/quality-gate/agentic-review-packet.json
+            coverage/coverage-summary.json
+            coverage/lcov.info
