@@ -22,8 +22,11 @@ explicitamente taxa zero. Saídas numéricas são estimativas.
   entrada explícita; regras futuras permanecem não verificadas.
 - IOF regressivo sobre o ganho positivo para resgates com menos de 30 dias
   corridos, pela tabela do Decreto 6.306/2007 (96% no 1º dia a 3% no 29º,
-  zero a partir do 30º). Incide também sobre produtos isentos de IR, e o IR
-  incide sobre o ganho já deduzido do IOF. A tabela é parâmetro com vigência.
+  zero a partir do 30º). O IR incide sobre o ganho já deduzido do IOF. A tabela
+  é parâmetro com vigência. O IOF independe da isenção de IR: `iofExempt`
+  marca produtos com alíquota zero, como a LCA (art. 32, §2º, V); sem ele, o
+  IOF regressivo se aplica, inclusive à LCI. O empate contra LCI usa o IOF
+  regressivo.
 - Tesouro Selic (`selic-like`) capitaliza pelo `selicSteps` do cenário. Sem
   ele, usa o caminho do CDI como aproximação declarada: a linha recebe o aviso
   `SELIC_FROM_CDI_PATH` e o resultado fica parcial.

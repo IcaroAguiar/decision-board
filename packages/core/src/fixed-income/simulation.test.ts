@@ -274,3 +274,22 @@ test("Tesouro Selic without a Selic path is disclosed as a CDI proxy and stays p
 	const proxyNet = proxy.output?.[0]?.value.net ?? 0;
 	assert.ok((modeled.output?.[0]?.value.net ?? 0) > proxyNet);
 });
+test("an IOF-exempt candidate (LCA) keeps its whole short-term gain through the simulation", () => {
+	const shortInput = { ...simulationInput(), redemptionDate: "2026-03-16" };
+	const run = (iofExempt?: boolean) =>
+		simulateFixedIncome(
+			{
+				...shortInput,
+				candidates: [datum({ ...candidate, taxExempt: true, ...(iofExempt ? { iofExempt } : {}) })],
+			},
+			calendar,
+		).output?.[0]?.value;
+	const lci = run();
+	const lca = run(true);
+	assert.ok(lci && lca);
+	const gain = lca.gross - 1000;
+	assert.equal(lca.iof, 0);
+	assert.ok(approxEqual(lca.net, 1000 + gain));
+	// 14 dias corridos: IOF de 53% do ganho.
+	assert.ok(approxEqual(lci.iof, gain * 0.53));
+});

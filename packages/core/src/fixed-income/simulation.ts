@@ -15,6 +15,8 @@ export interface FixedIncomeCandidate {
 	maturity: string;
 	rate: AccrualRate;
 	taxExempt: boolean;
+	/** Ausente: IOF regressivo. Informe `true` para produtos com IOF zero, como a LCA. */
+	iofExempt?: boolean;
 	custody: Datum<CustodyFee>;
 }
 export interface FixedIncomeInput {
@@ -35,6 +37,7 @@ export interface FixedIncomeInput {
 		candidateId: string;
 		custody: Datum<CustodyFee>;
 		taxExempt: boolean;
+		iofExempt?: boolean;
 	}[];
 	solver?: SolverOptions;
 }
@@ -148,7 +151,12 @@ export function simulateFixedIncome(input: FixedIncomeInput, calendar: BusinessC
 						`${candidate.id}/${scenario.value.id}`,
 						"Tesouro Selic estimado pelo caminho do CDI do cenário; a diferença entre Selic e CDI não foi modelada.",
 					);
-				const prefixed = { ...investment, rate: candidate.rate, taxExempt: candidate.taxExempt };
+				const prefixed = {
+					...investment,
+					rate: candidate.rate,
+					taxExempt: candidate.taxExempt,
+					iofExempt: candidate.iofExempt,
+				};
 				const value = redemptionValue(prefixed);
 				const breakEvens: SimulationRow["breakEvens"] = [];
 				let point: number | null = null;
@@ -176,6 +184,7 @@ export function simulateFixedIncome(input: FixedIncomeInput, calendar: BusinessC
 								...investment,
 								custody: request.custody.value,
 								taxExempt: request.taxExempt,
+								iofExempt: request.iofExempt,
 							},
 							solver: input.solver,
 						});

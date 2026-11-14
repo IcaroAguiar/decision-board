@@ -121,9 +121,11 @@ export interface RedemptionValue {
 export interface RedemptionInput extends GrowthInput {
 	asOf: string;
 	taxTable: TaxTable;
-	/** Padrão: `defaultRegressiveIofTable`. Incide também sobre produtos isentos de IR. */
+	/** Padrão: `defaultRegressiveIofTable`. */
 	iofTable?: IofTable;
 	taxExempt: boolean;
+	/** IOF independe da isenção de IR: LCI paga IOF regressivo, LCA tem alíquota zero. */
+	iofExempt?: boolean;
 	custody: CustodyFee;
 }
 export function redemptionValue(input: RedemptionInput): RedemptionValue {
@@ -137,7 +139,9 @@ export function prepareRedemption(input: Omit<RedemptionInput, "rate">) {
 	nonNegative(input.custody.exemptBalance);
 	const held = calendarDaysBetween(input.from, input.to);
 	const taxRate = incomeTaxRate(input.taxTable, held, input.asOf);
-	const iofFraction = iofRate(input.iofTable ?? defaultRegressiveIofTable, held, input.asOf);
+	const iofFraction = input.iofExempt
+		? 0
+		: iofRate(input.iofTable ?? defaultRegressiveIofTable, held, input.asOf);
 	const dates = businessDates(input.calendar, input.from, input.to);
 	nonNegative(input.principal);
 	const lazyFactors = (steps: readonly { effectiveFrom: string; annualRate: number }[]) => {

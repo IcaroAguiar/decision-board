@@ -114,7 +114,7 @@ test("custody applies to daily opening excess only, below and at threshold exemp
 	const twoDays = redemptionValue({ ...base, principal: 1200, to: "2026-03-04", custody });
 	assert.ok(approxEqual(twoDays.custody, ((200 + 1200 * 1.1 ** (1 / 252) - 1000) * 0.02) / 252));
 });
-test("IOF applies before day 30, also to IR-exempt products, and IR uses the yield net of IOF", () => {
+test("IOF applies before day 30 independently of IR exemption, and IR uses the yield net of IOF", () => {
 	const at = (days: number) =>
 		new Date(Date.parse(base.from) + days * 86_400_000).toISOString().slice(0, 10);
 	for (const [days, iofFraction] of [
@@ -129,9 +129,16 @@ test("IOF applies before day 30, also to IR-exempt products, and IR uses the yie
 		assert.ok(approxEqual(taxed.iof, gain * iofFraction));
 		assert.ok(approxEqual(taxed.incomeTax, gain * (1 - iofFraction) * 0.225));
 		assert.ok(approxEqual(taxed.net, 1000 + gain * (1 - iofFraction) * (1 - 0.225)));
-		const exempt = redemptionValue({ ...base, to: at(days), taxExempt: true });
-		assert.equal(exempt.incomeTax, 0);
-		assert.ok(approxEqual(exempt.iof, gain * iofFraction));
+		// LCI: isenta de IR, sujeita ao IOF regressivo.
+		const lci = redemptionValue({ ...base, to: at(days), taxExempt: true });
+		assert.equal(lci.incomeTax, 0);
+		assert.ok(approxEqual(lci.iof, gain * iofFraction));
+		assert.ok(approxEqual(lci.net, 1000 + gain * (1 - iofFraction)));
+		// LCA: isenta de IR e com IOF zero.
+		const lca = redemptionValue({ ...base, to: at(days), taxExempt: true, iofExempt: true });
+		assert.equal(lca.iof, 0);
+		assert.equal(lca.incomeTax, 0);
+		assert.ok(approxEqual(lca.net, 1000 + gain));
 	}
 	assert.throws(
 		() => iofRate({ validFrom: "2008-01-01", ratesByCalendarDay: [1.2] }, 1, base.asOf),
