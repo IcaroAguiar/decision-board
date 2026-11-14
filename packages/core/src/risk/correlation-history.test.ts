@@ -272,3 +272,37 @@ test("returns inconclusive when 58-month portfolio is tested against empty or no
 	assert.ok(mixedEmptyCandidate.worstMonths.every((entry) => entry.candidateReturn === null));
 	assertNoPrescriptiveWording(mixedResult.notVerified, mixedResult.findings);
 });
+
+test("a missing holding return outside every window still makes R3 partial and is disclosed", () => {
+	const endMonth = "2026-10";
+	const rand = createLcg(4242);
+	const holding = Array.from({ length: 70 }, () => 0.004 + (rand() - 0.5) * 0.07);
+	const candidate = Array.from({ length: 70 }, () => 0.003 + (rand() - 0.5) * 0.06);
+	const gapMonth = addMonths(endMonth, -66);
+	const withGap = createMonthlySeries(
+		toSeries(endMonth, holding).map((point) =>
+			point.month === gapMonth
+				? { month: point.month, value: missing("retorno não publicado") }
+				: point,
+		),
+	);
+	const run = (returns: typeof withGap) =>
+		runCorrelationTest({
+			asOf: "2026-10-31",
+			endMonth,
+			strategyVersion: null,
+			holdings: [{ key: "CART11", value: known(100_000, "observed", officialSource), returns }],
+			candidates: [{ key: "NOVO11", returns: toSeries(endMonth, candidate) }],
+			contribution: known(10_000, "informed", officialSource),
+			assumptions: { windows: [30, 58], rollingWindow: 24, worstMonths: 5 },
+		});
+
+	const control = run(toSeries(endMonth, holding));
+	assert.equal(control.status, "complete");
+	const gapped = run(withGap);
+	assert.equal(gapped.status, "partial");
+	const finding = gapped.findings.find((f) => f.code === "MISSING_PORTFOLIO_RETURNS");
+	assert.ok(finding?.message.includes(gapMonth));
+	assert.ok(gapped.notVerified.some((note) => note.includes(gapMonth)));
+	assertNoPrescriptiveWording(gapped.notVerified, gapped.findings);
+});

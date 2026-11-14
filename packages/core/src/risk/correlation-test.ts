@@ -229,6 +229,23 @@ export function runCorrelationTest(
 	);
 
 	let anyPartial = false;
+	// Antes do início da série mais curta é só histórico menor; depois dele, mês ausente é lacuna.
+	const commonStart = activeHoldingSeries
+		.map((series) => series.find((point) => point.month <= input.endMonth)?.month)
+		.reduce<YearMonth | undefined>(
+			(latest, first) =>
+				first === undefined ? latest : latest === undefined || first > latest ? first : latest,
+			undefined,
+		);
+	const portfolioGaps = portfolioAligned.missingMonths.filter(
+		(month) => commonStart !== undefined && month >= commonStart,
+	);
+	if (portfolioGaps.length > 0) {
+		anyPartial = true;
+		const reason = `Retorno da carteira ausente em ${portfolioGaps.length} mês(es) (${portfolioGaps.join(", ")}); esses meses ficaram fora do ranking dos piores meses.`;
+		addUniqueNote(notVerified, reason);
+		findings.push({ code: "MISSING_PORTFOLIO_RETURNS", severity: "warning", message: reason });
+	}
 	if (portfolioAligned.overlap < assumptions.worstMonths) {
 		anyPartial = true;
 		const reason = `Histórico alinhado da carteira (${portfolioAligned.overlap} meses) menor que os ${assumptions.worstMonths} piores meses solicitados.`;
