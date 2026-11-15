@@ -1,12 +1,10 @@
 name: Full CI
 
 on:
-  # A pedido: rótulo run-full-ci no PR (também em cada commit novo de um PR já rotulado), push à main
+  # A pedido: rótulo run-full-ci no PR (também em cada commit novo de um PR já rotulado)
   # ou Run workflow. Fica fora do quality-gate.yml para que rótulo nenhum reemita o check por PR.
   pull_request:
     types: [labeled, synchronize, reopened, ready_for_review]
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       refresh_baseline:
@@ -19,14 +17,13 @@ permissions:
   contents: read
 
 # Rótulo alheio cai num grupo à parte: não cancela a rodada pedida por run-full-ci nem um commit novo.
-# Cada push à main tem o seu grupo (SHA): nenhum commit fica sem rodada completa.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}-${{ github.event.action == 'labeled' && github.event.label.name != 'run-full-ci' && 'other' || 'full' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # Camada completa (PostgreSQL real, migrações, testes da API, cobertura, smoke, build, pacote de
-  # revisão agêntico e catraca): só a pedido (rótulo run-full-ci), no push à main ou pelo botão
+  # revisão agêntico e catraca): só a pedido (rótulo run-full-ci), pelo botão
   # Run workflow.
   full:
     if: >-
@@ -35,7 +32,7 @@ jobs:
         && github.event.pull_request.head.repo.full_name == github.repository
         && contains(github.event.pull_request.labels.*.name, 'run-full-ci')
         && (github.event.action != 'labeled' || github.event.label.name == 'run-full-ci'))
-    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_CI || '["ubuntu-latest"]') }}
+    runs-on: ${{ fromJSON(github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && '["ubuntu-latest"]' || vars.ACTIONS_RUNNER_LABELS_CI || '["ubuntu-latest"]') }}
     timeout-minutes: 20
     services:
       postgres:
