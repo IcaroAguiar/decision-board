@@ -1,8 +1,7 @@
 name: Agentic Quality Gate
 
 on:
-  # Sem labeled: rótulo não reemite este check. A camada a pedido (run-full-ci) está em full-ci.yml;
-  # o rótulo run-ci em PR de fork vale na próxima rodada (novo commit ou reabrir o PR).
+  # Sem labeled: rótulo não reemite este check. A camada a pedido (run-full-ci) está em full-ci.yml.
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
 
@@ -19,11 +18,9 @@ jobs:
   # O único job de todo PR: lint, tipos, testes dos pacotes (sem banco) e varredura de segredos.
   # Orçamento de trabalho de 5 minutos: se estourar, a correção é tirar peso do job, nunca aumentar o orçamento.
   quality-gate:
-    if: >-
-      !github.event.pull_request.draft
-      && (github.event.pull_request.head.repo.full_name == github.repository
-        || contains(github.event.pull_request.labels.*.name, 'run-ci'))
-    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_CI || '["ubuntu-latest"]') }}
+    # Forks rodam também, em runner hospedado sem segredos: um check obrigatório pulado conta como aprovado.
+    if: '!github.event.pull_request.draft'
+    runs-on: ${{ fromJSON(github.event.pull_request.head.repo.full_name != github.repository && '["ubuntu-latest"]' || vars.ACTIONS_RUNNER_LABELS_CI || '["ubuntu-latest"]') }}
     timeout-minutes: 10
     steps:
       - run: echo "GATE_STARTED=$(date +%s)" >> "$GITHUB_ENV"
